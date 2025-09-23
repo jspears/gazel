@@ -66,6 +66,19 @@ When you select a target, you'll see:
 2. **Actual output files** that will be generated when the target is built
 3. File types are highlighted (e.g., `.so`, `.a`, `.jar`, `.exe`)
 
+#### Running Executable Targets
+For executable targets (binaries and tests), you'll see a **"Run Target"** button:
+1. Click the green "Run" button that appears for executable targets
+2. A modal dialog opens showing:
+   - The exact `bazel run` command being executed
+   - Real-time streaming output from the command
+   - Auto-scrolling log that follows the output
+3. The modal shows clear status indicators:
+   - ⏳ Running - while the command is executing
+   - ✅ Success - when the command completes successfully
+   - ❌ Failed - if the command encounters an error
+4. Click "Close" to dismiss the modal (this also stops the stream if still running)
+
 Example searches:
 - **Bazel queries**: `deps(//src:main)`, `kind(".*_test", //...)`, `attr(visibility, "//visibility:public", //...)`
 - **Text search**: "server" to find all server-related targets

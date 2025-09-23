@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink } from 'lucide-svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink, Play, X, Clock, ChevronDown } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { BazelTarget } from '$lib/types';
   import { createEventDispatcher } from 'svelte';
+  import { storage } from '$lib/storage';
 
   const dispatch = createEventDispatcher();
   
@@ -20,14 +21,86 @@
   let loadingOutputs = false;
   let usingFallbackSearch = false;
 
+  // Run modal state
+  let showRunModal = false;
+  let runOutput: string[] = [];
+  let runCommand = '';
+  let runStatus: 'idle' | 'running' | 'success' | 'error' = 'idle';
+  let runCleanup: (() => void) | null = null;
+  let outputContainer: HTMLDivElement;
+
+  // Show hidden targets state
+  let showHiddenTargets = false;
+
+  // Infinite scrolling state
+  let displayLimit = 100;
+  let loadingMore = false;
+  let loadMoreElement: HTMLDivElement;
+
+  // Search history state
+  let searchHistory: string[] = [];
+  let showSearchHistory = false;
+
   onMount(() => {
     loadTargets();
+
+    // Load search history
+    searchHistory = storage.getSearchHistory();
+
+    // Load saved preferences
+    const savedShowHidden = storage.getPreference('showHiddenTargets');
+    if (savedShowHidden !== undefined) {
+      showHiddenTargets = savedShowHidden;
+    }
+
+    // Close search history dropdown when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.search-container')) {
+        showSearchHistory = false;
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+
+    // Set up intersection observer for infinite scrolling
+    if (typeof IntersectionObserver !== 'undefined') {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting && !loadingMore && displayLimit < visibleTargets.length) {
+              loadMoreTargets();
+            }
+          });
+        },
+        { threshold: 0.1 }
+      );
+
+      // Observe the load more element when it's available
+      const checkElement = setInterval(() => {
+        if (loadMoreElement) {
+          observer.observe(loadMoreElement);
+          clearInterval(checkElement);
+        }
+      }, 100);
+
+      return () => {
+        observer.disconnect();
+        clearInterval(checkElement);
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
   });
 
   async function loadTargets() {
     try {
       loading = true;
       error = null;
+      displayLimit = 100; // Reset display limit when loading new targets
       const result = await api.listTargets();
       targets = result.targets;
       filteredTargets = targets;
@@ -39,12 +112,43 @@
     }
   }
 
-  async function searchTargets() {
+  function loadMoreTargets() {
+    if (loadingMore || displayLimit >= visibleTargets.length) return;
+
+    loadingMore = true;
+    // Simulate loading delay for better UX
+    setTimeout(() => {
+      displayLimit = Math.min(displayLimit + 100, visibleTargets.length);
+      loadingMore = false;
+    }, 300);
+  }
+
+  function selectSearchFromHistory(query: string) {
+    searchQuery = query;
+    showSearchHistory = false;
+    searchTargets(false); // Don't save to history when selecting from history
+  }
+
+  function clearSearchHistory() {
+    storage.clearSearchHistory();
+    searchHistory = [];
+    showSearchHistory = false;
+  }
+
+  async function searchTargets(saveToHistory = true) {
+    displayLimit = 100; // Reset display limit when searching
+
     if (!searchQuery.trim()) {
       filteredTargets = targets;
       usingFallbackSearch = false;
       error = null;
       return;
+    }
+
+    // Save to history if it's a user-initiated search
+    if (saveToHistory) {
+      storage.addSearchQuery(searchQuery);
+      searchHistory = storage.getSearchHistory();
     }
 
     try {
@@ -148,6 +252,7 @@
     selectedType = type;
     usingFallbackSearch = false;
     error = null;
+    displayLimit = 100; // Reset display limit when filtering
 
     // If there's a search query, re-run the search with the new type filter
     if (searchQuery.trim()) {
@@ -211,22 +316,162 @@
     return outputPatterns[ruleType] || 'Target outputs';
   }
 
+  function isExecutableTarget(target: BazelTarget): boolean {
+    if (!target.ruleType) return false;
+
+    const executableTypes = [
+      'cc_binary',
+      'cc_test',
+      'py_binary',
+      'py_test',
+      'java_binary',
+      'java_test',
+      'go_binary',
+      'go_test',
+      'rust_binary',
+      'sh_binary',
+      'sh_test'
+    ];
+
+    return executableTypes.includes(target.ruleType);
+  }
+
+  function isHiddenTarget(target: BazelTarget): boolean {
+    // Check if the target name starts with a dot
+    const name = target.name || target.full || '';
+    const lastPart = name.split(':').pop() || '';
+    return lastPart.startsWith('.');
+  }
+
+  async function runTarget(target: BazelTarget) {
+    if (!target.full && !target.name) return;
+
+    const targetName = target.full || target.name;
+    runCommand = `bazel run ${targetName}`;
+    runOutput = [];
+    runStatus = 'running';
+    showRunModal = true;
+
+    try {
+      runCleanup = await api.streamRun(
+        targetName,
+        [],
+        (data) => {
+          if (data.type === 'stdout' || data.type === 'stderr') {
+            runOutput = [...runOutput, data.data];
+            // Auto-scroll to bottom
+            if (outputContainer) {
+              setTimeout(() => {
+                outputContainer.scrollTop = outputContainer.scrollHeight;
+              }, 0);
+            }
+          } else if (data.type === 'exit') {
+            if (data.code === 0) {
+              runStatus = 'success';
+              runOutput = [...runOutput, '\n✅ Command completed successfully'];
+            } else if (data.code === null) {
+              // Process was killed or terminated abnormally
+              runStatus = 'error';
+              runOutput = [...runOutput, '\n⚠️ Command was terminated'];
+            } else {
+              runStatus = 'error';
+              runOutput = [...runOutput, `\n❌ Command failed with exit code ${data.code}`];
+            }
+          } else if (data.type === 'error') {
+            // Handle stream errors
+            runStatus = 'error';
+            runOutput = [...runOutput, `\n❌ Error: ${data.data}`];
+          }
+        }
+      );
+    } catch (error: any) {
+      runStatus = 'error';
+      runOutput = [...runOutput, `\n❌ Error: ${error.message}`];
+    }
+  }
+
+  function closeRunModal() {
+    if (runCleanup) {
+      // If still running, add a message that we're stopping
+      if (runStatus === 'running') {
+        runOutput = [...runOutput, '\n⚠️ Stopping command...'];
+      }
+      runCleanup();
+      runCleanup = null;
+    }
+    showRunModal = false;
+    runStatus = 'idle';
+    runOutput = [];
+    runCommand = '';
+  }
+
+  onDestroy(() => {
+    if (runCleanup) {
+      runCleanup();
+    }
+  });
+
   $: uniqueTypes = [...new Set(targets.map(t => t.ruleType).filter(Boolean))];
+
+  // Filter targets based on hidden state
+  $: visibleTargets = showHiddenTargets
+    ? filteredTargets
+    : filteredTargets.filter(t => !isHiddenTarget(t));
+
+  $: hiddenCount = filteredTargets.filter(t => isHiddenTarget(t)).length;
+
+  // Save preference when showHiddenTargets changes
+  $: if (typeof showHiddenTargets !== 'undefined') {
+    storage.setPreference('showHiddenTargets', showHiddenTargets);
+  }
 </script>
 
 <div class="space-y-6">
   <div class="flex gap-4">
     <div class="flex-1">
-      <div class="relative">
+      <div class="relative search-container">
         <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <input
           type="text"
           bind:value={searchQuery}
-          on:input={searchTargets}
+          on:input={() => searchTargets()}
+          on:focus={() => showSearchHistory = searchHistory.length > 0}
           placeholder="Search targets (Bazel query or text)..."
-          class="w-full pl-10 pr-4 py-2 border rounded-md bg-background"
+          class="w-full pl-10 pr-10 py-2 border rounded-md bg-background"
           title="Enter a Bazel query expression or plain text to search. Falls back to text search if query syntax is invalid."
         />
+        {#if searchHistory.length > 0}
+          <button
+            on:click={() => showSearchHistory = !showSearchHistory}
+            class="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-muted rounded"
+            title="Search history"
+          >
+            <ChevronDown class={`w-4 h-4 text-muted-foreground transition-transform ${showSearchHistory ? 'rotate-180' : ''}`} />
+          </button>
+        {/if}
+
+        {#if showSearchHistory && searchHistory.length > 0}
+          <div class="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-10 max-h-64 overflow-y-auto">
+            <div class="p-2 border-b flex items-center justify-between">
+              <span class="text-xs text-muted-foreground font-medium">Recent Searches</span>
+              <button
+                on:click={clearSearchHistory}
+                class="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Clear
+              </button>
+            </div>
+            {#each searchHistory as query}
+              <button
+                on:click={() => selectSearchFromHistory(query)}
+                class="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2 group"
+              >
+                <Clock class="w-3 h-3 text-muted-foreground" />
+                <span class="text-sm truncate">{query}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
       </div>
     </div>
     <select
@@ -245,6 +490,20 @@
     >
       Refresh
     </button>
+  </div>
+
+  <div class="flex items-center gap-4">
+    <label class="flex items-center gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        bind:checked={showHiddenTargets}
+        class="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+      />
+      <span class="text-sm">Show hidden targets</span>
+      {#if hiddenCount > 0 && !showHiddenTargets}
+        <span class="text-xs text-muted-foreground">({hiddenCount} hidden)</span>
+      {/if}
+    </label>
   </div>
 
   {#if usingFallbackSearch && searchQuery}
@@ -268,13 +527,18 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="bg-card rounded-lg border">
         <div class="p-4 border-b flex items-center justify-between">
-          <h3 class="font-semibold">Targets ({filteredTargets.length})</h3>
+          <h3 class="font-semibold">
+            Targets ({visibleTargets.length})
+            {#if hiddenCount > 0 && !showHiddenTargets}
+              <span class="text-xs text-muted-foreground ml-1">(+{hiddenCount} hidden)</span>
+            {/if}
+          </h3>
           {#if usingFallbackSearch}
             <span class="text-xs text-amber-600 dark:text-amber-400">Text Search</span>
           {/if}
         </div>
         <div class="max-h-[600px] overflow-y-auto">
-          {#each filteredTargets.slice(0, 100) as target}
+          {#each visibleTargets.slice(0, displayLimit) as target}
             <button
               on:click={() => selectTarget(target)}
               class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 flex items-center justify-between group"
@@ -292,9 +556,18 @@
               <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
             </button>
           {/each}
-          {#if filteredTargets.length > 100}
-            <div class="p-4 text-center text-sm text-muted-foreground">
-              Showing first 100 of {filteredTargets.length} targets
+          {#if visibleTargets.length > displayLimit}
+            <div bind:this={loadMoreElement} class="p-4 text-center text-sm">
+              {#if loadingMore}
+                <div class="flex items-center justify-center gap-2">
+                  <div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
+                  <span class="text-muted-foreground">Loading more targets...</span>
+                </div>
+              {:else}
+                <span class="text-muted-foreground">
+                  Showing {displayLimit} of {visibleTargets.length} targets
+                </span>
+              {/if}
             </div>
           {/if}
         </div>
@@ -369,7 +642,20 @@
                   </div>
                 </div>
               {/if}
-              
+
+              {#if isExecutableTarget(selectedTarget)}
+                <div>
+                  <button
+                    on:click={() => selectedTarget && runTarget(selectedTarget)}
+                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md flex items-center gap-2 transition-colors"
+                    disabled={runStatus === 'running'}
+                  >
+                    <Play class="w-4 h-4" />
+                    Run Target
+                  </button>
+                </div>
+              {/if}
+
               {#if selectedTarget.attributes && Object.keys(selectedTarget.attributes).length > 0}
                 <div>
                   <h4 class="text-sm font-medium text-muted-foreground mb-1">Attributes</h4>
@@ -409,3 +695,55 @@
     </div>
   {/if}
 </div>
+
+<!-- Run Modal -->
+{#if showRunModal}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-background border rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="p-4 border-b flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-semibold">Running Target</h2>
+          <p class="text-sm text-muted-foreground font-mono mt-1">{runCommand}</p>
+        </div>
+        <button
+          on:click={closeRunModal}
+          class="p-2 hover:bg-muted rounded-md transition-colors"
+          title="Close"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <!-- Modal Body - Output Log -->
+      <div bind:this={outputContainer} class="flex-1 overflow-y-auto p-4 bg-muted/20">
+        <pre class="font-mono text-sm whitespace-pre-wrap">{runOutput.join('')}</pre>
+        {#if runStatus === 'running'}
+          <div class="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+            <div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
+            <span>Running...</span>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          {#if runStatus === 'success'}
+            <span class="text-green-600 dark:text-green-400 text-sm font-medium">✅ Success</span>
+          {:else if runStatus === 'error'}
+            <span class="text-red-600 dark:text-red-400 text-sm font-medium">❌ Failed</span>
+          {:else if runStatus === 'running'}
+            <span class="text-blue-600 dark:text-blue-400 text-sm font-medium">⏳ Running</span>
+          {/if}
+        </div>
+        <button
+          on:click={closeRunModal}
+          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

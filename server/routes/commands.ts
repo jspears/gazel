@@ -126,18 +126,18 @@ router.post('/test', async (req: Request, res: Response, next: NextFunction) => 
 router.post('/build/stream', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { target, options = [] }: CommandBody = req.body;
-    
+
     if (!target) {
       return res.status(400).json({ error: 'Target is required' });
     }
-    
+
     // Set up SSE
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive'
     });
-    
+
     const child = bazelService.streamCommand(
       'build',
       [target, ...options],
@@ -152,7 +152,49 @@ router.post('/build/stream', async (req: Request, res: Response, next: NextFunct
         res.end();
       }
     );
-    
+
+    // Handle client disconnect
+    req.on('close', () => {
+      child.kill();
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Stream run output (for running executable targets)
+ */
+router.post('/run/stream', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { target, options = [] }: CommandBody = req.body;
+
+    if (!target) {
+      return res.status(400).json({ error: 'Target is required' });
+    }
+
+    // Set up SSE
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+
+    const child = bazelService.streamCommand(
+      'run',
+      [target, ...options],
+      (data: string) => {
+        res.write(`data: ${JSON.stringify({ type: 'stdout', data })}\n\n`);
+      },
+      (data: string) => {
+        res.write(`data: ${JSON.stringify({ type: 'stderr', data })}\n\n`);
+      },
+      (code: number | null) => {
+        res.write(`data: ${JSON.stringify({ type: 'exit', code })}\n\n`);
+        res.end();
+      }
+    );
+
     // Handle client disconnect
     req.on('close', () => {
       child.kill();

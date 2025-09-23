@@ -72,6 +72,14 @@ class ApiClient {
     return this.fetchJson(`/targets/dependencies?${params}`);
   }
 
+  async getTargetsByFile(file: string): Promise<{
+    file: string;
+    total: number;
+    targets: BazelTarget[];
+  }> {
+    return this.fetchJson(`/targets/by-file?file=${encodeURIComponent(file)}`);
+  }
+
   async getTargetOutputs(target: string): Promise<{
     target: string;
     outputs: Array<{path: string; filename: string; type: string}>;
@@ -202,13 +210,82 @@ class ApiClient {
   streamBuild(target: string, options: string[] = [], onMessage: (data: any) => void): EventSource {
     const params = new URLSearchParams({ target, options: options.join(',') });
     const eventSource = new EventSource(`${API_BASE}/commands/build/stream?${params}`);
-    
+
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
       onMessage(data);
     };
-    
+
     return eventSource;
+  }
+
+  async streamRun(target: string, options: string[] = [], onMessage: (data: any) => void): Promise<() => void> {
+    const response = await fetch(`${API_BASE}/commands/run/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ target, options }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to start stream: ${response.statusText}`);
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    const readStream = async () => {
+      if (!reader) return;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            // Stream ended normally or was closed
+            if (buffer.trim()) {
+              // Process any remaining data in buffer
+              if (buffer.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(buffer.slice(6));
+                  onMessage(data);
+                } catch (e) {
+                  console.error('Failed to parse final SSE data:', e);
+                }
+              }
+            }
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                onMessage(data);
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Stream reading error:', error);
+        // Send an error message to the callback
+        onMessage({ type: 'error', data: 'Stream connection lost' });
+      }
+    };
+
+    readStream();
+
+    // Return a cleanup function
+    return () => {
+      reader?.cancel();
+    };
   }
 
   async getCommandHistory(limit = 50): Promise<{

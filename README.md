@@ -107,6 +107,7 @@ To reconfigure, either:
 - **Browse** all targets in your workspace with a clean, searchable interface
 - **Smart search** - Use Bazel queries or simple text search
 - **Filter** by target type (binary, library, test, etc.)
+- **Run executables** - Click "Run" button for any executable target with real-time output streaming
 - **See outputs** - Understand what files each target produces
 - **Navigate** directly to target definitions in BUILD files
 

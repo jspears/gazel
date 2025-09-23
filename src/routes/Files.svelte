@@ -25,10 +25,12 @@
   let searchResults: Array<{file: string; line: number; content: string}> = [];
   let loading = false;
   let error: string | null = null;
-  let activeTab: 'files' | 'workspace' | 'search' = 'files';
+  let activeTab: 'files' | 'workspace' | 'search' | 'actions' = 'files';
   let selectedTarget: BazelTarget | null = null;
   let targetDetails: BazelTarget | null = null;
   let highlightedLine: number | null = null;
+  let fileActions: BazelTarget[] = [];
+  let loadingActions = false;
 
   onMount(() => {
     loadBuildFiles();
@@ -68,10 +70,32 @@
 
       // Apply syntax highlighting
       applyHighlighting();
+
+      // Load actions for this file
+      loadFileActions(path);
     } catch (err: any) {
       error = err.message;
     } finally {
       loading = false;
+    }
+  }
+
+  async function loadFileActions(filePath: string) {
+    if (!filePath) return;
+
+    try {
+      loadingActions = true;
+      // Get the filename from the path
+      const fileName = filePath.split('/').pop();
+      if (!fileName) return;
+
+      const result = await api.getTargetsByFile(fileName);
+      fileActions = result.targets;
+    } catch (err) {
+      console.error('Failed to load file actions:', err);
+      fileActions = [];
+    } finally {
+      loadingActions = false;
     }
   }
 
@@ -295,22 +319,43 @@
     {/if}
 
     <div class="{fileTargets.length > 0 && activeTab === 'files' ? 'lg:col-span-2' : 'lg:col-span-3'} bg-card rounded-lg border">
-      <div class="p-4 border-b flex items-center justify-between">
-        <h3 class="font-semibold">
-          {#if activeTab === 'workspace'}
-            WORKSPACE File
-          {:else if activeTab === 'search'}
-            Search Results ({searchResults.length})
-          {:else if selectedFile}
-            {selectedFile}
-          {:else}
-            File Content
+      <div class="p-4 border-b">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold">
+            {#if activeTab === 'workspace'}
+              WORKSPACE File
+            {:else if activeTab === 'search'}
+              Search Results ({searchResults.length})
+            {:else if activeTab === 'actions'}
+              File Actions ({fileActions.length})
+            {:else if selectedFile}
+              {selectedFile}
+            {:else}
+              File Content
+            {/if}
+          </h3>
+          {#if targetDetails}
+            <div class="text-sm">
+              <span class="font-mono">{targetDetails.name}</span>
+              <span class="text-muted-foreground ml-2">({targetDetails.ruleType || targetDetails.type})</span>
+            </div>
           {/if}
-        </h3>
-        {#if targetDetails}
-          <div class="text-sm">
-            <span class="font-mono">{targetDetails.name}</span>
-            <span class="text-muted-foreground ml-2">({targetDetails.ruleType || targetDetails.type})</span>
+        </div>
+
+        {#if selectedFile && (activeTab === 'files' || activeTab === 'actions')}
+          <div class="flex gap-2">
+            <button
+              on:click={() => activeTab = 'files'}
+              class="px-3 py-1 text-sm rounded-md transition-colors {activeTab === 'files' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
+            >
+              Content
+            </button>
+            <button
+              on:click={() => activeTab = 'actions'}
+              class="px-3 py-1 text-sm rounded-md transition-colors {activeTab === 'actions' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
+            >
+              Actions ({fileActions.length})
+            </button>
           </div>
         {/if}
       </div>
@@ -320,6 +365,35 @@
           <div class="text-muted-foreground">Loading...</div>
         {:else if error}
           <div class="text-destructive">Error: {error}</div>
+        {:else if activeTab === 'actions'}
+          {#if loadingActions}
+            <div class="text-muted-foreground">Loading actions...</div>
+          {:else if fileActions.length === 0}
+            <div class="text-muted-foreground">No targets use this file</div>
+          {:else}
+            <div class="space-y-2">
+              {#each fileActions as action}
+                <div class="p-3 border rounded-md hover:bg-muted/50 transition-colors">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="font-mono text-sm font-medium">{action.name || action.full}</div>
+                      {#if action.ruleType || action.type}
+                        <div class="text-xs text-muted-foreground mt-1">
+                          Type: {action.ruleType || action.type}
+                        </div>
+                      {/if}
+                      {#if action.package}
+                        <div class="text-xs text-muted-foreground">
+                          Package: {action.package}
+                        </div>
+                      {/if}
+                    </div>
+                    <Target class="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
         {:else if activeTab === 'search' && searchResults.length > 0}
           <div class="space-y-4">
             {#each searchResults as result}

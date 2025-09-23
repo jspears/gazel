@@ -36,6 +36,13 @@
   - Automatically falls back to text search if query syntax is invalid
   - Text search looks through target names, labels, packages, types, tags, and dependencies
   - Visual indicator shows when using text search mode
+- **Run executable targets**:
+  - Automatic detection of executable targets (binaries, tests)
+  - One-click execution with "Run" button
+  - Real-time output streaming in modal dialog
+  - Shows exact command being executed
+  - Clear success/failure indicators
+  - Scrolling log with auto-scroll to latest output
 - View target dependencies
 - **View target outputs/returns**: See what files each target produces
 - Shows expected output types based on rule type (e.g., executables, libraries, JARs)
@@ -95,6 +102,8 @@
 
 ### Commands
 - `POST /api/commands/build` - Execute bazel build
+- `POST /api/commands/build/stream` - Stream bazel build output (SSE)
+- `POST /api/commands/run/stream` - Stream bazel run output (SSE)
 - `POST /api/commands/test` - Execute bazel test
 - `POST /api/commands/clean` - Clean Bazel cache
 - `GET /api/commands/history` - Get command history

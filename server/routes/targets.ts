@@ -156,14 +156,39 @@ router.get('/rdeps', async (req: Request, res: Response, next: NextFunction) => 
 
     // Ensure target starts with //
     const fullTarget = target.startsWith('//') ? target : `//${target}`;
-    
+
     const result = await bazelService.getReverseDependencies(fullTarget);
     const dependencies = parserService.parseLabelOutput(result.stdout);
-    
+
     res.json({
       target: fullTarget,
       total: dependencies.length,
       dependents: dependencies
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Get targets that use a specific file
+ */
+router.get('/by-file', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { file } = req.query as { file?: string };
+    if (!file) {
+      return res.status(400).json({ error: 'File parameter is required' });
+    }
+
+    // Query for targets that have this file in their srcs
+    const query = `attr(srcs, "${file}", //...)`;
+    const result = await bazelService.query(query, 'label_kind');
+    const targets = parserService.parseLabelKindOutput(result.stdout);
+
+    res.json({
+      file,
+      total: targets.length,
+      targets
     });
   } catch (error) {
     next(error);
