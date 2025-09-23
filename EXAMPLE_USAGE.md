@@ -47,7 +47,11 @@ When you first open Gazel, you'll see the **Workspace** tab which displays:
 
 Click on the **Targets** tab to:
 - View all Bazel targets in the workspace
-- Search targets by name
+- **Smart search with automatic fallback**:
+  - Enter Bazel query expressions like `deps(//src:main)` or `kind("cc_library", //...)`
+  - Or simply type text to search through names, labels, packages, and dependencies
+  - If a Bazel query fails, the tool automatically switches to text search
+  - An amber indicator shows when using text search mode
 - Filter targets by type (binary, library, test, etc.)
 - View target details including:
   - Rule type with expected output description
@@ -63,8 +67,9 @@ When you select a target, you'll see:
 3. File types are highlighted (e.g., `.so`, `.a`, `.jar`, `.exe`)
 
 Example searches:
-- Search for "server" to find all server-related targets
-- Filter by "cc_library" to see only C++ libraries
+- **Bazel queries**: `deps(//src:main)`, `kind(".*_test", //...)`, `attr(visibility, "//visibility:public", //...)`
+- **Text search**: "server" to find all server-related targets
+- **Combined**: Search for "proto" then filter by "cc_library" type
 - Click on any target to see what it produces
 - Click "View in BUILD file" to navigate to the target's definition
 

@@ -105,8 +105,12 @@ The application will be available at http://localhost:3001
 ### Target Browser
 - Browse all Bazel targets in the workspace
 - Filter targets by type (binary, library, test, etc.)
+- **Smart search with automatic fallback**:
+  - Enter Bazel query expressions for powerful searches
+  - Automatically falls back to text search if query syntax is invalid
+  - Text search looks through target names, labels, packages, types, tags, and dependencies
+  - Visual indicator shows when using text search mode
 - View target dependencies
-- Search targets by name or pattern
 - **View target outputs/returns**: See what files each target produces
 - Shows expected output types based on rule type (e.g., executables, libraries, JARs)
 - Navigate directly to BUILD file definitions from target details

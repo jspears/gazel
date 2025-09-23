@@ -18,6 +18,7 @@
   let targetDependencies: BazelTarget[] = [];
   let targetOutputs: Array<{path: string; filename: string; type: string}> = [];
   let loadingOutputs = false;
+  let usingFallbackSearch = false;
 
   onMount(() => {
     loadTargets();
@@ -41,17 +42,78 @@
   async function searchTargets() {
     if (!searchQuery.trim()) {
       filteredTargets = targets;
+      usingFallbackSearch = false;
+      error = null;
       return;
     }
 
     try {
       loading = true;
+      error = null;
+      usingFallbackSearch = false;
       const result = await api.searchTargets(searchQuery, selectedType);
       filteredTargets = result.targets;
     } catch (err: any) {
-      error = err.message;
+      // If the Bazel query fails, fall back to string search
+      console.log('Bazel query failed, falling back to string search:', err.message);
+      performStringSearch();
+      usingFallbackSearch = true;
+      // Don't show error for fallback search, just indicate we're using text search
+      error = null;
     } finally {
       loading = false;
+    }
+  }
+
+  function performStringSearch() {
+    const query = searchQuery.toLowerCase().trim();
+
+    filteredTargets = targets.filter(target => {
+      // Search in target name
+      if (target.name.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in target label
+      if (target.label && target.label.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in package name
+      if (target.package && target.package.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in rule type
+      if (target.type && target.type.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in visibility
+      if (target.visibility && target.visibility.some(v => v.toLowerCase().includes(query))) {
+        return true;
+      }
+
+      // Search in tags
+      if (target.tags && target.tags.some(tag => tag.toLowerCase().includes(query))) {
+        return true;
+      }
+
+      // Search in attributes (srcs, deps, etc.)
+      if (target.srcs && target.srcs.some(src => src.toLowerCase().includes(query))) {
+        return true;
+      }
+
+      if (target.deps && target.deps.some(dep => dep.toLowerCase().includes(query))) {
+        return true;
+      }
+
+      return false;
+    });
+
+    // Apply type filter if selected
+    if (selectedType) {
+      filteredTargets = filteredTargets.filter(t => t.type === selectedType);
     }
   }
 
@@ -84,10 +146,19 @@
 
   function filterByType(type: string) {
     selectedType = type;
-    if (!type) {
-      filteredTargets = targets;
+    usingFallbackSearch = false;
+    error = null;
+
+    // If there's a search query, re-run the search with the new type filter
+    if (searchQuery.trim()) {
+      searchTargets();
     } else {
-      filteredTargets = targets.filter(t => t.ruleType === type);
+      // No search query, just filter by type
+      if (!type) {
+        filteredTargets = targets;
+      } else {
+        filteredTargets = targets.filter(t => t.ruleType === type);
+      }
     }
   }
 
@@ -152,8 +223,9 @@
           type="text"
           bind:value={searchQuery}
           on:input={searchTargets}
-          placeholder="Search targets..."
+          placeholder="Search targets (Bazel query or text)..."
           class="w-full pl-10 pr-4 py-2 border rounded-md bg-background"
+          title="Enter a Bazel query expression or plain text to search. Falls back to text search if query syntax is invalid."
         />
       </div>
     </div>
@@ -175,6 +247,15 @@
     </button>
   </div>
 
+  {#if usingFallbackSearch && searchQuery}
+    <div class="bg-amber-500/10 text-amber-700 dark:text-amber-400 p-3 rounded-md flex items-center gap-2">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <span>Using text search (Bazel query syntax not recognized). Showing targets matching "{searchQuery}"</span>
+    </div>
+  {/if}
+
   {#if loading}
     <div class="flex items-center justify-center py-12">
       <div class="text-muted-foreground">Loading targets...</div>
@@ -186,8 +267,11 @@
   {:else}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="bg-card rounded-lg border">
-        <div class="p-4 border-b">
+        <div class="p-4 border-b flex items-center justify-between">
           <h3 class="font-semibold">Targets ({filteredTargets.length})</h3>
+          {#if usingFallbackSearch}
+            <span class="text-xs text-amber-600 dark:text-amber-400">Text Search</span>
+          {/if}
         </div>
         <div class="max-h-[600px] overflow-y-auto">
           {#each filteredTargets.slice(0, 100) as target}
