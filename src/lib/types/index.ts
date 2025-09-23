@@ -11,7 +11,8 @@ export interface BazelTarget {
   name: string;
   class?: string;
   location?: string;
-  attributes?: Record<string, any>;
+  attributes?: Record<string, unknown>;
+  visibility?: boolean;
   inputs?: string[];
   outputs?: string[];
   package?: string;

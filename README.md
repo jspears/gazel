@@ -1,224 +1,190 @@
-# Gazel - Bazel Exploration Tool
+# Gazel
 
-A graphical interface for inspecting Bazel build files and discovering available targets and commands.
+**A modern web-based UI for exploring and understanding Bazel workspaces**
 
-## Architecture
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)
 
-### Frontend
-- **Framework**: Svelte (vanilla, not SvelteKit) with TypeScript
-- **UI Components**: Bits UI component library
-- **Styling**: Tailwind CSS
-- **Icons**: Lucide Svelte
-- **Build Tool**: Vite
+## What is Gazel?
 
-### Backend
-- **Runtime**: Node.js with Express (TypeScript)
-- **Responsibilities**:
-  - Execute Bazel commands (build, test, query)
-  - Parse Bazel query responses (XML format) into JSON
-  - Serve Svelte app assets
-  - Provide REST APIs for search/navigation of Bazel build files
-- **Parser**: xml2js for parsing Bazel XML output
-- **Process Management**: Child process execution for Bazel commands
+Gazel is a powerful visualization and exploration tool for Bazel build systems. It provides an intuitive web interface to:
 
-## Prerequisites
+- 🔍 **Browse and search** Bazel targets across your entire workspace
+- 📄 **View BUILD files** with syntax highlighting and interactive navigation
+- 🎯 **Understand target dependencies** and see what files targets produce
+- 🚀 **Execute Bazel commands** with real-time output streaming
+- 📊 **Run complex queries** using Bazel query language or simple text search
 
-- Node.js >= 18.0.0
-- npm >= 9.0.0
-- Bazel ()
+Whether you're new to Bazel or an experienced developer, Gazel makes it easy to understand and navigate complex build configurations.
 
-## Installation
+## Quick Start
 
-1. Clone the repository:
+### Prerequisites
+
+- **Node.js** >= 18.0.0
+- **npm** >= 9.0.0
+- **Bazel** (any recent version)
+
+### Installation
+
 ```bash
-$ git clone https://github.com/jspears/gazel
-$ cd gazel
-```
+# Clone the repository
+git clone https://github.com/jspears/gazel
+cd gazel
 
-2. Run the setup script (recommended):
-```bash
+# Run the interactive setup script
 ./setup.sh
+
+# Start the application
+npm run dev
 ```
 
-The setup script will:
-- Check for Node.js (>=18) and npm
-- Detect Bazel workspaces in current and parent directories
-- Prompt you to confirm or enter a custom workspace path
-- Validate the workspace contains a WORKSPACE file
-- Save the configuration to `.env`
-- Install all npm dependencies
+The setup script will automatically:
+- ✅ Check system requirements
+- 🔍 Find your Bazel workspace
+- 📝 Configure the application
+- 📦 Install dependencies
 
-Or manually setup:
+**That's it!** Open http://localhost:5173 in your browser.
+
+### Manual Installation
+
+If you prefer to configure manually:
+
 ```bash
+# Install dependencies
 npm install
+
+# Copy and edit the configuration
 cp .env.example .env
-# Edit .env to set your BAZEL_WORKSPACE path
+# Edit .env and set BAZEL_WORKSPACE=/path/to/your/workspace
+
+# Start the application
+npm run dev
 ```
 
-## Configuration
+## Running Gazel
 
-The setup script automatically configures your Bazel workspace and saves it to `.env`.
+### Development Mode
 
-To manually configure or change the workspace, edit the `.env` file:
-
-```env
-# Path to your Bazel workspace (directory containing WORKSPACE file)
-BAZEL_WORKSPACE=/path/to/your/bazel/workspace
-```
-
-You can re-run `./setup.sh` at any time to reconfigure the workspace path.
-
-
-## Development
-
-Run both frontend and backend in development mode:
 ```bash
 npm run dev
 ```
 
-This will start:
-- Backend server on http://localhost:3001
-- Frontend dev server on http://localhost:5173
+Opens:
+- 🌐 **Frontend**: http://localhost:5173
+- 🔧 **API**: http://localhost:3001
 
-## Production Build
+### Production Mode
 
-1. Build the frontend:
 ```bash
+# Build the application
 npm run build
-```
 
-2. Start the production server:
-```bash
+# Start the production server
 npm start
 ```
 
-The application will be available at http://localhost:3001
+Visit http://localhost:3001
 
-## Features
+### Configuration
 
-### Workspace Overview
-- Display Bazel workspace metadata
-- Show workspace configuration
-- List available Bazel commands
-- **Clickable BUILD files**: Click any BUILD file to navigate directly to the Files tab and view its contents
+Gazel stores its configuration in a `.env` file:
 
-### Target Browser
-- Browse all Bazel targets in the workspace
-- Filter targets by type (binary, library, test, etc.)
-- **Smart search with automatic fallback**:
-  - Enter Bazel query expressions for powerful searches
-  - Automatically falls back to text search if query syntax is invalid
-  - Text search looks through target names, labels, packages, types, tags, and dependencies
-  - Visual indicator shows when using text search mode
-- View target dependencies
-- **View target outputs/returns**: See what files each target produces
-- Shows expected output types based on rule type (e.g., executables, libraries, JARs)
-- Navigate directly to BUILD file definitions from target details
-
-### Build File Explorer
-- Navigate BUILD and WORKSPACE files
-- **High-contrast syntax highlighting** with line numbers using highlight.js (Atom One Dark theme)
-- **Starlark/Bazel syntax highlighting** for BUILD, WORKSPACE, and .bzl files with excellent readability
-- Dark background with bright, distinct colors for maximum contrast
-- Search within build files
-- Quick navigation to target definitions
-- **Interactive target exploration**: When viewing a BUILD file, see all targets in a sidebar
-- Click on any target to highlight it in the code and view its details
-- View target attributes, inputs, outputs, and dependencies directly from the file view
-
-### Query Interface
-- Execute custom Bazel queries
-- View query results in structured format
-- Save and reuse common queries
-- Export query results
-
-### Command Execution
-- Execute Bazel build and test commands
-- Stream build output in real-time
-- View command history
-- Clean Bazel cache
-- **Enhanced error reporting**: When commands fail, displays the exact Bazel command that was executed
-
-### Dependency Graph
-- Visualize target dependencies
-- Interactive graph navigation
-- Filter by depth and target type
-
-## API Endpoints
-
-### Workspace Information
-- `GET /api/workspace/info` - Get workspace metadata
-- `GET /api/workspace/files` - List BUILD files
-
-### Targets
-- `GET /api/targets` - List all targets
-- `GET /api/targets/:target` - Get target details
-- `GET /api/targets/:target/dependencies` - Get target dependencies
-
-### Query
-- `POST /api/query` - Execute Bazel query
-- `GET /api/query/saved` - Get saved queries
-- `POST /api/query/save` - Save a query
-
-### Build Files
-- `GET /api/files/build` - List BUILD files
-- `GET /api/files/build/:path` - Get BUILD file content
-- `GET /api/files/workspace` - Get WORKSPACE file content
-
-### Commands
-- `POST /api/build` - Execute bazel build
-- `POST /api/test` - Execute bazel test
-- `GET /api/commands/history` - Get command history
-
-## Project Structure
-
+```env
+BAZEL_WORKSPACE=/path/to/your/bazel/workspace
+PORT=3001  # Optional: change the server port
 ```
-gazel/
-├── server/                 # Backend Node.js/Express server
-│   ├── index.js           # Main server file
-│   ├── config.js          # Configuration
-│   ├── routes/            # API routes
-│   │   ├── workspace.js
-│   │   ├── targets.js
-│   │   ├── query.js
-│   │   ├── files.js
-│   │   └── commands.js
-│   └── services/          # Business logic
-│       ├── bazel.js      # Bazel command execution
-│       └── parser.js     # Output parsing
-├── src/                   # Frontend Svelte application
-│   ├── App.svelte        # Main app component
-│   ├── main.js           # Entry point
-│   ├── lib/              # Reusable components
-│   │   ├── components/   # UI components
-│   │   ├── stores/       # Svelte stores
-│   │   └── utils/        # Utility functions
-│   └── routes/           # View components
-│       ├── Workspace.svelte
-│       ├── Targets.svelte
-│       ├── Files.svelte
-│       └── Query.svelte
-├── public/               # Static assets
-├── dist/                 # Built frontend (generated)
-├── package.json
-├── vite.config.js       # Vite configuration
-├── tailwind.config.js   # Tailwind configuration
-├── postcss.config.js    # PostCSS configuration
-└── README.md
 
-```
+To reconfigure, either:
+- Run `./setup.sh` again, or
+- Edit `.env` directly
+
+## What Can You Do With Gazel?
+
+### 🎯 Explore Targets
+- **Browse** all targets in your workspace with a clean, searchable interface
+- **Smart search** - Use Bazel queries or simple text search
+- **Filter** by target type (binary, library, test, etc.)
+- **See outputs** - Understand what files each target produces
+- **Navigate** directly to target definitions in BUILD files
+
+### 📄 Browse BUILD Files
+- **Syntax highlighting** for Bazel/Starlark code
+- **Interactive navigation** - Click targets to see their details
+- **Search** within files to find specific rules
+- **Jump** between related files and targets
+
+### 🔍 Run Queries
+- **Execute** Bazel query expressions with a friendly UI
+- **Save** frequently used queries for quick access
+- **Export** results for further analysis
+- **Fallback** to text search when queries fail
+
+### 🚀 Execute Commands
+- **Build** targets with real-time output streaming
+- **Run tests** and see results immediately
+- **View history** of all executed commands
+- **Debug** with exact command reproduction
+
+### 📊 Visualize Dependencies
+- **Graph view** of target dependencies
+- **Interactive exploration** of the dependency tree
+- **Filter** by depth and target type
+
+## Screenshots
+
+*Coming soon - See [EXAMPLE_USAGE.md](EXAMPLE_USAGE.md) for detailed usage examples*
+
+## Documentation
+
+- 📖 **[Usage Examples](EXAMPLE_USAGE.md)** - Step-by-step guide with examples
+- 🔧 **[Technical Details](TECHNICAL_DETAILS.md)** - Architecture, API, and development notes
+- 🚀 **[Contributing](CONTRIBUTING.md)** - How to contribute to the project
 
 ## Troubleshooting
 
-### Bazel command not found
-Ensure Bazel is installed and available in your PATH.
+### Common Issues
 
-### Permission denied errors
-The server needs read access to the Bazel workspace directory.
+**Bazel not found**
+- Make sure Bazel is installed and in your PATH
+- Test with: `bazel version`
 
-### Port already in use
-Change the port set the `PORT` environment variable.
+**Port already in use**
+- Change the port in `.env`: `PORT=3002`
+- Or use a different port: `PORT=3002 npm run dev`
+
+**Workspace not detected**
+- Ensure your workspace has a `WORKSPACE` or `WORKSPACE.bazel` file
+- Run `./setup.sh` to reconfigure
+
+**Permission denied**
+- The server needs read access to your Bazel workspace
+- Check file permissions: `ls -la /path/to/workspace`
+
+### Getting Help
+
+- 📝 Check the [documentation](TECHNICAL_DETAILS.md)
+- 🐛 [Report issues](https://github.com/jspears/gazel/issues)
+- 💬 [Start a discussion](https://github.com/jspears/gazel/discussions)
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) for details
+
+## Acknowledgments
+
+Built with:
+- [Svelte](https://svelte.dev/) - Cybernetically enhanced web apps
+- [Bazel](https://bazel.build/) - Fast, reliable build system
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [highlight.js](https://highlightjs.org/) - Syntax highlighting
+
+---
+
+**Made with ❤️ for the Bazel community**
