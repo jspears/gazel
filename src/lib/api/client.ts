@@ -48,6 +48,36 @@ class ApiClient {
     return this.fetchJson('/workspace/config');
   }
 
+  async getCurrentWorkspace(): Promise<{
+    configured: boolean;
+    workspace: string | null;
+    valid?: boolean;
+    error?: string;
+  }> {
+    return this.fetchJson('/workspace/current');
+  }
+
+  async scanWorkspaces(): Promise<{
+    workspaces: Array<{
+      path: string;
+      name: string;
+      type: 'current' | 'parent' | 'home' | 'discovered';
+    }>
+  }> {
+    return this.fetchJson('/workspace/scan');
+  }
+
+  async switchWorkspace(workspace: string): Promise<{
+    success: boolean;
+    workspace: string;
+    message: string;
+  }> {
+    return this.fetchJson('/workspace/switch', {
+      method: 'POST',
+      body: JSON.stringify({ workspace }),
+    });
+  }
+
   // Targets endpoints
   async listTargets(pattern = '//...', format = 'label_kind'): Promise<{
     total: number;

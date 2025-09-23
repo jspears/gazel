@@ -60,12 +60,12 @@ if [ "$CONFIGURE_WORKSPACE" = true ]; then
     PARENT_DIR=$(dirname "$CURRENT_DIR")
     GRANDPARENT_DIR=$(dirname "$PARENT_DIR")
 
-    # Look for WORKSPACE or WORKSPACE.bazel file
-    if [ -f "$CURRENT_DIR/WORKSPACE" ] || [ -f "$CURRENT_DIR/WORKSPACE.bazel" ]; then
+    # Look for MODULE.bazel file
+    if [ -f "$CURRENT_DIR/MODULE.bazel" ]; then
         DEFAULT_WORKSPACE="$CURRENT_DIR"
-    elif [ -f "$PARENT_DIR/WORKSPACE" ] || [ -f "$PARENT_DIR/WORKSPACE.bazel" ]; then
+    elif [ -f "$PARENT_DIR/MODULE.bazel" ]; then
         DEFAULT_WORKSPACE="$PARENT_DIR"
-    elif [ -f "$GRANDPARENT_DIR/WORKSPACE" ] || [ -f "$GRANDPARENT_DIR/WORKSPACE.bazel" ]; then
+    elif [ -f "$GRANDPARENT_DIR/MODULE.bazel" ]; then
         DEFAULT_WORKSPACE="$GRANDPARENT_DIR"
     else
         DEFAULT_WORKSPACE=""
@@ -99,14 +99,14 @@ if [ "$CONFIGURE_WORKSPACE" = true ]; then
         }
     fi
 
-    # Verify the workspace exists and contains WORKSPACE file
+    # Verify the workspace exists and contains MODULE.bazel file
     if [ ! -d "$BAZEL_WORKSPACE" ]; then
         echo "❌ Directory does not exist: $BAZEL_WORKSPACE"
         exit 1
     fi
 
-    if [ ! -f "$BAZEL_WORKSPACE/WORKSPACE" ] && [ ! -f "$BAZEL_WORKSPACE/WORKSPACE.bazel" ]; then
-        echo "⚠️  Warning: No WORKSPACE or WORKSPACE.bazel file found in $BAZEL_WORKSPACE"
+    if [ ! -f "$BAZEL_WORKSPACE/MODULE.bazel" ]; then
+        echo "⚠️  Warning: No MODULE.bazel file found in $BAZEL_WORKSPACE"
         echo -n "Continue anyway? (y/N): "
         read -r CONTINUE_ANYWAY
 

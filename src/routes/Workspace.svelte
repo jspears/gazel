@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { Folder, FileCode, Settings, Package, ExternalLink, Target, Clock, ChevronDown, ChevronRight } from 'lucide-svelte';
+  import { Folder, FileCode, Settings, Package, ExternalLink, Target, Clock, ChevronDown, ChevronRight, RefreshCw } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { WorkspaceInfo, BuildFile } from '$lib/types';
   import { storage } from '$lib/storage';
@@ -40,11 +40,15 @@
   }
 
   function viewWorkspaceFile() {
-    // Find the WORKSPACE file and navigate to it
-    const workspaceFile = buildFiles.find(f => f.type === 'workspace');
-    if (workspaceFile) {
-      dispatch('navigate-to-file', { path: workspaceFile.path });
+    // Find the MODULE.bazel file and navigate to it
+    const moduleFile = buildFiles.find(f => f.type === 'module' || f.type === 'workspace');
+    if (moduleFile) {
+      dispatch('navigate-to-file', { path: moduleFile.path });
     }
+  }
+
+  function openWorkspacePicker() {
+    dispatch('open-workspace-picker');
   }
 </script>
 
@@ -71,19 +75,28 @@
           </div>
           <div>
             <dt class="text-muted-foreground">Path</dt>
-            <dd class="font-mono text-xs break-all">{workspaceInfo.workspace_path}</dd>
+            <dd class="font-mono text-xs break-all">
+              <button
+                on:click={openWorkspacePicker}
+                class="text-left hover:text-primary transition-colors cursor-pointer group flex items-center gap-1"
+                title="Click to switch workspace"
+              >
+                <span>{workspaceInfo.workspace_path}</span>
+                <RefreshCw class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            </dd>
           </div>
           <div>
             <dt class="text-muted-foreground">Bazel Version</dt>
             <dd class="font-mono">{workspaceInfo.bazel_version}</dd>
           </div>
         </dl>
-        {#if buildFiles.some(f => f.type === 'workspace')}
+        {#if buildFiles.some(f => f.type === 'workspace' || f.type === 'module')}
           <button
             on:click={viewWorkspaceFile}
             class="mt-4 w-full px-3 py-2 bg-muted text-muted-foreground rounded-md hover:bg-muted/80 hover:text-foreground text-sm transition-colors"
           >
-            View WORKSPACE File
+            View {buildFiles.some(f => f.type === 'module') ? 'MODULE.bazel' : 'WORKSPACE'} File
           </button>
         {/if}
       </div>
@@ -99,8 +112,8 @@
             <dd class="text-2xl font-bold">{buildFiles.filter(f => f.type === 'build').length}</dd>
           </div>
           <div>
-            <dt class="text-muted-foreground">WORKSPACE files</dt>
-            <dd class="text-2xl font-bold">{buildFiles.filter(f => f.type === 'workspace').length}</dd>
+            <dt class="text-muted-foreground">MODULE.bazel files</dt>
+            <dd class="text-2xl font-bold">{buildFiles.filter(f => f.type === 'module' || f.type === 'workspace').length}</dd>
           </div>
         </dl>
       </div>
@@ -153,7 +166,7 @@
             </div>
             <div class="flex items-center gap-2">
               <span class="text-xs text-muted-foreground">
-                {file.type === 'workspace' ? 'WORKSPACE' : 'BUILD'}
+                {file.type === 'module' ? 'MODULE' : file.type === 'workspace' ? 'WORKSPACE' : 'BUILD'}
               </span>
               <ExternalLink class="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>

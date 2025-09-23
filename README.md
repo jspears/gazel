@@ -18,6 +18,14 @@ Gazel is a powerful visualization and exploration tool for Bazel build systems. 
 
 Whether you're new to Bazel or an experienced developer, Gazel makes it easy to understand and navigate complex build configurations.
 
+## Screenshot
+
+![Gazel Interface](docs/image.png)
+
+## Demo Video
+
+Watch Gazel in action: [View Demo](docs/gazel-bazel.mov)
+
 ## Quick Start
 
 ### Prerequisites
@@ -33,36 +41,37 @@ Whether you're new to Bazel or an experienced developer, Gazel makes it easy to 
 git clone https://github.com/jspears/gazel
 cd gazel
 
-# Run the interactive setup script
-./setup.sh
-
-# Start the application
-npm run dev
-```
-
-The setup script will automatically:
-- ✅ Check system requirements
-- 🔍 Find your Bazel workspace
-- 📝 Configure the application
-- 📦 Install dependencies
-
-**That's it!** Open http://localhost:5173 in your browser.
-
-### Manual Installation
-
-If you prefer to configure manually:
-
-```bash
 # Install dependencies
 npm install
 
-# Copy and edit the configuration
-cp .env.example .env
-# Edit .env and set BAZEL_WORKSPACE=/path/to/your/workspace
-
 # Start the application
 npm run dev
 ```
+
+**That's it!** Open http://localhost:5173 in your browser.
+
+When you first open Gazel:
+- 🔍 It will automatically scan for Bazel workspaces
+- 📁 You can select from discovered workspaces or enter a custom path
+- 💾 Your selection is saved for future sessions
+- 🔄 You can switch workspaces anytime by clicking the path in the Workspace tab
+
+### Optional: Using the Setup Script
+
+For automatic workspace detection during initial setup:
+
+```bash
+# Run the interactive setup script (optional)
+./setup.sh
+```
+
+The setup script will:
+- ✅ Check system requirements
+- 🔍 Find your Bazel workspace
+- 📝 Create initial .env configuration
+- 📦 Install dependencies (if not already installed)
+
+Note: The setup script is optional. Gazel can now configure workspaces through its UI.
 
 ## Running Gazel
 
@@ -90,16 +99,24 @@ Visit http://localhost:3001
 
 ### Configuration
 
-Gazel stores its configuration in a `.env` file:
+Gazel stores workspace configuration in two places:
 
-```env
-BAZEL_WORKSPACE=/path/to/your/bazel/workspace
-PORT=3001  # Optional: change the server port
-```
+1. **Browser Local Storage** (Primary)
+   - Workspace selection is saved automatically
+   - Persists across browser sessions
+   - Switch workspaces via the UI
 
-To reconfigure, either:
-- Run `./setup.sh` again, or
-- Edit `.env` directly
+2. **`.env` file** (Optional)
+   - Created by setup script or when switching workspaces
+   - Can be edited manually if needed
+   ```env
+   BAZEL_WORKSPACE=/path/to/your/bazel/workspace
+   PORT=3001  # Optional: change the server port
+   ```
+
+To switch workspaces:
+- Click on the workspace path in the Workspace tab, or
+- Clear browser local storage to reset selection
 
 ## What Can You Do With Gazel?
 
@@ -157,7 +174,7 @@ To reconfigure, either:
 - Or use a different port: `PORT=3002 npm run dev`
 
 **Workspace not detected**
-- Ensure your workspace has a `WORKSPACE` or `WORKSPACE.bazel` file
+- Ensure your workspace has a `MODULE.bazel` file
 - Run `./setup.sh` to reconfigure
 
 **Permission denied**

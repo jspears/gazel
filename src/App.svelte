@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import {
     Home,
     Target,
@@ -13,10 +14,89 @@
   import Files from './routes/Files.svelte';
   import Query from './routes/Query.svelte';
   import Commands from './routes/Commands.svelte';
+  import WorkspacePicker from './components/WorkspacePicker.svelte';
+  import { api } from '$lib/api/client';
+  import { storage } from '$lib/storage';
 
   let activeTab = 'workspace';
   let fileToOpen: string | null = null;
   let targetToOpen: string | null = null;
+  let showWorkspacePicker = false;
+  let currentWorkspace: string | null = null;
+  let checkingWorkspace = true;
+
+  onMount(async () => {
+    await checkWorkspace();
+  });
+
+  async function checkWorkspace() {
+    try {
+      checkingWorkspace = true;
+
+      // First check if we have a stored workspace preference
+      const storedWorkspace = storage.getPreference('lastWorkspace');
+
+      // Check current server configuration
+      const result = await api.getCurrentWorkspace();
+
+      // If server has no workspace but we have one stored, try to switch to it
+      if (!result.configured && storedWorkspace) {
+        try {
+          const switchResult = await api.switchWorkspace(storedWorkspace);
+          if (switchResult.success) {
+            currentWorkspace = storedWorkspace;
+            showWorkspacePicker = false;
+
+            // Get workspace name from history if available
+            const workspaceHistory = storage.getWorkspaceHistory();
+            const historyEntry = workspaceHistory.find(w => w.path === storedWorkspace);
+            const workspaceName = historyEntry?.name;
+
+            // Set the current workspace for workspace-specific data
+            storage.setCurrentWorkspace(storedWorkspace, workspaceName);
+            // Reload to ensure all components use the new workspace
+            window.location.reload();
+            return;
+          }
+        } catch (err) {
+          console.error('Failed to switch to stored workspace:', err);
+          // Clear invalid stored workspace
+          storage.setPreference('lastWorkspace', undefined);
+        }
+      }
+
+      if (!result.configured || !result.workspace || !result.valid) {
+        // No workspace configured or invalid, show picker
+        showWorkspacePicker = true;
+      } else {
+        currentWorkspace = result.workspace;
+        showWorkspacePicker = false;
+        // Store the current workspace if not already stored
+        if (result.workspace !== storedWorkspace) {
+          storage.setPreference('lastWorkspace', result.workspace);
+        }
+
+        // Get workspace name from history if available
+        const workspaceHistory = storage.getWorkspaceHistory();
+        const historyEntry = workspaceHistory.find(w => w.path === result.workspace);
+        let workspaceName = historyEntry?.name;
+
+        // If not in history, extract from path
+        if (!workspaceName) {
+          const parts = result.workspace.split('/').filter(p => p);
+          workspaceName = parts[parts.length - 1];
+        }
+
+        // Set the current workspace for workspace-specific data
+        storage.setCurrentWorkspace(result.workspace, workspaceName);
+      }
+    } catch (err) {
+      console.error('Failed to check workspace:', err);
+      showWorkspacePicker = true;
+    } finally {
+      checkingWorkspace = false;
+    }
+  }
 
   function handleNavigateToFile(event: CustomEvent<{path: string}>) {
     fileToOpen = event.detail.path;
@@ -27,77 +107,116 @@
     targetToOpen = event.detail.target;
     activeTab = 'targets';
   }
+
+  function handleOpenWorkspacePicker() {
+    showWorkspacePicker = true;
+  }
+
+  async function handleWorkspaceSelected(workspace: string) {
+    currentWorkspace = workspace;
+    showWorkspacePicker = false;
+    // Set the current workspace for workspace-specific data
+    storage.setCurrentWorkspace(workspace);
+    // Reload the page to refresh all components with new workspace
+    window.location.reload();
+  }
 </script>
 
-<div class="min-h-screen bg-background">
-  <header class="border-b">
-    <div class="container mx-auto px-4 py-4">
-      <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold">Gazel - Bazel Explorer</h1>
-        <div class="flex items-center gap-4">
-          <button class="p-2 hover:bg-muted rounded-md">
-            <Settings class="w-5 h-5" />
-          </button>
+{#if checkingWorkspace}
+  <div class="min-h-screen bg-background flex items-center justify-center">
+    <div class="text-muted-foreground">Checking workspace configuration...</div>
+  </div>
+{:else if showWorkspacePicker}
+  <div class="min-h-screen bg-background">
+    <header class="border-b">
+      <div class="container mx-auto px-4 py-4">
+        <div class="flex items-center justify-between">
+          <h1 class="text-2xl font-bold">Gazel - Bazel Explorer</h1>
         </div>
       </div>
-    </div>
-  </header>
-
-  <main class="container mx-auto px-4 py-6">
-    <div class="w-full">
-      <div class="grid w-full grid-cols-5 mb-6 bg-muted p-1 rounded-md">
-        <button
-          on:click={() => activeTab = 'workspace'}
-          class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'workspace' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
-        >
-          <Home class="w-4 h-4" />
-          Workspace
-        </button>
-        <button
-          on:click={() => activeTab = 'targets'}
-          class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'targets' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
-        >
-          <Target class="w-4 h-4" />
-          Targets
-        </button>
-        <button
-          on:click={() => activeTab = 'files'}
-          class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'files' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
-        >
-          <FileText class="w-4 h-4" />
-          Files
-        </button>
-        <button
-          on:click={() => activeTab = 'query'}
-          class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'query' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
-        >
-          <Search class="w-4 h-4" />
-          Query
-        </button>
-        <button
-          on:click={() => activeTab = 'commands'}
-          class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'commands' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
-        >
-          <Terminal class="w-4 h-4" />
-          Commands
-        </button>
+    </header>
+    <main class="container mx-auto px-4 py-6">
+      <WorkspacePicker
+        onWorkspaceSelected={handleWorkspaceSelected}
+        {currentWorkspace}
+      />
+    </main>
+  </div>
+{:else}
+  <div class="min-h-screen bg-background">
+    <header class="border-b">
+      <div class="container mx-auto px-4 py-4">
+        <div class="flex items-center justify-between">
+          <h1 class="text-2xl font-bold">Gazel - Bazel Explorer</h1>
+          <div class="flex items-center gap-4">
+            <button class="p-2 hover:bg-muted rounded-md">
+              <Settings class="w-5 h-5" />
+            </button>
+          </div>
+        </div>
       </div>
+    </header>
 
-      <div class="mt-2">
-        {#if activeTab === 'workspace'}
-          <Workspace on:navigate-to-file={handleNavigateToFile} on:navigate-to-targets={handleNavigateToTargets} />
-        {:else if activeTab === 'targets'}
-          <Targets on:navigate-to-file={handleNavigateToFile} />
-        {:else if activeTab === 'files'}
-          <Files bind:fileToOpen />
-        {:else if activeTab === 'query'}
-          <Query />
-        {:else if activeTab === 'commands'}
-          <Commands />
-        {/if}
+    <main class="container mx-auto px-4 py-6">
+      <div class="w-full">
+        <div class="grid w-full grid-cols-5 mb-6 bg-muted p-1 rounded-md">
+          <button
+            on:click={() => activeTab = 'workspace'}
+            class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'workspace' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+          >
+            <Home class="w-4 h-4" />
+            Workspace
+          </button>
+          <button
+            on:click={() => activeTab = 'targets'}
+            class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'targets' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+          >
+            <Target class="w-4 h-4" />
+            Targets
+          </button>
+          <button
+            on:click={() => activeTab = 'files'}
+            class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'files' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+          >
+            <FileText class="w-4 h-4" />
+            Files
+          </button>
+          <button
+            on:click={() => activeTab = 'query'}
+            class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'query' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+          >
+            <Search class="w-4 h-4" />
+            Query
+          </button>
+          <button
+            on:click={() => activeTab = 'commands'}
+            class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'commands' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+          >
+            <Terminal class="w-4 h-4" />
+            Commands
+          </button>
+        </div>
+
+        <div class="mt-2">
+          {#if activeTab === 'workspace'}
+            <Workspace
+              on:navigate-to-file={handleNavigateToFile}
+              on:navigate-to-targets={handleNavigateToTargets}
+              on:open-workspace-picker={handleOpenWorkspacePicker}
+            />
+          {:else if activeTab === 'targets'}
+            <Targets on:navigate-to-file={handleNavigateToFile} />
+          {:else if activeTab === 'files'}
+            <Files bind:fileToOpen />
+          {:else if activeTab === 'query'}
+            <Query />
+          {:else if activeTab === 'commands'}
+            <Commands />
+          {/if}
+        </div>
       </div>
-    </div>
-  </main>
-</div>
+    </main>
+  </div>
+{/if}
 
 

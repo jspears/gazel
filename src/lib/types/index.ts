@@ -24,7 +24,7 @@ export interface BazelTarget {
 export interface BuildFile {
   path: string;
   name: string;
-  type: 'workspace' | 'build';
+  type: 'workspace' | 'build' | 'module';
   targets?: number;
   lastModified?: number;
 }

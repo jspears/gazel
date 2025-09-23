@@ -59,7 +59,6 @@ class BazelService {
       return arg;
     }).join(' ')}`;
 
-    console.log(`Executing: ${cmdStr}`);
 
     try {
       const result = await execAsync(cmdStr, {
@@ -286,6 +285,14 @@ class BazelService {
    */
   clearCache(): void {
     this.queryCache.clear();
+  }
+
+  /**
+   * Update the workspace path dynamically
+   */
+  setWorkspace(newWorkspace: string): void {
+    this.workspace = newWorkspace;
+    this.clearCache();
   }
 }
 

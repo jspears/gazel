@@ -203,8 +203,9 @@ router.post('/search', async (req: Request, res: Response, next: NextFunction) =
               entry.name !== 'node_modules') {
             await searchInFiles(fullPath, relPath);
           }
-        } else if (entry.name === 'BUILD' || 
+        } else if (entry.name === 'BUILD' ||
                    entry.name === 'BUILD.bazel' ||
+                   entry.name === 'MODULE.bazel' ||
                    entry.name === 'WORKSPACE' ||
                    entry.name === 'WORKSPACE.bazel') {
           const content = await fs.readFile(fullPath, 'utf-8');

@@ -4,16 +4,17 @@
   "description": "Bazel exploration tool with Svelte frontend and Node.js backend",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "$npm_execpath run dev:server & $npm_execpath run dev:client",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
-    "build": "npm run build:server && npm run build:client",
+    "build": "$npm_execpat run build:server && $npm_execpat run build:client",
     "build:server": "tsc -p tsconfig.server.json",
     "build:client": "vite build",
     "preview": "vite preview",
     "start": "node dist/server/index.js",
-    "build:all": "npm run build && npm run start",
-    "typecheck": "tsc --noEmit && svelte-check"
+    "build:all": "$npm_execpath run build && npm run start",
+    "typecheck": "tsc --noEmit && svelte-check",
+    "env":"env"
   },
   "dependencies": {
     "@types/highlight.js": "^10.1.0",

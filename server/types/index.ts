@@ -33,17 +33,17 @@ export interface BazelQueryResult {
 }
 
 export interface WorkspaceInfo {
-  [key: string]: string;
   workspace_path: string;
   workspace_name: string;
   workspace_file_exists: boolean;
   bazel_version: string;
+  [key: string]: string | boolean | undefined;
 }
 
 export interface BuildFile {
   path: string;
   name: string;
-  type: 'workspace' | 'build';
+  type: 'workspace' | 'build' | 'module';
 }
 
 export interface CommandResult {
