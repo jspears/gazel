@@ -1,14 +1,25 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, afterUpdate } from 'svelte';
   import { FileCode, Search, File, FolderOpen, Target, ChevronRight } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { BuildFile, BazelTarget } from '$lib/types';
+  import hljs from 'highlight.js/lib/core';
+  import python from 'highlight.js/lib/languages/python';
+  import bash from 'highlight.js/lib/languages/bash';
+  import 'highlight.js/styles/atom-one-dark.css';
+
+  // Register languages for syntax highlighting
+  hljs.registerLanguage('python', python);
+  hljs.registerLanguage('bash', bash);
+  hljs.registerLanguage('starlark', python); // Use Python highlighting for Starlark
+  hljs.registerLanguage('bazel', python); // Use Python highlighting for Bazel
 
   export let fileToOpen: string | null = null;
 
   let buildFiles: BuildFile[] = [];
   let selectedFile: string | null = null;
   let fileContent = '';
+  let highlightedContent = '';
   let fileTargets: Array<{ruleType: string; name: string; line: number}> = [];
   let searchQuery = '';
   let searchResults: Array<{file: string; line: number; content: string}> = [];
@@ -27,6 +38,11 @@
   $: if (fileToOpen) {
     selectFile(fileToOpen);
     fileToOpen = null; // Reset after handling
+  }
+
+  // Re-apply highlighting when content changes
+  $: if (fileContent && (activeTab === 'files' || activeTab === 'workspace')) {
+    applyHighlighting();
   }
 
   async function loadBuildFiles() {
@@ -49,11 +65,65 @@
       fileContent = result.content;
       fileTargets = result.targets;
       activeTab = 'files';
+
+      // Apply syntax highlighting
+      applyHighlighting();
     } catch (err: any) {
       error = err.message;
     } finally {
       loading = false;
     }
+  }
+
+  function applyHighlighting() {
+    if (!fileContent) {
+      highlightedContent = '';
+      return;
+    }
+
+    // Determine the language based on file type
+    const language = getLanguageForFile(selectedFile || '');
+
+    try {
+      // Apply highlighting
+      const result = hljs.highlight(fileContent, { language });
+      highlightedContent = result.value;
+    } catch (err) {
+      // Fallback to plain text if highlighting fails
+      console.warn('Highlighting failed:', err);
+      highlightedContent = escapeHtml(fileContent);
+    }
+  }
+
+  function getLanguageForFile(filename: string): string {
+    if (filename.includes('BUILD') || filename.includes('WORKSPACE')) {
+      return 'python'; // Use Python syntax for Bazel/Starlark files
+    }
+    if (filename.endsWith('.bzl')) {
+      return 'python'; // .bzl files are also Starlark
+    }
+    if (filename.endsWith('.bazelrc')) {
+      return 'bash'; // .bazelrc files are similar to shell scripts
+    }
+    return 'plaintext';
+  }
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function getHighlightedLine(index: number): string {
+    if (!highlightedContent) {
+      // If no highlighting available, return escaped plain text
+      const lines = fileContent.split('\n');
+      return escapeHtml(lines[index] || '');
+    }
+
+    // Split the highlighted content by lines
+    const highlightedLines = highlightedContent.split('\n');
+    return highlightedLines[index] || '';
   }
 
   async function loadWorkspaceFile() {
@@ -64,6 +134,9 @@
       selectedFile = result.path;
       fileTargets = [];
       activeTab = 'workspace';
+
+      // Apply syntax highlighting
+      applyHighlighting();
     } catch (err: any) {
       error = err.message;
     } finally {
@@ -262,17 +335,17 @@
           </div>
         {:else if fileContent}
           <div class="relative">
-            <pre class="font-mono text-sm">
+            <div class="font-mono text-sm hljs-container">
               {#each fileContent.split('\n') as line, index}
                 <div
                   id="line-{index + 1}"
-                  class="hover:bg-muted/50 {highlightedLine === index + 1 ? 'bg-accent/20 border-l-2 border-accent pl-2' : ''}"
+                  class="code-line hover:bg-muted/50 {highlightedLine === index + 1 ? 'bg-accent/20 border-l-2 border-accent pl-2' : ''}"
                 >
-                  <span class="inline-block w-12 text-right text-muted-foreground mr-4 select-none">{index + 1}</span>
-                  <span>{line}</span>
+                  <span class="line-number inline-block w-12 text-right text-muted-foreground mr-4 select-none">{index + 1}</span>
+                  <span class="line-content">{@html getHighlightedLine(index)}</span>
                 </div>
               {/each}
-            </pre>
+            </div>
           </div>
         {:else}
           <p class="text-muted-foreground">Select a file to view its content</p>

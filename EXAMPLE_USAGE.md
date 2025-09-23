@@ -72,19 +72,30 @@ Example searches:
 
 The **Files** tab allows you to:
 - Browse all BUILD and WORKSPACE files
-- View file contents with syntax highlighting and line numbers
+- View file contents with **syntax highlighting** and line numbers
+- **Starlark/Bazel syntax highlighting** with color-coded keywords, strings, functions, and comments
 - Search within files for specific patterns
 - View the WORKSPACE file and external dependencies
 - **Interactively explore targets within BUILD files**
 
 Example usage:
-- Click on any BUILD file to view its contents
+- Click on any BUILD file to view its contents with full syntax highlighting
 - When viewing a BUILD file, a **Targets panel** appears showing all targets in that file
 - Click on any target in the panel to:
   - Highlight the target definition in the code
   - View detailed target information including attributes, inputs, and outputs
 - Use the search box to find files containing specific rules
 - Click "View WORKSPACE" to see external dependencies
+
+**Syntax Highlighting Features** (High-contrast Atom One Dark theme):
+- Keywords (def, if, for, etc.) are highlighted in bright purple with bold text
+- Strings appear in bright green for excellent visibility
+- Function names in bright blue with bold text
+- Comments in light gray italic for better readability
+- Numbers in orange for clear distinction
+- Built-in functions in cyan with bold text
+- Parameters and names in red/pink for easy identification
+- Dark background (#1e2127) provides maximum contrast
 
 #### Interactive Target Navigation
 1. Select a BUILD file from the left panel

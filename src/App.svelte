@@ -7,7 +7,7 @@
     Terminal,
     Settings
   } from 'lucide-svelte';
-
+  import './default.min.css';
   import Workspace from './routes/Workspace.svelte';
   import Targets from './routes/Targets.svelte';
   import Files from './routes/Files.svelte';

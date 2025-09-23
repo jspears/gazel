@@ -35,23 +35,38 @@ $ git clone https://github.com/jspears/gazel
 $ cd gazel
 ```
 
-2. Run the setup script:
+2. Run the setup script (recommended):
 ```bash
 ./setup.sh
 ```
 
-Or manually install dependencies:
+The setup script will:
+- Check for Node.js (>=18) and npm
+- Detect Bazel workspaces in current and parent directories
+- Prompt you to confirm or enter a custom workspace path
+- Validate the workspace contains a WORKSPACE file
+- Save the configuration to `.env`
+- Install all npm dependencies
+
+Or manually setup:
 ```bash
 npm install
+cp .env.example .env
+# Edit .env to set your BAZEL_WORKSPACE path
 ```
 
 ## Configuration
 
-Set you workspace by adding to ***.env***
+The setup script automatically configures your Bazel workspace and saves it to `.env`.
+
+To manually configure or change the workspace, edit the `.env` file:
 
 ```env
-BAZEL_WORKSPACE=../../your_workspace
+# Path to your Bazel workspace (directory containing WORKSPACE file)
+BAZEL_WORKSPACE=/path/to/your/bazel/workspace
 ```
+
+You can re-run `./setup.sh` at any time to reconfigure the workspace path.
 
 
 ## Development
@@ -98,7 +113,9 @@ The application will be available at http://localhost:3001
 
 ### Build File Explorer
 - Navigate BUILD and WORKSPACE files
-- Syntax-highlighted file viewer with line numbers
+- **High-contrast syntax highlighting** with line numbers using highlight.js (Atom One Dark theme)
+- **Starlark/Bazel syntax highlighting** for BUILD, WORKSPACE, and .bzl files with excellent readability
+- Dark background with bright, distinct colors for maximum contrast
 - Search within build files
 - Quick navigation to target definitions
 - **Interactive target exploration**: When viewing a BUILD file, see all targets in a sidebar
@@ -196,7 +213,7 @@ Ensure Bazel is installed and available in your PATH.
 The server needs read access to the Bazel workspace directory.
 
 ### Port already in use
-Change the port in `server/config.js` or set the `PORT` environment variable.
+Change the port set the `PORT` environment variable.
 
 ## License
 
