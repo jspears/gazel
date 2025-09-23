@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Play, Save, BookOpen, Trash2 } from 'lucide-svelte';
+  import { Play, Save, BookOpen, Trash2, Clock } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { QueryTemplate, SavedQuery, BazelTarget } from '$lib/types';
+  import { storage } from '$lib/storage';
   
   let query = '';
   let outputFormat = 'label_kind';
@@ -15,10 +16,12 @@
   let saveDialogOpen = false;
   let queryName = '';
   let queryDescription = '';
+  let recentQueries = storage.getRecentQueries();
 
   onMount(() => {
     loadTemplates();
     loadSavedQueries();
+    recentQueries = storage.getRecentQueries();
   });
 
   async function loadTemplates() {
@@ -46,6 +49,10 @@
       const result = await api.executeQuery(query, outputFormat);
       queryResult = result.result;
       rawOutput = result.raw;
+
+      // Save to recent queries
+      storage.addRecentQuery(query, outputFormat);
+      recentQueries = storage.getRecentQueries();
     } catch (err: any) {
       error = err.message;
       // Check if the error contains command info
@@ -193,11 +200,57 @@
           {/each}
         </div>
       </div>
+
+      <div class="bg-card rounded-lg border">
+        <div class="p-4 border-b flex items-center justify-between">
+          <h3 class="font-semibold flex items-center gap-2">
+            <Clock class="w-4 h-4" />
+            Recent Queries
+          </h3>
+          {#if recentQueries.length > 0}
+            <button
+              on:click={() => {
+                storage.clearRecentQueries();
+                recentQueries = [];
+              }}
+              class="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </button>
+          {/if}
+        </div>
+        <div class="max-h-[300px] overflow-y-auto">
+          {#if recentQueries.length === 0}
+            <div class="p-4 text-sm text-muted-foreground">No recent queries</div>
+          {/if}
+          {#each recentQueries as recent}
+            <button
+              on:click={() => {
+                query = recent.query;
+                outputFormat = recent.format;
+              }}
+              class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0"
+            >
+              <div class="font-mono text-sm truncate">{recent.query}</div>
+              <div class="text-xs text-muted-foreground mt-1">
+                Format: {recent.format} • {new Date(recent.timestamp).toLocaleString()}
+              </div>
+            </button>
+          {/each}
+        </div>
+      </div>
     </div>
 
     <div class="lg:col-span-2 bg-card rounded-lg border">
       <div class="p-4 border-b">
-        <h3 class="font-semibold">Query Results</h3>
+        <h3 class="font-semibold">
+          Query Results
+          {#if queryResult && queryResult.targets && queryResult.targets.length > 0}
+            <span class="text-sm font-normal text-muted-foreground ml-2">
+              (Found {queryResult.targets.length} targets)
+            </span>
+          {/if}
+        </h3>
       </div>
       <div class="p-4 max-h-[600px] overflow-auto">
         {#if loading}

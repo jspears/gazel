@@ -105,7 +105,7 @@ class BazelService {
     // Cache the result
     if (this.queryCache.size >= config.cache.maxSize) {
       const firstKey = this.queryCache.keys().next().value;
-      this.queryCache.delete(firstKey);
+      this.queryCache.delete(firstKey!);
     }
     
     this.queryCache.set(cacheKey, {
@@ -117,13 +117,46 @@ class BazelService {
   }
 
   /**
+   * Get Bazel version
+   */
+  async getBazelVersion(): Promise<string> {
+    try {
+      const result = await this.execute('version', []);
+
+      // Parse version from output
+      // Look for "Build label: X.X.X" which contains the actual Bazel version
+      // or "bazel X.X.X" in simpler outputs
+      const buildLabelMatch = result.stdout.match(/Build label:\s*([\d.]+(?:-\w+)?)/i);
+      if (buildLabelMatch) {
+        return buildLabelMatch[1];
+      }
+
+      // Fallback to looking for "bazel X.X.X" pattern
+      const bazelMatch = result.stdout.match(/^bazel\s+([\d.]+(?:-\w+)?)/im);
+      if (bazelMatch) {
+        return bazelMatch[1];
+      }
+
+      // If neither pattern matches, try to find any version number on first line
+      const lines = result.stdout.trim().split('\n');
+      const firstLine = lines[0] || '';
+      const versionMatch = firstLine.match(/([\d.]+(?:-\w+)?)/);
+
+      return versionMatch ? versionMatch[1] : 'unknown';
+    } catch (error) {
+      console.error('Failed to get Bazel version:', error);
+      return 'unknown';
+    }
+  }
+
+  /**
    * Get workspace info
    */
   async getWorkspaceInfo(): Promise<Partial<WorkspaceInfo>> {
     try {
       const result = await this.execute('info', ['workspace']);
       const info: Record<string, string> = {};
-      
+
       // Parse the output
       const lines = result.stdout.split('\n');
       for (const line of lines) {
@@ -132,7 +165,7 @@ class BazelService {
           info[key.toLowerCase().replace(/\s+/g, '_')] = value;
         }
       }
-      
+
       return info;
     } catch (error) {
       console.error('Failed to get workspace info:', error);

@@ -11,37 +11,44 @@ const router = Router();
  */
 router.get('/build', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const buildFiles: Array<{path: string; targets: number}> = [];
-    
+    const buildFiles: Array<{path: string; targets: number; lastModified: number}> = [];
+
     async function findBuildFiles(dir: string, relativePath: string = ''): Promise<void> {
       const entries = await fs.readdir(dir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         const relPath = path.join(relativePath, entry.name);
-        
+
         if (entry.isDirectory()) {
           // Skip bazel output directories and hidden directories
-          if (!entry.name.startsWith('.') && 
+          if (!entry.name.startsWith('.') &&
               !entry.name.startsWith('bazel-') &&
               entry.name !== 'node_modules') {
             await findBuildFiles(fullPath, relPath);
           }
         } else if (entry.name === 'BUILD' || entry.name === 'BUILD.bazel') {
+          // Get file stats for modification time
+          const stats = await fs.stat(fullPath);
+
           // Read file and count targets
           const content = await fs.readFile(fullPath, 'utf-8');
           const targets = parserService.parseBuildFile(content);
-          
+
           buildFiles.push({
             path: relPath,
-            targets: targets.length
+            targets: targets.length,
+            lastModified: stats.mtimeMs
           });
         }
       }
     }
-    
+
     await findBuildFiles(config.bazelWorkspace);
-    
+
+    // Sort by last modified date (newest first)
+    buildFiles.sort((a, b) => b.lastModified - a.lastModified);
+
     res.json({
       total: buildFiles.length,
       files: buildFiles

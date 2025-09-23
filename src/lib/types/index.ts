@@ -26,6 +26,7 @@ export interface BuildFile {
   name: string;
   type: 'workspace' | 'build';
   targets?: number;
+  lastModified?: number;
 }
 
 export interface QueryTemplate {

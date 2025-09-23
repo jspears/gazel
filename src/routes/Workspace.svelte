@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { Folder, FileCode, Settings, Package, ExternalLink } from 'lucide-svelte';
+  import { Folder, FileCode, Settings, Package, ExternalLink, Target, Clock, ChevronDown, ChevronRight } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { WorkspaceInfo, BuildFile } from '$lib/types';
+  import { storage } from '$lib/storage';
 
   const dispatch = createEventDispatcher();
 
@@ -11,6 +12,9 @@
   let bazelConfig: Record<string, string[]> = {};
   let loading = true;
   let error: string | null = null;
+  let recentTargets = storage.getRecentTargets();
+  let recentFilesExpanded = true;
+  let recentTargetsExpanded = true;
 
   onMount(async () => {
     try {
@@ -33,6 +37,14 @@
 
   function openFile(path: string) {
     dispatch('navigate-to-file', { path });
+  }
+
+  function viewWorkspaceFile() {
+    // Find the WORKSPACE file and navigate to it
+    const workspaceFile = buildFiles.find(f => f.type === 'workspace');
+    if (workspaceFile) {
+      dispatch('navigate-to-file', { path: workspaceFile.path });
+    }
   }
 </script>
 
@@ -66,6 +78,14 @@
             <dd class="font-mono">{workspaceInfo.bazel_version}</dd>
           </div>
         </dl>
+        {#if buildFiles.some(f => f.type === 'workspace')}
+          <button
+            on:click={viewWorkspaceFile}
+            class="mt-4 w-full px-3 py-2 bg-muted text-muted-foreground rounded-md hover:bg-muted/80 hover:text-foreground text-sm transition-colors"
+          >
+            View WORKSPACE File
+          </button>
+        {/if}
       </div>
 
       <div class="bg-card p-6 rounded-lg border">
@@ -105,14 +125,22 @@
     </div>
 
     <div class="bg-card p-6 rounded-lg border">
-      <div class="flex items-center justify-between mb-4">
+      <button
+        on:click={() => recentFilesExpanded = !recentFilesExpanded}
+        class="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+      >
         <div class="flex items-center gap-3">
           <Package class="w-5 h-5 text-primary" />
           <h3 class="font-semibold">Recent Build Files</h3>
         </div>
-        <span class="text-xs text-muted-foreground">Click to view file</span>
-      </div>
-      <div class="space-y-2">
+        {#if recentFilesExpanded}
+          <ChevronDown class="w-4 h-4 text-muted-foreground" />
+        {:else}
+          <ChevronRight class="w-4 h-4 text-muted-foreground" />
+        {/if}
+      </button>
+      {#if recentFilesExpanded}
+        <div class="space-y-2">
         {#each buildFiles.slice(0, 10) as file}
           <button
             on:click={() => openFile(file.path)}
@@ -135,6 +163,51 @@
           <div class="text-sm text-muted-foreground py-2">No BUILD files found</div>
         {/if}
       </div>
+      {/if}
     </div>
+
+    <!-- Recent Targets Section -->
+    {#if recentTargets.length > 0}
+      <div class="bg-card p-6 rounded-lg border">
+        <button
+          on:click={() => recentTargetsExpanded = !recentTargetsExpanded}
+          class="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+        >
+          <div class="flex items-center gap-3">
+            <Clock class="w-5 h-5 text-primary" />
+            <h3 class="font-semibold">Recent Targets</h3>
+          </div>
+          {#if recentTargetsExpanded}
+            <ChevronDown class="w-4 h-4 text-muted-foreground" />
+          {:else}
+            <ChevronRight class="w-4 h-4 text-muted-foreground" />
+          {/if}
+        </button>
+        {#if recentTargetsExpanded}
+          <div class="space-y-2">
+          {#each recentTargets.slice(0, 10) as target}
+            <button
+              on:click={() => dispatch('navigate-to-targets', { target: target.name })}
+              class="w-full flex items-center justify-between py-2 px-3 hover:bg-muted rounded-md transition-colors cursor-pointer group"
+              title="Click to view {target.name}"
+            >
+              <div class="flex items-center gap-2">
+                <Target class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                <span class="font-mono text-sm group-hover:text-primary transition-colors truncate">{target.name}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                {#if target.type}
+                  <span class="text-xs text-muted-foreground">
+                    {target.type}
+                  </span>
+                {/if}
+                <ExternalLink class="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </button>
+          {/each}
+          </div>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </div>

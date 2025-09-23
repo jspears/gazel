@@ -94,7 +94,7 @@ class ApiClient {
   async getReverseDependencies(target: string): Promise<{
     target: string;
     total: number;
-    dependents: BazelTarget[];
+    dependencies: BazelTarget[];
   }> {
     // Use query parameter to avoid conflicts with complex target names
     const params = new URLSearchParams({ target });

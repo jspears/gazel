@@ -12,15 +12,18 @@ const router = Router();
  */
 router.get('/info', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const info = await bazelService.getWorkspaceInfo();
-    
+    const [info, bazelVersion] = await Promise.all([
+      bazelService.getWorkspaceInfo(),
+      bazelService.getBazelVersion()
+    ]);
+
     // Add additional workspace info
     const workspaceFile = path.join(config.bazelWorkspace, 'WORKSPACE');
     const workspaceBazelFile = path.join(config.bazelWorkspace, 'WORKSPACE.bazel');
-    
+
     let workspaceExists = false;
     let workspaceContent = '';
-    
+
     try {
       // Try WORKSPACE.bazel first, then WORKSPACE
       try {
@@ -33,7 +36,7 @@ router.get('/info', async (req: Request, res: Response, next: NextFunction) => {
     } catch (error) {
       console.log('No WORKSPACE file found');
     }
-    
+
     // Extract workspace name from content
     let workspaceName = 'unknown';
     if (workspaceContent) {
@@ -42,15 +45,15 @@ router.get('/info', async (req: Request, res: Response, next: NextFunction) => {
         workspaceName = nameMatch[1];
       }
     }
-    
+
     const response: Partial<WorkspaceInfo> = {
       ...info,
       workspace_path: config.bazelWorkspace,
       workspace_name: workspaceName,
       workspace_file_exists: workspaceExists,
-      bazel_version: (info as any).release || 'unknown'
+      bazel_version: bazelVersion
     };
-    
+
     res.json(response);
   } catch (error) {
     next(error);

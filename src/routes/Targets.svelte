@@ -5,6 +5,7 @@
   import type { BazelTarget } from '$lib/types';
   import { createEventDispatcher } from 'svelte';
   import { storage } from '$lib/storage';
+  import CopyButton from '$lib/components/CopyButton.svelte';
 
   const dispatch = createEventDispatcher();
   
@@ -17,8 +18,10 @@
   let selectedType = '';
   let selectedTarget: BazelTarget | null = null;
   let targetDependencies: BazelTarget[] = [];
+  let targetReverseDependencies: BazelTarget[] = [];
   let targetOutputs: Array<{path: string; filename: string; type: string}> = [];
   let loadingOutputs = false;
+  let loadingReverseDeps = false;
   let usingFallbackSearch = false;
 
   // Run modal state
@@ -40,6 +43,9 @@
   // Search history state
   let searchHistory: string[] = [];
   let showSearchHistory = false;
+
+  // Navigation breadcrumb state
+  let navigationHistory: BazelTarget[] = [];
 
   onMount(() => {
     loadTargets();
@@ -221,17 +227,49 @@
     }
   }
 
-  async function selectTarget(target: BazelTarget) {
+  async function selectTarget(target: BazelTarget, addToHistory = true) {
     selectedTarget = target;
     targetOutputs = [];
+    targetReverseDependencies = [];
+
+    // Save to recent targets
+    if (target.full || target.name) {
+      storage.addRecentTarget(target.full || target.name || '', target.ruleType || target.type);
+    }
+
+    // Add to navigation history if not navigating back
+    if (addToHistory && selectedTarget) {
+      // Remove any items after the current position if we're not at the end
+      const currentIndex = navigationHistory.findIndex(t =>
+        (t.full || t.name) === (selectedTarget?.full || selectedTarget?.name)
+      );
+      if (currentIndex !== -1) {
+        navigationHistory = navigationHistory.slice(0, currentIndex);
+      } else {
+        navigationHistory = [...navigationHistory, target];
+      }
+    }
 
     if (target.full) {
+      // Load direct dependencies
       try {
         const deps = await api.getTargetDependencies(target.full, 1);
         targetDependencies = deps.dependencies;
       } catch (err) {
         console.error('Failed to load dependencies:', err);
         targetDependencies = [];
+      }
+
+      // Load reverse dependencies (what depends on this target)
+      loadingReverseDeps = true;
+      try {
+        const rdeps = await api.getReverseDependencies(target.full);
+        targetReverseDependencies = rdeps.dependencies || [];
+      } catch (err) {
+        console.error('Failed to load reverse dependencies:', err);
+        targetReverseDependencies = [];
+      } finally {
+        loadingReverseDeps = false;
       }
 
       // Load outputs for the selected target
@@ -246,6 +284,30 @@
         loadingOutputs = false;
       }
     }
+  }
+
+  async function navigateToTarget(target: BazelTarget) {
+    // If the target doesn't have full details, try to find it in the current list
+    const fullTarget = targets.find(t =>
+      (t.full === target.full) || (t.name === target.name)
+    );
+
+    if (fullTarget) {
+      selectTarget(fullTarget, true);
+    } else {
+      // If not found, select it anyway (it will load its dependencies)
+      selectTarget(target, true);
+    }
+  }
+
+  function navigateToBreadcrumb(index: number) {
+    const target = navigationHistory[index];
+    navigationHistory = navigationHistory.slice(0, index + 1);
+    selectTarget(target, false);
+  }
+
+  function clearNavigationHistory() {
+    navigationHistory = [];
   }
 
   function filterByType(type: string) {
@@ -553,7 +615,10 @@
                   <span class="text-xs text-muted-foreground">{target.ruleType}</span>
                 {/if}
               </div>
-              <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
+              <div class="flex items-center gap-1">
+                <CopyButton text={target.full || target.name} size="sm" className="opacity-0 group-hover:opacity-100" />
+                <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
+              </div>
             </button>
           {/each}
           {#if visibleTargets.length > displayLimit}
@@ -576,13 +641,43 @@
       <div class="bg-card rounded-lg border">
         <div class="p-4 border-b">
           <h3 class="font-semibold">Target Details</h3>
+          {#if navigationHistory.length > 0}
+            <div class="mt-2 flex items-center gap-1 flex-wrap">
+              <span class="text-xs text-muted-foreground">Navigation:</span>
+              {#each navigationHistory as navTarget, index}
+                <button
+                  on:click={() => navigateToBreadcrumb(index)}
+                  class="text-xs px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1"
+                  class:bg-primary={index === navigationHistory.length - 1}
+                  class:text-primary-foreground={index === navigationHistory.length - 1}
+                >
+                  {navTarget.name || navTarget.full}
+                </button>
+                {#if index < navigationHistory.length - 1}
+                  <ChevronRight class="w-3 h-3 text-muted-foreground" />
+                {/if}
+              {/each}
+              {#if navigationHistory.length > 1}
+                <button
+                  on:click={clearNavigationHistory}
+                  class="text-xs text-muted-foreground hover:text-foreground ml-2"
+                  title="Clear navigation history"
+                >
+                  Clear
+                </button>
+              {/if}
+            </div>
+          {/if}
         </div>
         <div class="p-4">
           {#if selectedTarget}
             <div class="space-y-4">
               <div>
                 <h4 class="text-sm font-medium text-muted-foreground mb-1">Name</h4>
-                <p class="font-mono text-sm">{selectedTarget.name || selectedTarget.full}</p>
+                <div class="flex items-center gap-2">
+                  <p class="font-mono text-sm">{selectedTarget.name || selectedTarget.full}</p>
+                  <CopyButton text={selectedTarget.name || selectedTarget.full || ''} size="sm" />
+                </div>
               </div>
               
               {#if selectedTarget.ruleType}
@@ -679,11 +774,38 @@
                   </h4>
                   <div class="space-y-1 max-h-40 overflow-y-auto">
                     {#each targetDependencies as dep}
-                      <div class="font-mono text-sm text-muted-foreground">
+                      <button
+                        on:click={() => navigateToTarget(dep)}
+                        class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
+                      >
+                        <ChevronRight class="w-3 h-3" />
                         {dep.full || dep.name}
-                      </div>
+                      </button>
                     {/each}
                   </div>
+                </div>
+              {/if}
+
+              {#if targetReverseDependencies.length > 0 || loadingReverseDeps}
+                <div>
+                  <h4 class="text-sm font-medium text-muted-foreground mb-1">
+                    Used By ({targetReverseDependencies.length})
+                  </h4>
+                  {#if loadingReverseDeps}
+                    <div class="text-sm text-muted-foreground">Loading...</div>
+                  {:else if targetReverseDependencies.length > 0}
+                    <div class="space-y-1 max-h-40 overflow-y-auto">
+                      {#each targetReverseDependencies as rdep}
+                        <button
+                          on:click={() => navigateToTarget(rdep)}
+                          class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
+                        >
+                          <ChevronRight class="w-3 h-3" />
+                          {rdep.full || rdep.name}
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
                 </div>
               {/if}
             </div>

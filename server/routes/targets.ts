@@ -163,7 +163,7 @@ router.get('/rdeps', async (req: Request, res: Response, next: NextFunction) => 
     res.json({
       target: fullTarget,
       total: dependencies.length,
-      dependents: dependencies
+      dependencies
     });
   } catch (error) {
     next(error);

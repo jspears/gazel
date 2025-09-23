@@ -16,10 +16,16 @@
 
   let activeTab = 'workspace';
   let fileToOpen: string | null = null;
+  let targetToOpen: string | null = null;
 
   function handleNavigateToFile(event: CustomEvent<{path: string}>) {
     fileToOpen = event.detail.path;
     activeTab = 'files';
+  }
+
+  function handleNavigateToTargets(event: CustomEvent<{target: string}>) {
+    targetToOpen = event.detail.target;
+    activeTab = 'targets';
   }
 </script>
 
@@ -79,7 +85,7 @@
 
       <div class="mt-2">
         {#if activeTab === 'workspace'}
-          <Workspace on:navigate-to-file={handleNavigateToFile} />
+          <Workspace on:navigate-to-file={handleNavigateToFile} on:navigate-to-targets={handleNavigateToTargets} />
         {:else if activeTab === 'targets'}
           <Targets on:navigate-to-file={handleNavigateToFile} />
         {:else if activeTab === 'files'}

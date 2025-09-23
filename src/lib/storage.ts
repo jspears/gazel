@@ -5,6 +5,8 @@
 interface StorageConfig {
   searchHistory: string[];
   recentFiles: string[];
+  recentTargets: Array<{name: string; type?: string; timestamp: number}>;
+  recentQueries: Array<{query: string; format: string; timestamp: number}>;
   preferences: {
     showHiddenTargets?: boolean;
     theme?: 'light' | 'dark' | 'system';
@@ -43,6 +45,8 @@ class LocalStorageService {
     return {
       searchHistory: [],
       recentFiles: [],
+      recentTargets: [],
+      recentQueries: [],
       preferences: {}
     };
   }
@@ -110,6 +114,64 @@ class LocalStorageService {
 
   clearRecentFiles(): void {
     this.config.recentFiles = [];
+    this.saveConfig();
+  }
+
+  // Recent targets management
+  addRecentTarget(name: string, type?: string): void {
+    // Remove existing entry if present
+    this.config.recentTargets = this.config.recentTargets.filter(t => t.name !== name);
+
+    // Add new entry at the beginning
+    this.config.recentTargets.unshift({
+      name,
+      type,
+      timestamp: Date.now()
+    });
+
+    // Keep only the most recent items
+    if (this.config.recentTargets.length > MAX_HISTORY_ITEMS) {
+      this.config.recentTargets = this.config.recentTargets.slice(0, MAX_HISTORY_ITEMS);
+    }
+
+    this.saveConfig();
+  }
+
+  getRecentTargets(): Array<{name: string; type?: string; timestamp: number}> {
+    return [...this.config.recentTargets];
+  }
+
+  clearRecentTargets(): void {
+    this.config.recentTargets = [];
+    this.saveConfig();
+  }
+
+  // Recent queries management
+  addRecentQuery(query: string, format: string): void {
+    // Remove existing entry if present
+    this.config.recentQueries = this.config.recentQueries.filter(q => q.query !== query);
+
+    // Add new entry at the beginning
+    this.config.recentQueries.unshift({
+      query,
+      format,
+      timestamp: Date.now()
+    });
+
+    // Keep only the most recent items
+    if (this.config.recentQueries.length > MAX_HISTORY_ITEMS) {
+      this.config.recentQueries = this.config.recentQueries.slice(0, MAX_HISTORY_ITEMS);
+    }
+
+    this.saveConfig();
+  }
+
+  getRecentQueries(): Array<{query: string; format: string; timestamp: number}> {
+    return [...this.config.recentQueries];
+  }
+
+  clearRecentQueries(): void {
+    this.config.recentQueries = [];
     this.saveConfig();
   }
 

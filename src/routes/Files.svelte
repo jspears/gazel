@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { onMount, afterUpdate } from 'svelte';
-  import { FileCode, Search, File, FolderOpen, Target, ChevronRight } from 'lucide-svelte';
+  import { onMount, afterUpdate, createEventDispatcher } from 'svelte';
+  import { FileCode, Search, File, FolderOpen, Target, ChevronRight, Play, TestTube, ExternalLink } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { BuildFile, BazelTarget } from '$lib/types';
+  import CopyButton from '$lib/components/CopyButton.svelte';
   import hljs from 'highlight.js/lib/core';
   import python from 'highlight.js/lib/languages/python';
   import bash from 'highlight.js/lib/languages/bash';
@@ -16,6 +17,8 @@
 
   export let fileToOpen: string | null = null;
 
+  const dispatch = createEventDispatcher();
+
   let buildFiles: BuildFile[] = [];
   let selectedFile: string | null = null;
   let fileContent = '';
@@ -25,7 +28,7 @@
   let searchResults: Array<{file: string; line: number; content: string}> = [];
   let loading = false;
   let error: string | null = null;
-  let activeTab: 'files' | 'workspace' | 'search' | 'actions' = 'files';
+  let activeTab: 'files' | 'workspace' | 'search' | 'actions' | 'targets' = 'files';
   let selectedTarget: BazelTarget | null = null;
   let targetDetails: BazelTarget | null = null;
   let highlightedLine: number | null = null;
@@ -71,8 +74,13 @@
       // Apply syntax highlighting
       applyHighlighting();
 
-      // Load actions for this file
-      loadFileActions(path);
+      // Only load actions for non-BUILD/WORKSPACE files
+      const fileName = path.split('/').pop();
+      if (fileName && !fileName.startsWith('BUILD') && !fileName.startsWith('WORKSPACE')) {
+        loadFileActions(path);
+      } else {
+        fileActions = [];
+      }
     } catch (err: any) {
       error = err.message;
     } finally {
@@ -253,12 +261,7 @@
     >
       Search
     </button>
-    <button
-      on:click={loadWorkspaceFile}
-      class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
-    >
-      View WORKSPACE
-    </button>
+
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -273,16 +276,20 @@
         {#each buildFiles as file}
           <button
             on:click={() => selectFile(file.path)}
-            class="w-full text-left px-4 py-2 hover:bg-muted border-b last:border-b-0 flex items-center gap-2"
+            class="w-full text-left px-4 py-2 hover:bg-muted border-b last:border-b-0"
             class:bg-muted={selectedFile === file.path}
           >
-            <FileCode class="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <span class="font-mono text-sm truncate">{file.path}</span>
-            {#if file.targets}
-              <span class="text-xs text-muted-foreground ml-auto">
-                {file.targets} targets
-              </span>
-            {/if}
+            <div class="flex items-center gap-2">
+              <FileCode class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <div class="flex-1 min-w-0">
+                <div class="font-mono text-sm truncate">{file.path}</div>
+                {#if file.lastModified}
+                  <div class="text-xs text-muted-foreground">
+                    {new Date(file.lastModified).toLocaleDateString()}
+                  </div>
+                {/if}
+              </div>
+            </div>
           </button>
         {/each}
       </div>
@@ -328,6 +335,8 @@
               Search Results ({searchResults.length})
             {:else if activeTab === 'actions'}
               File Actions ({fileActions.length})
+            {:else if activeTab === 'targets'}
+              Targets ({fileTargets.length})
             {:else if selectedFile}
               {selectedFile}
             {:else}
@@ -342,7 +351,9 @@
           {/if}
         </div>
 
-        {#if selectedFile && (activeTab === 'files' || activeTab === 'actions')}
+        {#if selectedFile && (activeTab === 'files' || activeTab === 'actions' || activeTab === 'targets')}
+          {@const fileName = selectedFile.split('/').pop()}
+          {@const isBuildFile = fileName && (fileName.startsWith('BUILD') || fileName.startsWith('WORKSPACE'))}
           <div class="flex gap-2">
             <button
               on:click={() => activeTab = 'files'}
@@ -350,12 +361,22 @@
             >
               Content
             </button>
-            <button
-              on:click={() => activeTab = 'actions'}
-              class="px-3 py-1 text-sm rounded-md transition-colors {activeTab === 'actions' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
-            >
-              Actions ({fileActions.length})
-            </button>
+            {#if isBuildFile && fileTargets.length > 0}
+              <button
+                on:click={() => activeTab = 'targets'}
+                class="px-3 py-1 text-sm rounded-md transition-colors {activeTab === 'targets' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
+              >
+                Targets ({fileTargets.length})
+              </button>
+            {/if}
+            {#if !isBuildFile}
+              <button
+                on:click={() => activeTab = 'actions'}
+                class="px-3 py-1 text-sm rounded-md transition-colors {activeTab === 'actions' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
+              >
+                Actions ({fileActions.length})
+              </button>
+            {/if}
           </div>
         {/if}
       </div>
@@ -394,6 +415,44 @@
               {/each}
             </div>
           {/if}
+        {:else if activeTab === 'targets' && fileTargets.length > 0}
+          <div class="space-y-2">
+            {#each fileTargets as target}
+              <div class="flex items-center justify-between p-3 hover:bg-muted rounded-md transition-colors group">
+                <div class="flex items-center gap-3">
+                  <Target class="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <button
+                      on:click={() => dispatch('navigate-to-targets', { target: target.name })}
+                      class="font-mono text-sm hover:text-primary transition-colors"
+                    >
+                      {target.name}
+                    </button>
+                    <div class="text-xs text-muted-foreground">
+                      {target.ruleType} • Line {target.line}
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <CopyButton text={target.name} />
+                  {#if target.ruleType && (target.ruleType.includes('binary') || target.ruleType.includes('test'))}
+                    <button
+                      on:click={() => dispatch('run-target', { target: target.name })}
+                      class="p-1 hover:bg-primary/10 rounded transition-colors"
+                      title="Run {target.name}"
+                    >
+                      {#if target.ruleType.includes('test')}
+                        <TestTube class="w-4 h-4 text-primary" />
+                      {:else}
+                        <Play class="w-4 h-4 text-primary" />
+                      {/if}
+                    </button>
+                  {/if}
+                  <ExternalLink class="w-3 h-3 text-muted-foreground" />
+                </div>
+              </div>
+            {/each}
+          </div>
         {:else if activeTab === 'search' && searchResults.length > 0}
           <div class="space-y-4">
             {#each searchResults as result}
