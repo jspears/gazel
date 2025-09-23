@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { Folder, FileCode, Settings, Package } from 'lucide-svelte';
+  import { onMount, createEventDispatcher } from 'svelte';
+  import { Folder, FileCode, Settings, Package, ExternalLink } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { WorkspaceInfo, BuildFile } from '$lib/types';
-  
+
+  const dispatch = createEventDispatcher();
+
   let workspaceInfo: WorkspaceInfo | null = null;
   let buildFiles: BuildFile[] = [];
   let bazelConfig: Record<string, string[]> = {};
@@ -18,7 +20,7 @@
         api.getWorkspaceFiles(),
         api.getWorkspaceConfig()
       ]);
-      
+
       workspaceInfo = info;
       buildFiles = files.files;
       bazelConfig = config.configurations;
@@ -28,6 +30,10 @@
       loading = false;
     }
   });
+
+  function openFile(path: string) {
+    dispatch('navigate-to-file', { path });
+  }
 </script>
 
 <div class="space-y-6">
@@ -99,22 +105,35 @@
     </div>
 
     <div class="bg-card p-6 rounded-lg border">
-      <div class="flex items-center gap-3 mb-4">
-        <Package class="w-5 h-5 text-primary" />
-        <h3 class="font-semibold">Recent Build Files</h3>
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <Package class="w-5 h-5 text-primary" />
+          <h3 class="font-semibold">Recent Build Files</h3>
+        </div>
+        <span class="text-xs text-muted-foreground">Click to view file</span>
       </div>
       <div class="space-y-2">
         {#each buildFiles.slice(0, 10) as file}
-          <div class="flex items-center justify-between py-2 px-3 hover:bg-muted rounded-md">
+          <button
+            on:click={() => openFile(file.path)}
+            class="w-full flex items-center justify-between py-2 px-3 hover:bg-muted rounded-md transition-colors cursor-pointer group"
+            title="Click to view {file.path}"
+          >
             <div class="flex items-center gap-2">
-              <FileCode class="w-4 h-4 text-muted-foreground" />
-              <span class="font-mono text-sm">{file.path}</span>
+              <FileCode class="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span class="font-mono text-sm group-hover:text-primary transition-colors">{file.path}</span>
             </div>
-            <span class="text-xs text-muted-foreground">
-              {file.type === 'workspace' ? 'WORKSPACE' : 'BUILD'}
-            </span>
-          </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-muted-foreground">
+                {file.type === 'workspace' ? 'WORKSPACE' : 'BUILD'}
+              </span>
+              <ExternalLink class="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </button>
         {/each}
+        {#if buildFiles.length === 0}
+          <div class="text-sm text-muted-foreground py-2">No BUILD files found</div>
+        {/if}
       </div>
     </div>
   {/if}

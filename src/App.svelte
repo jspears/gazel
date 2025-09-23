@@ -79,7 +79,7 @@
 
       <div class="mt-2">
         {#if activeTab === 'workspace'}
-          <Workspace />
+          <Workspace on:navigate-to-file={handleNavigateToFile} />
         {:else if activeTab === 'targets'}
           <Targets on:navigate-to-file={handleNavigateToFile} />
         {:else if activeTab === 'files'}

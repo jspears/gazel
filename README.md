@@ -85,6 +85,7 @@ The application will be available at http://localhost:3001
 - Display Bazel workspace metadata
 - Show workspace configuration
 - List available Bazel commands
+- **Clickable BUILD files**: Click any BUILD file to navigate directly to the Files tab and view its contents
 
 ### Target Browser
 - Browse all Bazel targets in the workspace

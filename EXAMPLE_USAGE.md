@@ -35,6 +35,12 @@ When you first open Gazel, you'll see the **Workspace** tab which displays:
 - Bazel version
 - Number of BUILD files
 - Configuration options from .bazelrc
+- **Clickable BUILD files**: Recent BUILD files are displayed as clickable links
+
+**Quick Navigation Tip**:
+- Hover over any BUILD file to see the external link icon
+- Click on any BUILD file to immediately jump to the Files tab and view its contents
+- This provides a quick way to explore your workspace structure
 - List of recent BUILD files
 
 ### 2. Browsing Targets
@@ -216,7 +222,7 @@ bazel version
 #### Permission denied
 The server needs read access to the Bazel workspace:
 ```bash
-ls -la /Users/justinspears/augment/augment
+ls -la /your/workspace
 ```
 
 #### Port already in use
