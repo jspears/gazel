@@ -68,7 +68,6 @@ For automatic workspace detection during initial setup:
 The setup script will:
 - ✅ Check system requirements
 - 🔍 Find your Bazel workspace
-- 📝 Create initial .env configuration
 - 📦 Install dependencies (if not already installed)
 
 Note: The setup script is optional. Gazel can now configure workspaces through its UI.
@@ -99,20 +98,20 @@ Visit http://localhost:3001
 
 ### Configuration
 
-Gazel stores workspace configuration in two places:
+Gazel manages workspace configuration through the browser:
 
-1. **Browser Local Storage** (Primary)
-   - Workspace selection is saved automatically
-   - Persists across browser sessions
-   - Switch workspaces via the UI
+**Workspace Management**
+- Workspace selection is stored in browser Local Storage
+- The server keeps the current workspace in memory only
+- No workspace configuration is persisted to disk
+- Workspace persists across browser sessions
+- Switch workspaces easily via the UI
 
-2. **`.env` file** (Optional)
-   - Created by setup script or when switching workspaces
-   - Can be edited manually if needed
-   ```env
-   BAZEL_WORKSPACE=/path/to/your/bazel/workspace
-   PORT=3001  # Optional: change the server port
-   ```
+**Optional Server Configuration** (`.env` file)
+```env
+# PORT=3001  # Optional: change the server port
+# BAZEL_EXECUTABLE=/usr/local/bin/bazel  # Optional: custom bazel path
+```
 
 To switch workspaces:
 - Click on the workspace path in the Workspace tab, or

@@ -32,93 +32,20 @@ if ! command -v bazel &> /dev/null; then
     echo "⚠️  Warning: Bazel is not in PATH. Make sure it's installed and accessible."
 fi
 
-# Configure Bazel workspace
+# Note about workspace configuration
 echo ""
-echo "🔧 Configuring Bazel workspace..."
+echo "📝 Note: Workspace configuration is now managed through the UI"
+echo ""
+echo "Gazel will prompt you to select a workspace when you first open it."
+echo "The workspace selection is saved in your browser and persists across sessions."
 echo ""
 
-# Check if .env file exists and has BAZEL_WORKSPACE set
-if [ -f .env ] && grep -q "BAZEL_WORKSPACE=" .env; then
-    EXISTING_WORKSPACE=$(grep "BAZEL_WORKSPACE=" .env | cut -d'=' -f2)
-    echo "Found existing workspace configuration: $EXISTING_WORKSPACE"
-    echo -n "Do you want to keep this configuration? (Y/n): "
-    read -r KEEP_CONFIG
-
-    if [[ "$KEEP_CONFIG" =~ ^[Nn]$ ]]; then
-        CONFIGURE_WORKSPACE=true
-    else
-        CONFIGURE_WORKSPACE=false
-        echo "✅ Keeping existing workspace configuration"
-    fi
-else
-    CONFIGURE_WORKSPACE=true
-fi
-
-if [ "$CONFIGURE_WORKSPACE" = true ]; then
-    # Try to find Bazel workspace automatically
-    CURRENT_DIR=$(pwd)
-    PARENT_DIR=$(dirname "$CURRENT_DIR")
-    GRANDPARENT_DIR=$(dirname "$PARENT_DIR")
-
-    # Look for MODULE.bazel file
-    if [ -f "$CURRENT_DIR/MODULE.bazel" ]; then
-        DEFAULT_WORKSPACE="$CURRENT_DIR"
-    elif [ -f "$PARENT_DIR/MODULE.bazel" ]; then
-        DEFAULT_WORKSPACE="$PARENT_DIR"
-    elif [ -f "$GRANDPARENT_DIR/MODULE.bazel" ]; then
-        DEFAULT_WORKSPACE="$GRANDPARENT_DIR"
-    else
-        DEFAULT_WORKSPACE=""
-    fi
-
-    if [ -n "$DEFAULT_WORKSPACE" ]; then
-        echo "Found Bazel workspace at: $DEFAULT_WORKSPACE"
-        echo -n "Use this workspace? (Y/n): "
-        read -r USE_DEFAULT
-
-        if [[ ! "$USE_DEFAULT" =~ ^[Nn]$ ]]; then
-            BAZEL_WORKSPACE="$DEFAULT_WORKSPACE"
-        else
-            echo -n "Enter the path to your Bazel workspace: "
-            read -r BAZEL_WORKSPACE
-        fi
-    else
-        echo "No Bazel workspace found in current or parent directories."
-        echo -n "Enter the path to your Bazel workspace: "
-        read -r BAZEL_WORKSPACE
-    fi
-
-    # Expand tilde and relative paths
-    BAZEL_WORKSPACE=$(eval echo "$BAZEL_WORKSPACE")
-
-    # Convert relative path to absolute path
-    if [[ ! "$BAZEL_WORKSPACE" = /* ]]; then
-        BAZEL_WORKSPACE="$(cd "$BAZEL_WORKSPACE" 2>/dev/null && pwd)" || {
-            echo "❌ Invalid path: $BAZEL_WORKSPACE"
-            exit 1
-        }
-    fi
-
-    # Verify the workspace exists and contains MODULE.bazel file
-    if [ ! -d "$BAZEL_WORKSPACE" ]; then
-        echo "❌ Directory does not exist: $BAZEL_WORKSPACE"
-        exit 1
-    fi
-
-    if [ ! -f "$BAZEL_WORKSPACE/MODULE.bazel" ]; then
-        echo "⚠️  Warning: No MODULE.bazel file found in $BAZEL_WORKSPACE"
-        echo -n "Continue anyway? (y/N): "
-        read -r CONTINUE_ANYWAY
-
-        if [[ ! "$CONTINUE_ANYWAY" =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
-    fi
-
-    # Write to .env file
-    echo "BAZEL_WORKSPACE=$BAZEL_WORKSPACE" > .env
-    echo "✅ Workspace configuration saved to .env"
-    echo "   BAZEL_WORKSPACE=$BAZEL_WORKSPACE"
+# Create minimal .env file if it doesn't exist
+if [ ! -f .env ]; then
+    echo "# Gazel configuration" > .env
+    echo "# Workspace is managed through the UI and stored in browser localStorage" >> .env
+    echo "" >> .env
+    echo "✅ Created .env file for optional server configuration"
 fi
 
 # Install dependencies
@@ -135,13 +62,6 @@ echo ""
 echo "✅ Setup complete!"
 echo ""
 
-# Display workspace configuration
-if [ -f .env ] && grep -q "BAZEL_WORKSPACE=" .env; then
-    WORKSPACE_PATH=$(grep "BAZEL_WORKSPACE=" .env | cut -d'=' -f2)
-    echo "📁 Bazel workspace: $WORKSPACE_PATH"
-    echo ""
-fi
-
 echo "Available commands:"
 echo "  npm run dev       - Start development servers (frontend + backend)"
 echo "  npm run build     - Build for production"
@@ -152,6 +72,6 @@ echo "The application will run on:"
 echo "  Development: http://localhost:5173 (frontend) + http://localhost:3001 (backend)"
 echo "  Production:  http://localhost:3001"
 echo ""
-echo "To change the Bazel workspace, edit the .env file or run this setup script again."
+echo "To select or change your Bazel workspace, use the workspace picker in the UI."
 echo ""
 
