@@ -140,7 +140,10 @@
       filteredTargets = targets;
       byPackage = result.byPackage;
     } catch (err: any) {
-      error = err.message;
+      // Don't show error if request was aborted due to page reload (workspace switching)
+      if (!err.isAborted) {
+        error = err.message;
+      }
     } finally {
       loading = false;
     }

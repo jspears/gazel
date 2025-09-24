@@ -10,29 +10,58 @@ import type {
 const API_BASE = '/api';
 
 class ApiClient {
-  private async fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${API_BASE}${url}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-    });
+  private abortController: AbortController | null = null;
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: response.statusText }));
-      const errorMessage = errorData.error || `HTTP ${response.status}`;
-      const error: any = new Error(errorMessage);
-      error.response = response;
-      error.data = errorData;
-      // Include command if present in error response
-      if (errorData.command) {
-        error.command = errorData.command;
+  // Cancel all pending requests
+  cancelPendingRequests(): void {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+  }
+
+  private async fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+    try {
+      // Create a new abort controller if we don't have one
+      if (!this.abortController) {
+        this.abortController = new AbortController();
+      }
+
+      const response = await fetch(`${API_BASE}${url}`, {
+        ...options,
+        signal: options?.signal || this.abortController.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        const errorMessage = errorData.error || `HTTP ${response.status}`;
+        const error: any = new Error(errorMessage);
+        error.response = response;
+        error.data = errorData;
+        // Include command if present in error response
+        if (errorData.command) {
+          error.command = errorData.command;
+        }
+        throw error;
+      }
+
+      return response.json();
+    } catch (error: any) {
+      // Check if this is an abort error (happens during page unload/reload)
+      if (error.name === 'AbortError' ||
+          (error.message && error.message.toLowerCase().includes('failed to fetch'))) {
+        // During workspace switching, the page reloads and pending requests get aborted
+        // This is expected behavior, so we'll throw a more specific error
+        const abortError: any = new Error('Request aborted due to page reload');
+        abortError.isAborted = true;
+        throw abortError;
       }
       throw error;
     }
-
-    return response.json();
   }
 
   // Modules endpoints

@@ -27,16 +27,22 @@
   async function loadTemplates() {
     try {
       templates = await api.getQueryTemplates();
-    } catch (err) {
-      console.error('Failed to load templates:', err);
+    } catch (err: any) {
+      // Don't log error if request was aborted due to page reload (workspace switching)
+      if (!err.isAborted) {
+        console.error('Failed to load templates:', err);
+      }
     }
   }
 
   async function loadSavedQueries() {
     try {
       savedQueries = await api.getSavedQueries();
-    } catch (err) {
-      console.error('Failed to load saved queries:', err);
+    } catch (err: any) {
+      // Don't log error if request was aborted due to page reload (workspace switching)
+      if (!err.isAborted) {
+        console.error('Failed to load saved queries:', err);
+      }
     }
   }
 
@@ -54,10 +60,13 @@
       storage.addRecentQuery(query, outputFormat);
       recentQueries = storage.getRecentQueries();
     } catch (err: any) {
-      error = err.message;
-      // Check if the error contains command info
-      if (err.command) {
-        error += `\n\nFailed command: ${err.command}`;
+      // Don't show error if request was aborted due to page reload (workspace switching)
+      if (!err.isAborted) {
+        error = err.message;
+        // Check if the error contains command info
+        if (err.command) {
+          error += `\n\nFailed command: ${err.command}`;
+        }
       }
       if (err.data?.details) {
         error += `\n\nDetails: ${err.data.details}`;

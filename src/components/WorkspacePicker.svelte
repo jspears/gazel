@@ -68,6 +68,9 @@
       switching = true;
       error = null;
 
+      // Cancel any pending API requests before switching
+      api.cancelPendingRequests();
+
       const result = await api.switchWorkspace(workspaceToUse);
 
       if (result.success) {

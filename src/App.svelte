@@ -192,6 +192,8 @@
   }
 
   function handleOpenWorkspacePicker() {
+    // Cancel any pending API requests before showing workspace picker
+    api.cancelPendingRequests();
     showWorkspacePicker = true;
   }
 
