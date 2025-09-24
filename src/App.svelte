@@ -342,7 +342,12 @@
               on:navigate-to-commands={handleNavigateToCommands}
             />
           {:else if activeTab === 'files'}
-            <Files bind:fileToOpen />
+            <Files
+              bind:fileToOpen
+              on:navigate-to-graph={handleNavigateToGraph}
+              on:navigate-to-commands={handleNavigateToCommands}
+              on:navigate-to-targets={handleNavigateToTargets}
+            />
           {:else if activeTab === 'modules'}
             <Modules />
           {:else if activeTab === 'query'}

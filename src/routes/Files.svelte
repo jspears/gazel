@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onMount, afterUpdate, createEventDispatcher } from 'svelte';
+  import { onMount, createEventDispatcher } from 'svelte';
   import { FileCode, Search, File, FolderOpen, Target, ChevronRight, Play, TestTube, ExternalLink } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { BuildFile, BazelTarget } from '$lib/types';
   import CopyButton from '$lib/components/CopyButton.svelte';
+  import TargetDetails from '$lib/components/TargetDetails.svelte';
   import hljs from 'highlight.js/lib/core';
   import python from 'highlight.js/lib/languages/python';
   import bash from 'highlight.js/lib/languages/bash';
@@ -30,10 +31,12 @@
   let error: string | null = null;
   let activeTab: 'files' | 'workspace' | 'search' | 'actions' | 'targets' = 'files';
   let selectedTarget: BazelTarget | null = null;
-  let targetDetails: BazelTarget | null = null;
   let highlightedLine: number | null = null;
   let fileActions: BazelTarget[] = [];
   let loadingActions = false;
+  let fileContentTab: 'content' | 'targets' = 'content';
+  let buildFileTargets: BazelTarget[] = [];
+  let loadingBuildTargets = false;
 
   onMount(() => {
     loadBuildFiles();
@@ -70,16 +73,23 @@
       fileContent = result.content;
       fileTargets = result.targets;
       activeTab = 'files';
+      fileContentTab = 'content'; // Reset to content tab when selecting a new file
 
       // Apply syntax highlighting
       applyHighlighting();
 
-      // Only load actions for non-BUILD/WORKSPACE files
+      // Check if this is a BUILD file
       const fileName = path.split('/').pop();
-      if (fileName && !fileName.startsWith('BUILD') && !fileName.startsWith('WORKSPACE')) {
+      if (fileName && (fileName.startsWith('BUILD') || fileName.includes('BUILD'))) {
+        // Load targets for BUILD file
+        loadBuildFileTargets();
+        fileActions = [];
+      } else if (fileName && !fileName.startsWith('WORKSPACE')) {
+        // Load actions for non-BUILD/WORKSPACE files
         loadFileActions(path);
       } else {
         fileActions = [];
+        buildFileTargets = [];
       }
     } catch (err: any) {
       error = err.message;
@@ -158,24 +168,6 @@
     return highlightedLines[index] || '';
   }
 
-  async function loadWorkspaceFile() {
-    try {
-      loading = true;
-      const result = await api.getWorkspaceFile();
-      fileContent = result.content;
-      selectedFile = result.path;
-      fileTargets = [];
-      activeTab = 'workspace';
-
-      // Apply syntax highlighting
-      applyHighlighting();
-    } catch (err: any) {
-      error = err.message;
-    } finally {
-      loading = false;
-    }
-  }
-
   async function searchFiles() {
     if (!searchQuery.trim()) {
       searchResults = [];
@@ -194,15 +186,6 @@
     }
   }
 
-  function highlightLine(lineNumber: number) {
-    const lines = fileContent.split('\n');
-    return lines.map((line, index) => ({
-      number: index + 1,
-      content: line,
-      highlighted: index + 1 === lineNumber
-    }));
-  }
-
   async function selectTargetFromFile(target: {ruleType: string; name: string; line: number}) {
     highlightedLine = target.line;
 
@@ -212,17 +195,17 @@
       const fullTargetPath = packagePath ? `//${packagePath}:${target.name}` : `//:${target.name}`;
 
       try {
-        targetDetails = await api.getTarget(fullTargetPath);
-        selectedTarget = targetDetails;
+        const targetData = await api.getTarget(fullTargetPath);
+        selectedTarget = targetData;
       } catch (err) {
         console.error('Failed to load target details:', err);
         // Try without the full path
         try {
-          targetDetails = await api.getTarget(target.name);
-          selectedTarget = targetDetails;
+          const targetData = await api.getTarget(target.name);
+          selectedTarget = targetData;
         } catch (err2) {
           console.error('Failed to load target with name only:', err2);
-          targetDetails = null;
+          selectedTarget = null;
         }
       }
     }
@@ -234,10 +217,62 @@
     }
   }
 
-  function getTargetPath(targetName: string): string {
-    if (!selectedFile) return targetName;
+  async function loadBuildFileTargets() {
+    if (!selectedFile) return;
+
+    // Extract package path from the BUILD file path
     const packagePath = selectedFile.replace(/\/BUILD(\.bazel)?$/, '');
-    return packagePath ? `//${packagePath}:${targetName}` : `//:${targetName}`;
+    const queryPath = packagePath ? `//${packagePath}:all` : '//:all';
+
+    try {
+      loadingBuildTargets = true;
+      buildFileTargets = [];
+
+      // Execute a bazel query to get all targets in this BUILD file
+      const result = await api.executeQuery(queryPath, 'label_kind');
+
+      if (result.result && result.result.targets) {
+        buildFileTargets = result.result.targets;
+      }
+    } catch (err) {
+      console.error('Failed to load BUILD file targets:', err);
+      buildFileTargets = [];
+    } finally {
+      loadingBuildTargets = false;
+    }
+  }
+
+  // Event handlers for TargetDetails component navigation
+  function handleTargetNavigation(event: CustomEvent) {
+    const { target } = event.detail;
+    if (target) {
+      // Pass the event up to the parent component
+      dispatch('navigate-to-targets', { target });
+    }
+  }
+
+  function handleRunTarget(event: CustomEvent) {
+    const { target } = event.detail;
+    if (target) {
+      dispatch('run-target', { target });
+    }
+  }
+
+  function handleNavigateToFile(event: CustomEvent) {
+    const { path } = event.detail;
+    if (path) {
+      selectFile(path);
+    }
+  }
+
+  function handleNavigateToGraph(event: CustomEvent) {
+    // Pass the event up to the parent component
+    dispatch('navigate-to-graph', event.detail);
+  }
+
+  function handleNavigateToCommands(event: CustomEvent) {
+    // Pass the event up to the parent component
+    dispatch('navigate-to-commands', event.detail);
   }
 </script>
 
@@ -261,7 +296,6 @@
     >
       Search
     </button>
-
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -343,41 +377,27 @@
               File Content
             {/if}
           </h3>
-          {#if targetDetails}
-            <div class="text-sm">
-              <span class="font-mono">{targetDetails.name}</span>
-              <span class="text-muted-foreground ml-2">({targetDetails.ruleType || targetDetails.type})</span>
-            </div>
-          {/if}
         </div>
 
-        {#if selectedFile && (activeTab === 'files' || activeTab === 'actions' || activeTab === 'targets')}
+        {#if selectedFile && activeTab === 'files'}
           {@const fileName = selectedFile.split('/').pop()}
-          {@const isBuildFile = fileName && (fileName.startsWith('BUILD') || fileName.startsWith('WORKSPACE'))}
-          <div class="flex gap-2">
-            <button
-              on:click={() => activeTab = 'files'}
-              class="px-3 py-1 text-sm rounded-md transition-colors {activeTab === 'files' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
-            >
-              Content
-            </button>
-            {#if isBuildFile && fileTargets.length > 0}
+          {@const isBuildFile = fileName && (fileName.startsWith('BUILD') || fileName.includes('BUILD'))}
+          {#if isBuildFile}
+            <div class="flex gap-2">
               <button
-                on:click={() => activeTab = 'targets'}
-                class="px-3 py-1 text-sm rounded-md transition-colors {activeTab === 'targets' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
+                on:click={() => fileContentTab = 'content'}
+                class="px-3 py-1 text-sm rounded-md transition-colors {fileContentTab === 'content' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
               >
-                Targets ({fileTargets.length})
+                Content
               </button>
-            {/if}
-            {#if !isBuildFile}
               <button
-                on:click={() => activeTab = 'actions'}
-                class="px-3 py-1 text-sm rounded-md transition-colors {activeTab === 'actions' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
+                on:click={() => { fileContentTab = 'targets'; loadBuildFileTargets(); }}
+                class="px-3 py-1 text-sm rounded-md transition-colors {fileContentTab === 'targets' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
               >
-                Actions ({fileActions.length})
+                Targets {#if buildFileTargets.length > 0}({buildFileTargets.length}){/if}
               </button>
-            {/if}
-          </div>
+            </div>
+          {/if}
         {/if}
       </div>
 
@@ -386,6 +406,30 @@
           <div class="text-muted-foreground">Loading...</div>
         {:else if error}
           <div class="text-destructive">Error: {error}</div>
+        {:else if activeTab === 'files' && fileContentTab === 'targets'}
+          {#if loadingBuildTargets}
+            <div class="text-muted-foreground">Loading targets...</div>
+          {:else if buildFileTargets.length === 0}
+            <div class="text-muted-foreground">No targets found in this BUILD file</div>
+          {:else}
+            <div class="space-y-4">
+              {#each buildFileTargets as target}
+                <div class="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                  <TargetDetails
+                    {target}
+                    compact={true}
+                    showActions={true}
+                    showNavigation={true}
+                    on:navigate-to-file={handleNavigateToFile}
+                    on:navigate-to-graph={handleNavigateToGraph}
+                    on:navigate-to-commands={handleNavigateToCommands}
+                    on:navigate-to-target={handleTargetNavigation}
+                    on:run-target={handleRunTarget}
+                  />
+                </div>
+              {/each}
+            </div>
+          {/if}
         {:else if activeTab === 'actions'}
           {#if loadingActions}
             <div class="text-muted-foreground">Loading actions...</div>
@@ -486,82 +530,4 @@
       </div>
     </div>
   </div>
-
-  {#if targetDetails && activeTab === 'files'}
-    <div class="mt-6 bg-card rounded-lg border p-6">
-      <h3 class="font-semibold mb-4 flex items-center gap-2">
-        <Target class="w-4 h-4" />
-        Target Details: {targetDetails.name}
-      </h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <h4 class="text-sm font-medium text-muted-foreground mb-2">Basic Information</h4>
-          <dl class="space-y-2 text-sm">
-            <div>
-              <dt class="text-muted-foreground">Full Path</dt>
-              <dd class="font-mono">{getTargetPath(targetDetails.name)}</dd>
-            </div>
-            <div>
-              <dt class="text-muted-foreground">Type</dt>
-              <dd class="font-mono">{targetDetails.ruleType || targetDetails.type || targetDetails.class}</dd>
-            </div>
-            {#if targetDetails.location}
-              <div>
-                <dt class="text-muted-foreground">Location</dt>
-                <dd class="font-mono text-xs">{targetDetails.location}</dd>
-              </div>
-            {/if}
-          </dl>
-        </div>
-
-        {#if targetDetails.attributes && Object.keys(targetDetails.attributes).length > 0}
-          <div>
-            <h4 class="text-sm font-medium text-muted-foreground mb-2">Attributes</h4>
-            <dl class="space-y-1 text-sm max-h-40 overflow-y-auto">
-              {#each Object.entries(targetDetails.attributes).slice(0, 10) as [key, value]}
-                <div>
-                  <dt class="text-muted-foreground inline">{key}:</dt>
-                  <dd class="font-mono inline ml-2">
-                    {#if Array.isArray(value)}
-                      [{value.length} items]
-                    {:else if typeof value === 'object'}
-                      {JSON.stringify(value)}
-                    {:else}
-                      {value}
-                    {/if}
-                  </dd>
-                </div>
-              {/each}
-            </dl>
-          </div>
-        {/if}
-      </div>
-
-      {#if targetDetails.inputs || targetDetails.outputs}
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {#if targetDetails.inputs && targetDetails.inputs.length > 0}
-            <div>
-              <h4 class="text-sm font-medium text-muted-foreground mb-2">Inputs ({targetDetails.inputs.length})</h4>
-              <div class="space-y-1 max-h-32 overflow-y-auto">
-                {#each targetDetails.inputs.slice(0, 10) as input}
-                  <div class="font-mono text-xs text-muted-foreground">{input}</div>
-                {/each}
-              </div>
-            </div>
-          {/if}
-
-          {#if targetDetails.outputs && targetDetails.outputs.length > 0}
-            <div>
-              <h4 class="text-sm font-medium text-muted-foreground mb-2">Outputs ({targetDetails.outputs.length})</h4>
-              <div class="space-y-1 max-h-32 overflow-y-auto">
-                {#each targetDetails.outputs.slice(0, 10) as output}
-                  <div class="font-mono text-xs text-muted-foreground">{output}</div>
-                {/each}
-              </div>
-            </div>
-          {/if}
-        </div>
-      {/if}
-    </div>
-  {/if}
 </div>
