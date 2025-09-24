@@ -6,6 +6,7 @@
   import { createEventDispatcher } from 'svelte';
   import { storage } from '$lib/storage';
   import CopyButton from '$lib/components/CopyButton.svelte';
+  import TypeSelector from '$lib/components/TypeSelector.svelte';
   import { updateParam } from '$lib/navigation';
 
   const dispatch = createEventDispatcher();
@@ -522,11 +523,6 @@
     runCommand = '';
   }
 
-  onDestroy(() => {
-    if (runCleanup) {
-      runCleanup();
-    }
-  });
 
   $: uniqueTypes = [...new Set(targets.map(t => t.ruleType).filter(Boolean))];
 
@@ -591,16 +587,11 @@
         {/if}
       </div>
     </div>
-    <select
+    <TypeSelector
       bind:value={selectedType}
+      types={uniqueTypes}
       on:change={() => filterByType(selectedType)}
-      class="px-4 py-2 border rounded-md bg-background"
-    >
-      <option value="">All types</option>
-      {#each uniqueTypes as type}
-        <option value={type}>{type}</option>
-      {/each}
-    </select>
+    />
     <button
       on:click={loadTargets}
       class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
@@ -616,7 +607,7 @@
         bind:checked={showHiddenTargets}
         class="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
       />
-      <span class="text-sm">Show hidden targets</span>
+      <span class="text -sm">Show hidden targets</span>
       {#if hiddenCount > 0 && !showHiddenTargets}
         <span class="text-xs text-muted-foreground">({hiddenCount} hidden)</span>
       {/if}

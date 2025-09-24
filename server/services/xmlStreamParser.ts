@@ -1,5 +1,5 @@
 import sax from 'sax';
-import { Readable, Transform } from 'stream';
+import { Transform } from 'stream';
 
 export interface BazelRule {
   name: string;
@@ -27,10 +27,7 @@ export function createXmlToJsonStream(): Transform {
     lowercase: true
   });
 
-  const result: ParsedDependencyData = {
-    rules: [],
-    edges: []
-  };
+ 
 
   let currentRule: Partial<BazelRule> | null = null;
 
@@ -40,7 +37,7 @@ export function createXmlToJsonStream(): Transform {
   const transform = new Transform({
     writableObjectMode: false,
     readableObjectMode: false,
-    transform(chunk, encoding, callback) {
+    transform(chunk, _encoding, callback) {
       // Pass the chunk to the SAX parser
       parser.write(chunk);
       callback();
@@ -142,7 +139,6 @@ export function createCompactXmlToJsonStream(): Transform {
   });
 
   let currentRule: Partial<BazelRule> | null = null;
-  let currentElement: string | null = null;
   let currentText = '';
   
   // Track unique rules and edges to avoid duplicates
@@ -150,13 +146,12 @@ export function createCompactXmlToJsonStream(): Transform {
   const seenEdges = new Set<string>();
   
   // Track if we've started sending data
-  let hasStarted = false;
   let needsComma = false;
 
   const transform = new Transform({
     writableObjectMode: false,
     readableObjectMode: false,
-    transform(chunk, encoding, callback) {
+    transform(chunk, _encoding, callback) {
       parser.write(chunk);
       callback();
     },
@@ -176,7 +171,6 @@ export function createCompactXmlToJsonStream(): Transform {
   transform.push('{\n  "rules": [\n');
 
   parser.on('opentag', (node) => {
-    currentElement = node.name;
     
     if (node.name === 'rule') {
       const ruleName = node.attributes.name as string;
@@ -230,7 +224,6 @@ export function createCompactXmlToJsonStream(): Transform {
       currentText = '';
     }
     
-    currentElement = null;
   });
 
   parser.on('error', (err) => {
@@ -288,7 +281,7 @@ export function parseXmlToJson(xmlString: string): Promise<ParsedDependencyData>
 
           result.edges.push({
             source: source,
-            target: currentRule.name
+            target: currentRule.name!
           });
         }
       }

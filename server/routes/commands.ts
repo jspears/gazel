@@ -49,7 +49,7 @@ router.post('/build', async (req: Request, res: Response, next: NextFunction) =>
       historyEntry.output = result.stdout;
       commandHistory.unshift(historyEntry);
       
-      res.json({
+      return res.json({
         success: true,
         output: result.stdout,
         stderr: result.stderr
@@ -67,14 +67,14 @@ router.post('/build', async (req: Request, res: Response, next: NextFunction) =>
       });
     }
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
 /**
  * Test a target
  */
-router.post('/test', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/test', async (req: Request, res: Response,next: NextFunction) => {
   try {
     const { target, options = [] }: CommandBody = req.body;
     
@@ -98,7 +98,7 @@ router.post('/test', async (req: Request, res: Response, next: NextFunction) => 
       historyEntry.output = result.stdout;
       commandHistory.unshift(historyEntry);
       
-      res.json({
+      return res.json({
         success: true,
         output: result.stdout,
         stderr: result.stderr
@@ -116,7 +116,7 @@ router.post('/test', async (req: Request, res: Response, next: NextFunction) => 
       });
     }
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -182,7 +182,7 @@ router.get('/build/stream', async (req: Request, res: Response, next: NextFuncti
       }
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -249,7 +249,7 @@ router.get('/run/stream', async (req: Request, res: Response, next: NextFunction
     });
   } catch (error) {
     console.error('Error in run/stream:', error);
-    next(error);
+   return next(error);
   }
 });
 
@@ -312,7 +312,7 @@ router.get('/history', async (req: Request, res: Response, next: NextFunction) =
 /**
  * Clear command history
  */
-router.delete('/history', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/history', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     commandHistory.length = 0;
     res.json({ success: true });
@@ -324,14 +324,13 @@ router.delete('/history', async (req: Request, res: Response, next: NextFunction
 /**
  * Clear Bazel cache
  */
-router.post('/clean', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/clean', async (req: Request, res: Response, _next: NextFunction) => {
   try {
     const { expunge = false } = req.body;
-    
-    const command = expunge ? 'clean --expunge' : 'clean';
+
     const result = await bazelService.execute('clean', expunge ? ['--expunge'] : []);
-    
-    res.json({
+
+    return res.json({
       success: true,
       output: result.stdout
     });

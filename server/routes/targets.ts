@@ -48,7 +48,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
  * Get target outputs (what files it produces)
  * Using query parameter instead of path to avoid conflicts with targets containing /outputs
  */
-router.get('/outputs', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/outputs', async (req: Request, res: Response, _next: NextFunction) => {
   const target = req.query.target as string;
   if (!target) {
     return res.status(400).json({ error: 'Target parameter is required' });
@@ -73,7 +73,7 @@ router.get('/outputs', async (req: Request, res: Response, next: NextFunction) =
         };
       });
 
-    res.json({
+    return res.json({
       target: fullTarget,
       outputs,
       count: outputs.length
@@ -87,7 +87,7 @@ router.get('/outputs', async (req: Request, res: Response, next: NextFunction) =
         .filter(line => line.includes('output') || line.includes('Creating'))
         .map(line => line.trim());
 
-      res.json({
+      return res.json({
         target: fullTarget,
         outputs: outputs.map(o => ({ path: o, filename: o, type: 'info' })),
         count: outputs.length,
@@ -95,7 +95,7 @@ router.get('/outputs', async (req: Request, res: Response, next: NextFunction) =
       });
     } catch (fallbackError) {
       console.error('Failed to get target outputs:', error);
-      res.json({
+      return res.json({
         target: fullTarget,
         outputs: [],
         count: 0,
@@ -132,14 +132,14 @@ router.get('/dependencies', async (req: Request, res: Response, next: NextFuncti
       dependencies = parserService.parseLabelOutput(result.stdout);
     }
     
-    res.json({
+    return res.json({
       target: fullTarget,
       depth: depthNum,
       total: dependencies.length,
       dependencies
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -160,13 +160,13 @@ router.get('/rdeps', async (req: Request, res: Response, next: NextFunction) => 
     const result = await bazelService.getReverseDependencies(fullTarget);
     const dependencies = parserService.parseLabelOutput(result.stdout);
 
-    res.json({
+    return res.json({
       target: fullTarget,
       total: dependencies.length,
       dependencies
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -185,13 +185,13 @@ router.get('/by-file', async (req: Request, res: Response, next: NextFunction) =
     const result = await bazelService.query(query, 'label_kind');
     const targets = parserService.parseLabelKindOutput(result.stdout);
 
-    res.json({
+    return res.json({
       file,
       total: targets.length,
       targets
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -229,7 +229,7 @@ router.post('/search', async (req: Request, res: Response, next: NextFunction) =
     const result = await bazelService.query(bazelQuery, 'label_kind');
     const targets = parserService.parseLabelKindOutput(result.stdout);
     
-    res.json({
+    return res.json({
       query,
       total: targets.length,
       targets
@@ -253,10 +253,10 @@ router.post('/search', async (req: Request, res: Response, next: NextFunction) =
           targets: filtered
         });
       } catch (fallbackError) {
-        next(fallbackError);
+       return next(fallbackError);
       }
     } else {
-      next(error);
+   return   next(error);
     }
   }
 });
@@ -290,7 +290,7 @@ router.get('/:target(*)', async (req: Request, res: Response, next: NextFunction
         details: error.stderr
       });
     }
-    next(error);
+  return next(error);
   }
 });
 

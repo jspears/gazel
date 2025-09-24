@@ -109,7 +109,7 @@ router.post('/query', async (req: Request, res: Response, next: NextFunction) =>
     });
 
   } catch (error: any) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -193,7 +193,7 @@ router.post('/query-compact', async (req: Request, res: Response, next: NextFunc
     });
 
   } catch (error: any) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -278,7 +278,7 @@ router.post('/query-enhanced', async (req: Request, res: Response, next: NextFun
     });
 
   } catch (error: any) {
-    next(error);
+    return next(error);
   }
 });
 

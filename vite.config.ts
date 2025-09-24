@@ -31,6 +31,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    emptyOutDir: false // Don't clear the dist directory to preserve server files
   }
 });

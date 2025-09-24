@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import config from './config.js';
+import { printStartupBanner, printShutdownMessage } from './utils/console-styles.js';
 
 // Import routes
 import workspaceRoutes from './routes/workspace.js';
@@ -37,11 +38,12 @@ app.use('/api/modules', modulesRoutes);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
+  console.log(`Serving static files from ${path.join(__dirname, '..', '..', 'dist')}`);
   const distPath = path.join(__dirname, '..', '..', 'dist');
   app.use(express.static(distPath));
   
   // Handle client-side routing
-  app.get('*', (req: Request, res: Response) => {
+  app.get('*', (_req: Request, res: Response) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
@@ -54,7 +56,7 @@ interface ErrorWithStatus extends Error {
   stderr?: string;
 }
 
-app.use((err: ErrorWithStatus, req: Request, res: Response, next: NextFunction) => {
+app.use((err: ErrorWithStatus, _req: Request, res: Response, _next: NextFunction) => {
   console.error('Error:', err);
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
@@ -63,8 +65,25 @@ app.use((err: ErrorWithStatus, req: Request, res: Response, next: NextFunction) 
 });
 
 // Start server
-app.listen(config.port, () => {
-  console.log(`Gazel server running on http://localhost:${config.port}`);
-  console.log(`Bazel workspace: ${config.bazelWorkspace}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+const server = app.listen(config.port, () => {
+  printStartupBanner(
+    config.port,
+    config.bazelWorkspace,
+    process.env.NODE_ENV || 'development'
+  );
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  printShutdownMessage();
+  server.close(() => {
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  printShutdownMessage();
+  server.close(() => {
+    process.exit(0);
+  });
 });

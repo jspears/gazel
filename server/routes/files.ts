@@ -9,7 +9,7 @@ const router = Router();
 /**
  * List BUILD files
  */
-router.get('/build', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/build', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const buildFiles: Array<{path: string; targets: number; lastModified: number}> = [];
 
@@ -49,12 +49,12 @@ router.get('/build', async (req: Request, res: Response, next: NextFunction) => 
     // Sort by last modified date (newest first)
     buildFiles.sort((a, b) => b.lastModified - a.lastModified);
 
-    res.json({
+    return res.json({
       total: buildFiles.length,
       files: buildFiles
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -101,22 +101,22 @@ router.get('/build/*', async (req: Request, res: Response, next: NextFunction) =
     
     // Parse targets in the file
     const targets = parserService.parseBuildFile(content);
-    
-    res.json({
+
+    return res.json({
       path: path.relative(config.bazelWorkspace, actualPath),
       content,
       targets,
       lines: content.split('\n').length
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
 /**
  * Get WORKSPACE file content
  */
-router.get('/workspace', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/workspace', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaceFile = path.join(config.bazelWorkspace, 'WORKSPACE');
     const workspaceBazelFile = path.join(config.bazelWorkspace, 'WORKSPACE.bazel');
@@ -160,7 +160,7 @@ router.get('/workspace', async (req: Request, res: Response, next: NextFunction)
       }
     }
     
-    res.json({
+    return res.json({
       path: path.relative(config.bazelWorkspace, actualPath),
       content,
       workspaceName,
@@ -168,7 +168,7 @@ router.get('/workspace', async (req: Request, res: Response, next: NextFunction)
       lines: content.split('\n').length
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -228,15 +228,15 @@ router.post('/search', async (req: Request, res: Response, next: NextFunction) =
     }
     
     await searchInFiles(config.bazelWorkspace);
-    
-    res.json({
+
+    return res.json({
       query,
       caseSensitive,
       total: results.length,
       results: results.slice(0, 100) // Limit to 100 results
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

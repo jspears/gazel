@@ -41,11 +41,9 @@ export function parseEnhancedXmlToJson(xmlString: string): Promise<EnhancedDepen
 
     let currentRule: EnhancedBazelRule | null = null;
     let currentList: string | null = null;
-    let currentElement: string | null = null;
     let inList = false;
 
     parser.onopentag = (node) => {
-      currentElement = node.name;
 
       if (node.name === 'rule') {
         // Start a new rule
@@ -190,7 +188,7 @@ export function createEnhancedXmlStream(): Transform {
   const transform = new Transform({
     writableObjectMode: false,
     readableObjectMode: false,
-    transform(chunk, encoding, callback) {
+    transform(chunk, _encoding, callback) {
       parser.write(chunk);
       callback();
     },

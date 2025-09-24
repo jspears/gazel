@@ -48,11 +48,7 @@ class ParserService {
    */
   async parseXmlOutput(xmlString: string): Promise<BazelQueryResult> {
     try {
-      const result = await parseXml(xmlString, {
-        explicitArray: false,
-        mergeAttrs: true,
-        normalizeTags: true
-      });
+      const result = await parseXml(xmlString);
       
       return this.transformXmlResult(result);
     } catch (error: any) {

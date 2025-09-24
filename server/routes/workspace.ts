@@ -2,7 +2,6 @@ import { Router, Request, Response, NextFunction } from 'express';
 import fs from 'fs/promises';
 import fsSync from 'node:fs';
 import path from 'path';
-import os from 'os';
 import bazelService from '../services/bazel.js';
 import config, { setWorkspace } from '../config.js';
 import type { BuildFile, WorkspaceInfo } from '../types/index.js';
@@ -12,7 +11,7 @@ const router = Router();
 /**
  * Get workspace information
  */
-router.get('/info', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/info', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [info, bazelVersion] = await Promise.all([
       bazelService.getWorkspaceInfo(),
@@ -60,7 +59,7 @@ router.get('/info', async (req: Request, res: Response, next: NextFunction) => {
 /**
  * List all BUILD files in the workspace
  */
-router.get('/files', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/files', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const buildFiles: BuildFile[] = [];
     
@@ -110,7 +109,7 @@ router.get('/files', async (req: Request, res: Response, next: NextFunction) => 
 /**
  * Get Bazel configuration (deprecated - returns empty config)
  */
-router.get('/config', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/config', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     // Return empty configuration since .bazelrc support is removed
     res.json({
@@ -125,7 +124,7 @@ router.get('/config', async (req: Request, res: Response, next: NextFunction) =>
 /**
  * Get current workspace or null if not configured
  */
-router.get('/current', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/current', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     if (!config.bazelWorkspace) {
       res.json({ configured: false, workspace: null });
@@ -169,7 +168,7 @@ router.get('/current', async (req: Request, res: Response, next: NextFunction) =
 /**
  * Scan for available Bazel workspaces
  */
-router.get('/scan', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/scan', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const workspaces: Array<{
       path: string;
@@ -260,13 +259,13 @@ router.post('/switch', async (req: Request, res: Response, next: NextFunction) =
     // Clear any caches
     bazelService.clearCache();
 
-    res.json({
+    return res.json({
       success: true,
       workspace: normalized,
       message: 'Workspace switched successfully'
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

@@ -39,7 +39,7 @@ interface FlattenedModule {
 /**
  * Get module graph information
  */
-router.get('/graph', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/graph', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     let moduleGraph: ModuleNode;
 
@@ -124,7 +124,7 @@ router.get('/graph', async (req: Request, res: Response, next: NextFunction) => 
     res.json(processedGraph);
   } catch (error: any) {
     console.error('Unexpected error in module graph endpoint:', error);
-    next(error);
+    return next(error);
   }
 });
 
@@ -164,7 +164,7 @@ router.get('/info/:moduleName', async (req: Request, res: Response, next: NextFu
     // Get additional details about the module
     const detailedInfo = getModuleDetails(moduleName, moduleInfo, flattened);
 
-    res.json(detailedInfo);
+    return res.json(detailedInfo);
   } catch (error: any) {
     console.error('Failed to get module info:', error);
     
@@ -176,8 +176,8 @@ router.get('/info/:moduleName', async (req: Request, res: Response, next: NextFu
         stderr: error.stderr
       });
     }
-    
-    next(error);
+
+    return next(error);
   }
 });
 
@@ -187,7 +187,7 @@ router.get('/info/:moduleName', async (req: Request, res: Response, next: NextFu
 function flattenModuleGraph(node: ModuleNode, depth = 0, visited = new Set<string>()): Map<string, FlattenedModule> {
   const modules = new Map<string, FlattenedModule>();
 
-  function traverse(node: ModuleDependency, currentDepth: number, parentKey?: string) {
+  function traverse(node: ModuleDependency, currentDepth: number,) {
     if (visited.has(node.key)) {
       return;
     }
@@ -211,7 +211,7 @@ function flattenModuleGraph(node: ModuleNode, depth = 0, visited = new Set<strin
         flatModule.allDependencies.add(dep.key);
 
         // Recursively traverse dependencies
-        traverse(dep, currentDepth + 1, node.key);
+        traverse(dep, currentDepth + 1);
       }
     }
 
@@ -289,11 +289,30 @@ function processModuleGraph(rootNode: ModuleNode): any {
   return processed;
 }
 
+type Dep = {
+  key: string;
+  name: string;
+  version: string;
+  apparentName: string;
+}
+type Details = {
+  moduleName: string;
+  key: string;
+  name: string;
+  version: string;
+  apparentName: string;
+  isRoot?: boolean;
+  depth: number;
+  directDependents: Dep[];
+  directDependencies: Dep[];
+  transitiveDependencies: Dep[];
+}
 /**
  * Get detailed information about a module
  */
-function getModuleDetails(moduleName: string, moduleInfo: FlattenedModule, allModules: Map<string, FlattenedModule>): any {
-  const details: any = {
+function getModuleDetails(moduleName: string, moduleInfo: FlattenedModule, allModules: Map<string, FlattenedModule>) {
+  const details:Details = {
+    moduleName,
     key: moduleInfo.key,
     name: moduleInfo.name,
     version: moduleInfo.version,
@@ -302,7 +321,7 @@ function getModuleDetails(moduleName: string, moduleInfo: FlattenedModule, allMo
     depth: moduleInfo.depth,
     directDependents: [],
     directDependencies: [],
-    transitiveDependencies: []
+    transitiveDependencies:[]
   };
 
   // Get direct dependencies with full info
@@ -319,7 +338,7 @@ function getModuleDetails(moduleName: string, moduleInfo: FlattenedModule, allMo
   }
 
   // Find modules that depend on this module
-  for (const [key, module] of allModules) {
+  for (const [, module] of allModules) {
     if (module.directDependencies.includes(moduleInfo.key)) {
       details.directDependents.push({
         key: module.key,

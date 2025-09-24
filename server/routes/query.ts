@@ -24,9 +24,9 @@ const savedQueries: Map<string, SavedQuery> = new Map();
  * Execute a Bazel query
  */
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { query, outputFormat = 'label_kind' }: QueryBody = req.body;
+  const { query, outputFormat = 'label_kind' }: QueryBody = req.body;
 
+  try {
     if (!query) {
       return res.status(400).json({ error: 'Query is required' });
     }
@@ -52,7 +52,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       };
     }
 
-    res.json({
+    return res.json({
       query,
       outputFormat,
       result: parsedResult,
@@ -66,19 +66,19 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         details: error.stderr
       });
     }
-    next(error);
+    return next(error);
   }
 });
 
 /**
  * Get saved queries
  */
-router.get('/saved', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/saved', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const queries = Array.from(savedQueries.values());
-    res.json(queries);
+    return res.json(queries);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -88,11 +88,11 @@ router.get('/saved', async (req: Request, res: Response, next: NextFunction) => 
 router.post('/save', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, query, description } = req.body;
-    
+
     if (!name || !query) {
       return res.status(400).json({ error: 'Name and query are required' });
     }
-    
+
     const id = `query_${Date.now()}`;
     const savedQuery: SavedQuery = {
       id,
@@ -101,12 +101,12 @@ router.post('/save', async (req: Request, res: Response, next: NextFunction) => 
       description,
       createdAt: new Date()
     };
-    
+
     savedQueries.set(id, savedQuery);
-    
-    res.json(savedQuery);
+
+    return res.json(savedQuery);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -116,22 +116,22 @@ router.post('/save', async (req: Request, res: Response, next: NextFunction) => 
 router.delete('/saved/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    
+
     if (!savedQueries.has(id)) {
       return res.status(404).json({ error: 'Query not found' });
     }
-    
+
     savedQueries.delete(id);
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
 /**
  * Get common query templates
  */
-router.get('/templates', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/templates', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const templates = [
       {
@@ -175,10 +175,10 @@ router.get('/templates', async (req: Request, res: Response, next: NextFunction)
         description: 'Show only direct dependencies'
       }
     ];
-    
-    res.json(templates);
+
+    return res.json(templates);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
