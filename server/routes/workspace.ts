@@ -108,43 +108,14 @@ router.get('/files', async (req: Request, res: Response, next: NextFunction) => 
 });
 
 /**
- * Get Bazel configuration
+ * Get Bazel configuration (deprecated - returns empty config)
  */
 router.get('/config', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const bazelrcPath = path.join(config.bazelWorkspace, '.bazelrc');
-    let bazelrcContent = '';
-    
-    try {
-      bazelrcContent = await fs.readFile(bazelrcPath, 'utf-8');
-    } catch {
-      console.log('No .bazelrc file found');
-    }
-    
-    // Parse .bazelrc content
-    const configs: Record<string, string[]> = {};
-    if (bazelrcContent) {
-      const lines = bazelrcContent.split('\n');
-      lines.forEach(line => {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith('#')) {
-          const match = trimmed.match(/^(build|test|query|common):?(.*)$/);
-          if (match) {
-            const [, command, options] = match;
-            if (!configs[command]) {
-              configs[command] = [];
-            }
-            if (options) {
-              configs[command].push(options.trim());
-            }
-          }
-        }
-      });
-    }
-    
+    // Return empty configuration since .bazelrc support is removed
     res.json({
-      bazelrc_exists: !!bazelrcContent,
-      configurations: configs
+      bazelrc_exists: false,
+      configurations: {}
     });
   } catch (error) {
     next(error);

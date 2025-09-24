@@ -254,28 +254,40 @@ class BazelService {
    * Stream command output (for long-running commands)
    */
   streamCommand(
-    command: string, 
-    args: string[] = [], 
-    onData: (data: string) => void,
-    onError: (data: string) => void,
-    onClose: (code: number | null) => void
+    command: string,
+    args: string[] = [],
+    onData?: (data: string) => void,
+    onError?: (data: string) => void,
+    onClose?: (code: number | null) => void
   ): ChildProcess {
+    console.log(`Executing: ${this.executable} ${command} ${args.join(' ')} in ${this.workspace}`);
+
+    // Don't use shell: true as it can cause issues with command parsing
+    // Instead, pass the command and args directly to spawn
     const child = spawn(this.executable, [command, ...args], {
       cwd: this.workspace,
-      shell: true
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe']
     });
+    if (onData) {
+      child.stdout?.on('data', (data: Buffer) => {
+        onData(data.toString());
+      });
+    }
 
-    child.stdout?.on('data', (data: Buffer) => {
-      onData(data.toString());
-    });
+    if (onError) {
+      child.stderr?.on('data', (data: Buffer) => {
+        const errorStr = data.toString();
+        onError(errorStr);
+      });
+    }
 
-    child.stderr?.on('data', (data: Buffer) => {
-      onError(data.toString());
-    });
+    if (onClose) {
+      child.on('close', (code: number | null) => {
+        onClose(code);
+      });
+    }
 
-    child.on('close', (code: number | null) => {
-      onClose(code);
-    });
 
     return child;
   }

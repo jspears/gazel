@@ -274,8 +274,7 @@ PORT=3002 npm run dev
 BAZEL_EXECUTABLE=/usr/local/bin/bazel npm run dev
 ```
 
-### Custom Bazel Options
-Edit `.bazelrc` in your workspace to set default options that will be reflected in the tool.
+
 
 ## Example Workflows
 

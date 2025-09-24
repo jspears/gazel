@@ -1,17 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Play, TestTube, Trash2, Clock, CheckCircle, XCircle } from 'lucide-svelte';
+  import { Play, TestTube, Trash2, Clock, CheckCircle, XCircle, Terminal } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { CommandHistory } from '$lib/types';
-  
+
   let target = '';
-  let commandType: 'build' | 'test' = 'build';
+  let commandType: 'build' | 'test' | 'run' = 'build';
   let options = '';
   let output = '';
   let isStreaming = false;
   let history: CommandHistory[] = [];
   let loading = false;
   let error: string | null = null;
+  let cancelStreamRun: (() => void) | null = null;
 
   onMount(() => {
     loadHistory();
@@ -76,7 +77,7 @@
     isStreaming = true;
     output = '';
     error = null;
-    
+
     const optionsArray = options.trim() ? options.trim().split(' ') : [];
     const eventSource = api.streamBuild(target, optionsArray, (data) => {
       if (data.type === 'stdout') {
@@ -96,6 +97,52 @@
     return () => {
       eventSource.close();
     };
+  }
+
+  function streamRun() {
+    if (!target.trim() || isStreaming) return;
+
+    isStreaming = true;
+    output = '';
+    error = null;
+
+    const optionsArray = options.trim() ? options.trim().split(' ') : [];
+
+    // Use EventSource for streaming
+    const eventSource = api.streamRun(target, optionsArray, (data) => {
+      if (data.type === 'stdout') {
+        output += data.data;
+      } else if (data.type === 'stderr') {
+        output += `\n[ERROR] ${data.data}`;
+      } else if (data.type === 'info') {
+        output += `\n[INFO] ${data.data}\n`;
+      } else if (data.type === 'exit') {
+        isStreaming = false;
+        if (data.code !== 0) {
+          error = `Process exited with code ${data.code}`;
+        }
+        loadHistory();
+        eventSource.close();
+      } else if (data.type === 'error') {
+        isStreaming = false;
+        error = data.data;
+        eventSource.close();
+      }
+    });
+
+    // Store the EventSource for cleanup
+    cancelStreamRun = () => {
+      eventSource.close();
+      isStreaming = false;
+    };
+  }
+
+  function stopStreaming() {
+    if (cancelStreamRun) {
+      cancelStreamRun();
+      cancelStreamRun = null;
+    }
+    isStreaming = false;
   }
 
   async function clearHistory() {
@@ -175,10 +222,28 @@
         <button
           on:click={streamBuild}
           disabled={loading || isStreaming || !target.trim()}
-          class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50"
+          class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50 flex items-center gap-2"
         >
+          <Play class="w-4 h-4" />
           Stream Build
         </button>
+        <button
+          on:click={streamRun}
+          disabled={loading || isStreaming || !target.trim()}
+          class="px-4 py-2 bg-accent text-accent-foreground rounded-md hover:bg-accent/90 disabled:opacity-50 flex items-center gap-2"
+        >
+          <Terminal class="w-4 h-4" />
+          Run Target
+        </button>
+        {#if isStreaming}
+          <button
+            on:click={stopStreaming}
+            class="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 flex items-center gap-2"
+          >
+            <XCircle class="w-4 h-4" />
+            Stop
+          </button>
+        {/if}
         <div class="ml-auto flex gap-2">
           <button
             on:click={() => cleanBazel(false)}

@@ -32,7 +32,7 @@
   let runOutput: string[] = [];
   let runCommand = '';
   let runStatus: 'idle' | 'running' | 'success' | 'error' = 'idle';
-  let runCleanup: (() => void) | null = null;
+  let runEventSource: EventSource | null = null;
   let outputContainer: HTMLDivElement;
 
   // Show hidden targets state
@@ -448,7 +448,7 @@
     return lastPart.startsWith('.');
   }
 
-  async function runTarget(target: BazelTarget) {
+  function runTarget(target: BazelTarget) {
     if (!target.full && !target.name) return;
 
     const targetName = target.full || target.name;
@@ -457,52 +457,64 @@
     runStatus = 'running';
     showRunModal = true;
 
-    try {
-      runCleanup = await api.streamRun(
-        targetName,
-        [],
-        (data) => {
-          if (data.type === 'stdout' || data.type === 'stderr') {
-            runOutput = [...runOutput, data.data];
-            // Auto-scroll to bottom
-            if (outputContainer) {
-              setTimeout(() => {
-                outputContainer.scrollTop = outputContainer.scrollHeight;
-              }, 0);
-            }
-          } else if (data.type === 'exit') {
-            if (data.code === 0) {
-              runStatus = 'success';
-              runOutput = [...runOutput, '\n✅ Command completed successfully'];
-            } else if (data.code === null) {
-              // Process was killed or terminated abnormally
-              runStatus = 'error';
-              runOutput = [...runOutput, '\n⚠️ Command was terminated'];
-            } else {
-              runStatus = 'error';
-              runOutput = [...runOutput, `\n❌ Command failed with exit code ${data.code}`];
-            }
-          } else if (data.type === 'error') {
-            // Handle stream errors
-            runStatus = 'error';
-            runOutput = [...runOutput, `\n❌ Error: ${data.data}`];
-          }
+    // Use EventSource for streaming
+    runEventSource = api.streamRun(targetName, [], (data) => {
+      if (data.type === 'stdout' || data.type === 'stderr') {
+        runOutput = [...runOutput, data.data];
+        // Auto-scroll to bottom
+        if (outputContainer) {
+          setTimeout(() => {
+            outputContainer.scrollTop = outputContainer.scrollHeight;
+          }, 0);
         }
-      );
-    } catch (error: any) {
-      runStatus = 'error';
-      runOutput = [...runOutput, `\n❌ Error: ${error.message}`];
-    }
+      } else if (data.type === 'info') {
+        runOutput = [...runOutput, `ℹ️ ${data.data}\n`];
+        // Auto-scroll for info messages too
+        if (outputContainer) {
+          setTimeout(() => {
+            outputContainer.scrollTop = outputContainer.scrollHeight;
+          }, 0);
+        }
+      } else if (data.type === 'exit') {
+        if (data.code === 0) {
+          runStatus = 'success';
+          runOutput = [...runOutput, '\n✅ Command completed successfully'];
+        } else if (data.code === null) {
+          // Process was killed or terminated abnormally
+          runStatus = 'error';
+          runOutput = [...runOutput, '\n⚠️ Command was terminated'];
+        } else {
+          runStatus = 'error';
+          runOutput = [...runOutput, `\n❌ Command failed with exit code ${data.code}`];
+        }
+        // Close the EventSource when process exits
+        if (runEventSource) {
+          runEventSource.close();
+          runEventSource = null;
+        }
+      } else if (data.type === 'error') {
+        // Handle stream errors
+        runStatus = 'error';
+        runOutput = [...runOutput, `\n❌ Error: ${data.data}`];
+        // Close the EventSource on error
+        if (runEventSource) {
+          runEventSource.close();
+          runEventSource = null;
+        }
+      }
+    });
   }
 
+
+
   function closeRunModal() {
-    if (runCleanup) {
+    if (runEventSource) {
       // If still running, add a message that we're stopping
       if (runStatus === 'running') {
         runOutput = [...runOutput, '\n⚠️ Stopping command...'];
       }
-      runCleanup();
-      runCleanup = null;
+      runEventSource.close();
+      runEventSource = null;
     }
     showRunModal = false;
     runStatus = 'idle';

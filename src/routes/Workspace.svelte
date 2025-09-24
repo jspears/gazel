@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { Folder, FileCode, Settings, Package, ExternalLink, Target, Clock, ChevronDown, ChevronRight, RefreshCw } from 'lucide-svelte';
+  import { Folder, FileCode, Package, ExternalLink, Target, Clock, ChevronDown, ChevronRight, RefreshCw } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { WorkspaceInfo, BuildFile } from '$lib/types';
   import { storage } from '$lib/storage';
@@ -9,7 +9,6 @@
 
   let workspaceInfo: WorkspaceInfo | null = null;
   let buildFiles: BuildFile[] = [];
-  let bazelConfig: Record<string, string[]> = {};
   let loading = true;
   let error: string | null = null;
   let recentTargets = storage.getRecentTargets();
@@ -19,15 +18,13 @@
   onMount(async () => {
     try {
       loading = true;
-      const [info, files, config] = await Promise.all([
+      const [info, files] = await Promise.all([
         api.getWorkspaceInfo(),
-        api.getWorkspaceFiles(),
-        api.getWorkspaceConfig()
+        api.getWorkspaceFiles()
       ]);
 
       workspaceInfo = info;
       buildFiles = files.files;
-      bazelConfig = config.configurations;
     } catch (err: any) {
       error = err.message;
     } finally {
@@ -115,24 +112,6 @@
             <dt class="text-muted-foreground">MODULE.bazel files</dt>
             <dd class="text-2xl font-bold">{buildFiles.filter(f => f.type === 'module' || f.type === 'workspace').length}</dd>
           </div>
-        </dl>
-      </div>
-
-      <div class="bg-card p-6 rounded-lg border">
-        <div class="flex items-center gap-3 mb-4">
-          <Settings class="w-5 h-5 text-primary" />
-          <h3 class="font-semibold">Configuration</h3>
-        </div>
-        <dl class="space-y-2 text-sm">
-          {#each Object.entries(bazelConfig) as [key, values]}
-            <div>
-              <dt class="text-muted-foreground">{key}</dt>
-              <dd class="font-mono">{values.length} options</dd>
-            </div>
-          {/each}
-          {#if Object.keys(bazelConfig).length === 0}
-            <div class="text-muted-foreground">No .bazelrc configuration found</div>
-          {/if}
         </dl>
       </div>
     </div>

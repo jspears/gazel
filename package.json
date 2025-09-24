@@ -7,7 +7,7 @@
     "dev": "$npm_execpath run dev:server & $npm_execpath run dev:client",
     "dev:server": "tsx  server/index.ts",
     "dev:client": "vite",
-    "build": "$npm_execpat run build:server && $npm_execpat run build:client",
+    "build": "$npm_execpath run build:server && $npm_execpath run build:client",
     "build:server": "tsc -p tsconfig.server.json",
     "build:client": "vite build",
     "preview": "vite preview",

@@ -121,22 +121,31 @@ router.post('/test', async (req: Request, res: Response, next: NextFunction) => 
 });
 
 /**
- * Stream build output (for long-running builds)
+ * Stream build output (for long-running builds) - GET endpoint for EventSource
  */
-router.post('/build/stream', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/build/stream', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { target, options = [] }: CommandBody = req.body;
+    // Decode URL search parameters
+    const target = req.query.target as string;
+    const optionsParam = req.query.options as string;
+    const options = optionsParam ? optionsParam.split(',').filter(opt => opt.trim()) : [];
 
     if (!target) {
       return res.status(400).json({ error: 'Target is required' });
     }
 
+    console.log(`Building target: ${target} with options:`, options);
+
     // Set up SSE
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
-    });
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    // Send initial message
+    res.write(`data: ${JSON.stringify({ type: 'info', data: `Starting: bazel build ${target}` })}\n\n`);
+
+    let processKilled = false;
 
     const child = bazelService.streamCommand(
       'build',
@@ -148,6 +157,7 @@ router.post('/build/stream', async (req: Request, res: Response, next: NextFunct
         res.write(`data: ${JSON.stringify({ type: 'stderr', data })}\n\n`);
       },
       (code: number | null) => {
+        processKilled = true;
         res.write(`data: ${JSON.stringify({ type: 'exit', code })}\n\n`);
         res.end();
       }
@@ -155,7 +165,21 @@ router.post('/build/stream', async (req: Request, res: Response, next: NextFunct
 
     // Handle client disconnect
     req.on('close', () => {
-      child.kill();
+      if (!processKilled) {
+        processKilled = true;
+        console.log(`Client disconnected, killing build for target: ${target}`);
+        child.kill();
+      }
+    });
+
+    // Handle process errors
+    child.on('error', (err) => {
+      console.error(`Build process error for target ${target}:`, err);
+      if (!processKilled) {
+        processKilled = true;
+        res.write(`data: ${JSON.stringify({ type: 'error', data: err.message })}\n\n`);
+        res.end();
+      }
     });
   } catch (error) {
     next(error);
@@ -163,22 +187,31 @@ router.post('/build/stream', async (req: Request, res: Response, next: NextFunct
 });
 
 /**
- * Stream run output (for running executable targets)
+ * Stream run output (for running executable targets) - GET endpoint for EventSource
  */
-router.post('/run/stream', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/run/stream', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { target, options = [] }: CommandBody = req.body;
+    // Decode URL search parameters
+    const target = req.query.target as string;
+    const optionsParam = req.query.options as string;
+    const options = optionsParam ? optionsParam.split(',').filter(opt => opt.trim()) : [];
 
     if (!target) {
       return res.status(400).json({ error: 'Target is required' });
     }
 
+    console.log(`Running target: ${target} with options:`, options);
+
     // Set up SSE
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
-    });
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    // Send initial message
+    res.write(`data: ${JSON.stringify({ type: 'info', data: `Starting: bazel run ${target}` })}\n\n`);
+
+    let processKilled = false;
 
     const child = bazelService.streamCommand(
       'run',
@@ -190,6 +223,7 @@ router.post('/run/stream', async (req: Request, res: Response, next: NextFunctio
         res.write(`data: ${JSON.stringify({ type: 'stderr', data })}\n\n`);
       },
       (code: number | null) => {
+        processKilled = true;
         res.write(`data: ${JSON.stringify({ type: 'exit', code })}\n\n`);
         res.end();
       }
@@ -197,8 +231,63 @@ router.post('/run/stream', async (req: Request, res: Response, next: NextFunctio
 
     // Handle client disconnect
     req.on('close', () => {
-      child.kill();
+      if (!processKilled) {
+        processKilled = true;
+        console.log(`Client disconnected, killing process for target: ${target}`);
+        child.kill();
+      }
     });
+
+    // Handle process errors
+    child.on('error', (err) => {
+      console.error(`Process error for target ${target}:`, err);
+      if (!processKilled) {
+        processKilled = true;
+        res.write(`data: ${JSON.stringify({ type: 'error', data: err.message })}\n\n`);
+        res.end();
+      }
+    });
+  } catch (error) {
+    console.error('Error in run/stream:', error);
+    next(error);
+  }
+});
+
+/**
+ * Test run endpoint (for testing without bazel)
+ */
+router.post('/test-run', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { target } = req.body;
+
+    // Set up SSE
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+
+    // Simulate a run command
+    res.write(`data: ${JSON.stringify({ type: 'info', data: `Starting test run for: ${target}` })}\n\n`);
+
+    setTimeout(() => {
+      res.write(`data: ${JSON.stringify({ type: 'stdout', data: `Building ${target}...\n` })}\n\n`);
+    }, 500);
+
+    setTimeout(() => {
+      res.write(`data: ${JSON.stringify({ type: 'stdout', data: `Running ${target}...\n` })}\n\n`);
+    }, 1000);
+
+    setTimeout(() => {
+      res.write(`data: ${JSON.stringify({ type: 'stdout', data: `Hello from ${target}!\n` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'stdout', data: `This is a test output.\n` })}\n\n`);
+    }, 1500);
+
+    setTimeout(() => {
+      res.write(`data: ${JSON.stringify({ type: 'exit', code: 0 })}\n\n`);
+      res.end();
+    }, 2000);
+
   } catch (error) {
     next(error);
   }
@@ -247,7 +336,7 @@ router.post('/clean', async (req: Request, res: Response, next: NextFunction) =>
       output: result.stdout
     });
   } catch (error: any) {
-    const command = expunge ? 'bazel clean --expunge' : 'bazel clean';
+    const command = req.body.expunge ? 'bazel clean --expunge' : 'bazel clean';
     return res.status(400).json({
       success: false,
       error: error.message,
