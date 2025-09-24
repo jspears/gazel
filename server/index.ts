@@ -10,6 +10,7 @@ import targetsRoutes from './routes/targets.js';
 import queryRoutes from './routes/query.js';
 import filesRoutes from './routes/files.js';
 import commandsRoutes from './routes/commands.js';
+import streamRoutes from './routes/stream.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,12 +22,16 @@ app.use(cors(config.cors));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve sample files
+app.use('/samples', express.static(path.join(__dirname, '..', 'samples')));
+
 // API Routes
 app.use('/api/workspace', workspaceRoutes);
 app.use('/api/targets', targetsRoutes);
 app.use('/api/query', queryRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/commands', commandsRoutes);
+app.use('/api/stream', streamRoutes);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

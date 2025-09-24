@@ -6,7 +6,8 @@
     FileText,
     Search,
     Terminal,
-    Settings
+    Settings,
+    GitBranch
   } from 'lucide-svelte';
   import './default.min.css';
   import Workspace from './routes/Workspace.svelte';
@@ -14,6 +15,7 @@
   import Files from './routes/Files.svelte';
   import Query from './routes/Query.svelte';
   import Commands from './routes/Commands.svelte';
+  import DependencyGraph from './routes/DependencyGraph.svelte';
   import WorkspacePicker from './components/WorkspacePicker.svelte';
   import { api } from '$lib/api/client';
   import { storage } from '$lib/storage';
@@ -21,6 +23,7 @@
   let activeTab = 'workspace';
   let fileToOpen: string | null = null;
   let targetToOpen: string | null = null;
+  let graphTarget: string | null = null;
   let showWorkspacePicker = false;
   let currentWorkspace: string | null = null;
   let checkingWorkspace = true;
@@ -106,6 +109,15 @@
   function handleNavigateToTargets(event: CustomEvent<{target: string}>) {
     targetToOpen = event.detail.target;
     activeTab = 'targets';
+    // Reset after a short delay to allow the component to use it
+    setTimeout(() => {
+      targetToOpen = null;
+    }, 100);
+  }
+
+  function handleNavigateToGraph(event: CustomEvent<{target: string}>) {
+    graphTarget = event.detail.target;
+    activeTab = 'graph';
   }
 
   function handleOpenWorkspacePicker() {
@@ -159,7 +171,7 @@
 
     <main class="container mx-auto px-4 py-6">
       <div class="w-full">
-        <div class="grid w-full grid-cols-5 mb-6 bg-muted p-1 rounded-md">
+        <div class="grid w-full grid-cols-7 mb-6 bg-muted p-1 rounded-md">
           <button
             on:click={() => activeTab = 'workspace'}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'workspace' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
@@ -189,6 +201,13 @@
             Query
           </button>
           <button
+            on:click={() => activeTab = 'graph'}
+            class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'graph' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+          >
+            <GitBranch class="w-4 h-4" />
+            Graph
+          </button>
+          <button
             on:click={() => activeTab = 'commands'}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'commands' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
@@ -205,13 +224,20 @@
               on:open-workspace-picker={handleOpenWorkspacePicker}
             />
           {:else if activeTab === 'targets'}
-            <Targets on:navigate-to-file={handleNavigateToFile} />
+            <Targets
+              initialTarget={targetToOpen}
+              on:navigate-to-file={handleNavigateToFile}
+              on:navigate-to-graph={handleNavigateToGraph}
+            />
           {:else if activeTab === 'files'}
             <Files bind:fileToOpen />
           {:else if activeTab === 'query'}
             <Query />
+          {:else if activeTab === 'graph'}
+            <DependencyGraph bind:initialTarget={graphTarget} />
           {:else if activeTab === 'commands'}
             <Commands />
+          
           {/if}
         </div>
       </div>

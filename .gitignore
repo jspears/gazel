@@ -39,3 +39,9 @@ coverage/
 
 # Svelte
 .svelte-kit/
+
+# Bazel
+bazel-out
+bazel-bin
+bazel-testlogs
+

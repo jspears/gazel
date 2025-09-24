@@ -1,0 +1,23 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "math",
+    srcs = ["math.cc"],
+    hdrs = ["math.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "string_utils",
+    srcs = ["string_utils.cc"],
+    hdrs = ["string_utils.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "advanced_math",
+    srcs = ["advanced_math.cc"],
+    hdrs = ["advanced_math.h"],
+    deps = [":math"],
+    visibility = ["//visibility:public"],
+)

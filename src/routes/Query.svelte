@@ -124,6 +124,7 @@
             <option value="label">Label</option>
             <option value="label_kind">Label with Kind</option>
             <option value="xml">XML</option>
+            <option value="graph">Graph (DOT)</option>
           </select>
         </div>
 
@@ -264,7 +265,7 @@
             <div class="text-sm text-muted-foreground mb-2">
               Found {queryResult.targets.length} targets
             </div>
-            {#if outputFormat === 'xml'}
+            {#if outputFormat === 'xml' || outputFormat === 'graph'}
               <pre class="font-mono text-xs bg-muted p-4 rounded overflow-x-auto">{rawOutput}</pre>
             {:else}
               {#each queryResult.targets as target}

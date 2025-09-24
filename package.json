@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "$npm_execpath run dev:server & $npm_execpath run dev:client",
-    "dev:server": "tsx watch server/index.ts",
+    "dev:server": "tsx  server/index.ts",
     "dev:client": "vite",
     "build": "$npm_execpat run build:server && $npm_execpat run build:client",
     "build:server": "tsc -p tsconfig.server.json",
@@ -14,14 +14,17 @@
     "start": "node dist/server/index.js",
     "build:all": "$npm_execpath run build && npm run start",
     "typecheck": "tsc --noEmit && svelte-check",
-    "env":"env"
+    "env": "env"
   },
   "dependencies": {
     "@types/highlight.js": "^10.1.0",
+    "@xyflow/svelte": "0.1.36",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
+    "elkjs": "^0.11.0",
     "express": "^4.19.2",
     "highlight.js": "^11.11.1",
+    "sax": "^1.4.1",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
@@ -31,6 +34,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.0",
+    "@types/sax": "^1.2.7",
     "@types/xml2js": "^0.4.14",
     "autoprefixer": "^10.4.0",
     "bits-ui": "^0.21.0",

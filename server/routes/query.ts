@@ -26,13 +26,13 @@ const savedQueries: Map<string, SavedQuery> = new Map();
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { query, outputFormat = 'label_kind' }: QueryBody = req.body;
-    
+
     if (!query) {
       return res.status(400).json({ error: 'Query is required' });
     }
-    
+
     const result = await bazelService.query(query, outputFormat);
-    
+
     let parsedResult: any;
     if (outputFormat === 'xml') {
       parsedResult = await parserService.parseXmlOutput(result.stdout);
@@ -40,12 +40,18 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       parsedResult = {
         targets: parserService.parseLabelKindOutput(result.stdout)
       };
+    } else if (outputFormat === 'graph') {
+      // For graph output, we'll return the raw DOT format
+      parsedResult = {
+        graph: result.stdout,
+        targets: [] // Graph format doesn't list targets in the same way
+      };
     } else {
       parsedResult = {
         targets: parserService.parseLabelOutput(result.stdout)
       };
     }
-    
+
     res.json({
       query,
       outputFormat,

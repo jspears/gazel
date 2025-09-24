@@ -1,0 +1,90 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<query version="2">
+    <rule class="cc_library" location="/gazel/example-bazel-workspace/app/BUILD.bazel:10:11" name="//app:core">
+        <string name="name" value="core"/>
+        <list name="visibility">
+            <label value="//visibility:public"/>
+        </list>
+        <string name="generator_name" value="core"/>
+        <string name="generator_function" value="cc_library"/>
+        <string name="generator_location" value="app/BUILD.bazel:10:11"/>
+        <list name="srcs">
+            <label value="//app:core.cc"/>
+        </list>
+        <list name="hdrs">
+            <label value="//app:core.h"/>
+        </list>
+        <list name="deps">
+            <label value="//app:utils"/>
+            <label value="//lib:math"/>
+        </list>
+        <rule-input name="//app:core.cc"/>
+        <rule-input name="//app:core.h"/>
+        <rule-input name="//app:utils"/>
+        <rule-input name="//lib:math"/>
+        <rule-input name="@bazel_tools//tools/cpp:current_cc_toolchain"/>
+        <rule-input name="@bazel_tools//tools/def_parser:def_parser"/>
+    </rule>
+    <rule class="cc_test" location="/gazel/example-bazel-workspace/app/BUILD.bazel:32:8" name="//app:core_test">
+        <string name="name" value="core_test"/>
+        <list name="srcs">
+            <label value="//app:core_test.cc"/>
+        </list>
+        <list name="deps">
+            <label value="//app:core"/>
+            <label value="@googletest//:gtest_main"/>
+        </list>
+        <boolean configurable="yes" name="linkstatic"/>
+        <rule-input name="//app:core"/>
+        <rule-input name="//app:core_test.cc"/>
+        <rule-input name="@bazel_tools//tools/cpp:current_cc_toolchain"/>
+        <rule-input name="@bazel_tools//tools/cpp:link_extra_lib"/>
+        <rule-input name="@bazel_tools//tools/cpp:malloc"/>
+        <rule-input name="@bazel_tools//tools/def_parser:def_parser"/>
+        <rule-input name="@bazel_tools//tools/test:collect_cc_coverage"/>
+        <rule-input name="@bazel_tools//tools/test:collect_coverage"/>
+        <rule-input name="@bazel_tools//tools/test:coverage_report_generator"/>
+        <rule-input name="@bazel_tools//tools/test:coverage_support"/>
+        <rule-input name="@bazel_tools//tools/test:runtime"/>
+        <rule-input name="@bazel_tools//tools/test:test_setup"/>
+        <rule-input name="@bazel_tools//tools/test:test_wrapper"/>
+        <rule-input name="@bazel_tools//tools/test:test_xml_generator"/>
+        <rule-input name="@bazel_tools//tools/test:xml_writer"/>
+        <rule-input name="@googletest//:gtest_main"/>
+        <rule-input name="@@platforms//os:ios"/>
+        <rule-input name="@@platforms//os:macos"/>
+        <rule-input name="@@platforms//os:tvos"/>
+        <rule-input name="@@platforms//os:watchos"/>
+        <rule-input name="@@platforms//os:windows"/>
+        <rule-output name="//app:core_test.stripped"/>
+        <rule-output name="//app:core_test.dwp"/>
+    </rule>
+    <rule class="cc_binary" location="/gazel/example-bazel-workspace/app/BUILD.bazel:21:10" name="//app:main">
+        <string name="name" value="main"/>
+        <string name="generator_name" value="main"/>
+        <string name="generator_function" value="cc_binary"/>
+        <string name="generator_location" value="app/BUILD.bazel:21:10"/>
+        <list name="srcs">
+            <label value="//app:main.cc"/>
+        </list>
+        <list name="deps">
+            <label value="//app:core"/>
+            <label value="//app:utils"/>
+            <label value="//lib:math"/>
+            <label value="//lib:string_utils"/>
+            <label value="@rules_cc//:link_extra_lib"/>
+        </list>
+        <rule-input name="//app:core"/>
+        <rule-input name="//app:main.cc"/>
+        <rule-input name="//app:utils"/>
+        <rule-input name="//lib:math"/>
+        <rule-input name="//lib:string_utils"/>
+        <rule-input name="@bazel_tools//tools/cpp:current_cc_toolchain"/>
+        <rule-input name="@bazel_tools//tools/cpp:link_extra_lib"/>
+        <rule-input name="@bazel_tools//tools/cpp:malloc"/>
+        <rule-input name="@bazel_tools//tools/def_parser:def_parser"/>
+        <rule-input name="@rules_cc//:link_extra_lib"/>
+        <rule-output name="//app:main.stripped"/>
+        <rule-output name="//app:main.dwp"/>
+    </rule>
+</query>

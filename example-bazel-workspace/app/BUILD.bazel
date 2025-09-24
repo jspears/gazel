@@ -1,0 +1,39 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
+cc_library(
+    name = "utils",
+    srcs = ["utils.cc"],
+    hdrs = ["utils.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "core",
+    srcs = ["core.cc"],
+    hdrs = ["core.h"],
+    deps = [
+        ":utils",
+        "//lib:math",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_binary(
+    name = "main",
+    srcs = ["main.cc"],
+    deps = [
+        ":core",
+        ":utils",
+        "//lib:math",
+        "//lib:string_utils",
+    ],
+)
+
+cc_test(
+    name = "core_test",
+    srcs = ["core_test.cc"],
+    deps = [
+        ":core",
+        "@googletest//:gtest_main",
+    ],
+)

@@ -13,7 +13,7 @@ console.log(`Using BAZEL_WORKSPACE '${bazelWorkspace}'`)
 //   throw new Error(`Please point BAZEL_WORKSPACE to your bazel workspace`)
 
 export const config: Config = {
-  port: parseInt(process.env.PORT || '3001', 10),
+  port: parseInt(process.env.PORT || '3002', 10),
   bazelWorkspace,
   bazelExecutable: process.env.BAZEL_EXECUTABLE || 'bazel',
   cors: {

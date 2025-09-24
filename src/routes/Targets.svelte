@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink, Play, X, Clock, ChevronDown } from 'lucide-svelte';
+  import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink, Play, X, Clock, ChevronDown, GitBranch } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { BazelTarget } from '$lib/types';
   import { createEventDispatcher } from 'svelte';
@@ -8,6 +8,8 @@
   import CopyButton from '$lib/components/CopyButton.svelte';
 
   const dispatch = createEventDispatcher();
+
+  export let initialTarget: string | null = null;
   
   let targets: BazelTarget[] = [];
   let filteredTargets: BazelTarget[] = [];
@@ -47,11 +49,35 @@
   // Navigation breadcrumb state
   let navigationHistory: BazelTarget[] = [];
 
-  onMount(() => {
-    loadTargets();
+  onMount(async () => {
+    await loadTargets();
 
     // Load search history
     searchHistory = storage.getSearchHistory();
+
+    // If there's an initial target, find and select it
+    if (initialTarget) {
+      const target = targets.find(t =>
+        t.full === initialTarget ||
+        t.name === initialTarget ||
+        (t.full && t.full.includes(initialTarget)) ||
+        (t.name && t.name.includes(initialTarget))
+      );
+
+      if (target) {
+        selectTarget(target);
+        // Optionally scroll to the target in the list
+        setTimeout(() => {
+          const targetElement = document.querySelector(`[data-target="${target.full || target.name}"]`);
+          if (targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+      }
+
+      // Clear the initial target after using it
+      initialTarget = null;
+    }
 
     // Load saved preferences
     const savedShowHidden = storage.getPreference('showHiddenTargets');
@@ -210,7 +236,7 @@
       }
 
       // Search in attributes (srcs, deps, etc.)
-      if (target.srcs && target.srcs.some(src => src.toLowerCase().includes(query))) {
+      if (target.srcs?.some(src => src.toLowerCase().includes(query))) {
         return true;
       }
 
@@ -338,6 +364,14 @@
         // Dispatch event to parent to switch to Files tab with this file
         dispatch('navigate-to-file', { path: buildPath });
       }
+    }
+  }
+
+  function navigateToGraph(target: BazelTarget) {
+    const targetName = target.full || target.name;
+    if (targetName) {
+      // Dispatch event to parent to switch to Graph tab with this target
+      dispatch('navigate-to-graph', { target: targetName });
     }
   }
 
@@ -603,6 +637,7 @@
           {#each visibleTargets.slice(0, displayLimit) as target}
             <button
               on:click={() => selectTarget(target)}
+              data-target={target.full || target.name}
               class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 flex items-center justify-between group"
               class:bg-muted={selectedTarget === target}
             >
@@ -616,6 +651,13 @@
                 {/if}
               </div>
               <div class="flex items-center gap-1">
+                <button
+                  on:click|stopPropagation={() => navigateToGraph(target)}
+                  class="p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="View in dependency graph"
+                >
+                  <GitBranch class="w-4 h-4 text-muted-foreground hover:text-primary" />
+                </button>
                 <CopyButton text={target.full || target.name} size="sm" className="opacity-0 group-hover:opacity-100" />
                 <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
               </div>
@@ -676,6 +718,13 @@
                 <h4 class="text-sm font-medium text-muted-foreground mb-1">Name</h4>
                 <div class="flex items-center gap-2">
                   <p class="font-mono text-sm">{selectedTarget.name || selectedTarget.full}</p>
+                  <button
+                    on:click={() => selectedTarget && navigateToGraph(selectedTarget)}
+                    class="p-1 hover:bg-muted rounded transition-colors"
+                    title="View in dependency graph"
+                  >
+                    <GitBranch class="w-4 h-4 text-muted-foreground hover:text-primary" />
+                  </button>
                   <CopyButton text={selectedTarget.name || selectedTarget.full || ''} size="sm" />
                 </div>
               </div>

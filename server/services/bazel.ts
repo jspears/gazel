@@ -63,7 +63,7 @@ class BazelService {
     try {
       const result = await execAsync(cmdStr, {
         cwd: this.workspace,
-        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+        maxBuffer: 100 * 1024 * 1024, // 100MB buffer - increased for large dependency graphs
         ...options
       });
 

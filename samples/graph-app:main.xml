@@ -1,0 +1,142 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<query version="2">
+    <rule class="cc_library" location="/gazel/example-bazel-workspace/app/BUILD.bazel:10:11" name="//app:core">
+        <string name="name" value="core"/>
+        <list name="visibility">
+            <label value="//visibility:public"/>
+        </list>
+        <string name="generator_name" value="core"/>
+        <string name="generator_function" value="cc_library"/>
+        <string name="generator_location" value="app/BUILD.bazel:10:11"/>
+        <list name="srcs">
+            <label value="//app:core.cc"/>
+        </list>
+        <list name="hdrs">
+            <label value="//app:core.h"/>
+        </list>
+        <list name="deps">
+            <label value="//app:utils"/>
+            <label value="//lib:math"/>
+        </list>
+        <rule-input name="//app:core.cc"/>
+        <rule-input name="//app:core.h"/>
+        <rule-input name="//app:utils"/>
+        <rule-input name="//lib:math"/>
+    </rule>
+    <source-file location="/gazel/example-bazel-workspace/app/core.cc:1:1" name="//app:core.cc">
+        <visibility-label name="//visibility:private"/>
+    </source-file>
+    <source-file location="/gazel/example-bazel-workspace/app/core.h:1:1" name="//app:core.h">
+        <visibility-label name="//visibility:private"/>
+    </source-file>
+    <rule class="cc_binary" location="/gazel/example-bazel-workspace/app/BUILD.bazel:21:10" name="//app:main">
+        <string name="name" value="main"/>
+        <string name="generator_name" value="main"/>
+        <string name="generator_function" value="cc_binary"/>
+        <string name="generator_location" value="app/BUILD.bazel:21:10"/>
+        <list name="srcs">
+            <label value="//app:main.cc"/>
+        </list>
+        <list name="deps">
+            <label value="//app:core"/>
+            <label value="//app:utils"/>
+            <label value="//lib:math"/>
+            <label value="//lib:string_utils"/>
+            <label value="@rules_cc//:link_extra_lib"/>
+        </list>
+        <rule-input name="//app:core"/>
+        <rule-input name="//app:main.cc"/>
+        <rule-input name="//app:utils"/>
+        <rule-input name="//lib:math"/>
+        <rule-input name="//lib:string_utils"/>
+        <rule-input name="@rules_cc//:link_extra_lib"/>
+        <rule-output name="//app:main.stripped"/>
+        <rule-output name="//app:main.dwp"/>
+    </rule>
+    <source-file location="/gazel/example-bazel-workspace/app/main.cc:1:1" name="//app:main.cc">
+        <visibility-label name="//visibility:private"/>
+    </source-file>
+    <rule class="cc_library" location="/gazel/example-bazel-workspace/app/BUILD.bazel:3:11" name="//app:utils">
+        <string name="name" value="utils"/>
+        <list name="visibility">
+            <label value="//visibility:public"/>
+        </list>
+        <string name="generator_name" value="utils"/>
+        <string name="generator_function" value="cc_library"/>
+        <string name="generator_location" value="app/BUILD.bazel:3:11"/>
+        <list name="srcs">
+            <label value="//app:utils.cc"/>
+        </list>
+        <list name="hdrs">
+            <label value="//app:utils.h"/>
+        </list>
+        <rule-input name="//app:utils.cc"/>
+        <rule-input name="//app:utils.h"/>
+    </rule>
+    <source-file location="/gazel/example-bazel-workspace/app/utils.cc:1:1" name="//app:utils.cc">
+        <visibility-label name="//visibility:private"/>
+    </source-file>
+    <source-file location="/gazel/example-bazel-workspace/app/utils.h:1:1" name="//app:utils.h">
+        <visibility-label name="//visibility:private"/>
+    </source-file>
+    <rule class="cc_library" location="/gazel/example-bazel-workspace/lib/BUILD.bazel:3:11" name="//lib:math">
+        <string name="name" value="math"/>
+        <list name="visibility">
+            <label value="//visibility:public"/>
+        </list>
+        <string name="generator_name" value="math"/>
+        <string name="generator_function" value="cc_library"/>
+        <string name="generator_location" value="lib/BUILD.bazel:3:11"/>
+        <list name="srcs">
+            <label value="//lib:math.cc"/>
+        </list>
+        <list name="hdrs">
+            <label value="//lib:math.h"/>
+        </list>
+        <rule-input name="//lib:math.cc"/>
+        <rule-input name="//lib:math.h"/>
+    </rule>
+    <source-file location="/gazel/example-bazel-workspace/lib/math.cc:1:1" name="//lib:math.cc">
+        <visibility-label name="//visibility:private"/>
+    </source-file>
+    <source-file location="/gazel/example-bazel-workspace/lib/math.h:1:1" name="//lib:math.h">
+        <visibility-label name="//visibility:private"/>
+    </source-file>
+    <rule class="cc_library" location="/gazel/example-bazel-workspace/lib/BUILD.bazel:10:11" name="//lib:string_utils">
+        <string name="name" value="string_utils"/>
+        <list name="visibility">
+            <label value="//visibility:public"/>
+        </list>
+        <string name="generator_name" value="string_utils"/>
+        <string name="generator_function" value="cc_library"/>
+        <string name="generator_location" value="lib/BUILD.bazel:10:11"/>
+        <list name="srcs">
+            <label value="//lib:string_utils.cc"/>
+        </list>
+        <list name="hdrs">
+            <label value="//lib:string_utils.h"/>
+        </list>
+        <rule-input name="//lib:string_utils.cc"/>
+        <rule-input name="//lib:string_utils.h"/>
+    </rule>
+    <source-file location="/gazel/example-bazel-workspace/lib/string_utils.cc:1:1" name="//lib:string_utils.cc">
+        <visibility-label name="//visibility:private"/>
+    </source-file>
+    <source-file location="/gazel/example-bazel-workspace/lib/string_utils.h:1:1" name="//lib:string_utils.h">
+        <visibility-label name="//visibility:private"/>
+    </source-file>
+    <rule class="cc_library" location="/private/var/tmp/_bazel_justinspears/bbe283f69cdad0806da2a6d43d79a282/external/rules_cc+/BUILD:20:11" name="@rules_cc//:link_extra_lib">
+        <string name="name" value="link_extra_lib"/>
+        <string name="generator_name" value="link_extra_lib"/>
+        <string name="generator_function" value="cc_library"/>
+        <string name="generator_location" value="/private/var/tmp/_bazel_justinspears/bbe283f69cdad0806da2a6d43d79a282/external/rules_cc+/BUILD:20:11"/>
+        <list name="deps">
+            <label value="@rules_cc//:link_extra_libs"/>
+        </list>
+        <rule-input name="@rules_cc//:link_extra_libs"/>
+    </rule>
+    <rule class="label_flag" location="/private/var/tmp/_bazel_justinspears/bbe283f69cdad0806da2a6d43d79a282/external/rules_cc+/BUILD:13:11" name="@rules_cc//:link_extra_libs">
+        <string name="name" value="link_extra_libs"/>
+        <label name="build_setting_default" value="@rules_cc//:empty_lib"/>
+    </rule>
+</query>

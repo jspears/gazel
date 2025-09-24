@@ -341,6 +341,103 @@ class ApiClient {
       body: JSON.stringify({ expunge }),
     });
   }
+
+  // Streaming endpoints for large queries
+  async streamQuery(query: string, parseXml = false): Promise<Response> {
+    const response = await fetch('/api/stream/query', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        outputFormat: 'xml',
+        parseXml
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: response.statusText }));
+      throw new Error(error.error || 'Stream query failed');
+    }
+
+    return response;
+  }
+
+  async streamQueryCompact(query: string): Promise<Response> {
+    const response = await fetch('/api/stream/query-compact', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: response.statusText }));
+      throw new Error(error.error || 'Stream query failed');
+    }
+
+    return response;
+  }
+
+  /**
+   * Stream and parse large XML query results
+   */
+  async *streamQueryAsObjects(query: string): AsyncGenerator<any, void, unknown> {
+    const response = await this.streamQuery(query, true);
+    const reader = response.body?.getReader();
+
+    if (!reader) {
+      throw new Error('Response body is not readable');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Try to parse complete JSON objects from the buffer
+        // The stream sends JSON objects separated by commas and newlines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep the incomplete line in buffer
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && trimmed !== '[' && trimmed !== ']') {
+            // Remove trailing comma if present
+            const jsonStr = trimmed.endsWith(',') ? trimmed.slice(0, -1) : trimmed;
+            try {
+              const obj = JSON.parse(jsonStr);
+              yield obj;
+            } catch (e) {
+              // Skip malformed JSON
+              console.warn('Failed to parse JSON chunk:', jsonStr);
+            }
+          }
+        }
+      }
+
+      // Process any remaining buffer
+      if (buffer.trim() && buffer.trim() !== ']') {
+        const jsonStr = buffer.trim().endsWith(',') ? buffer.trim().slice(0, -1) : buffer.trim();
+        try {
+          const obj = JSON.parse(jsonStr);
+          yield obj;
+        } catch (e) {
+          console.warn('Failed to parse final JSON chunk:', jsonStr);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
 }
 
 export const api = new ApiClient();
