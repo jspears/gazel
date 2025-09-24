@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink, Play, X, Clock, ChevronDown, GitBranch } from 'lucide-svelte';
+  import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink, Play, X, Clock, ChevronDown, GitBranch, Terminal } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { BazelTarget } from '$lib/types';
   import { createEventDispatcher } from 'svelte';
@@ -385,6 +385,14 @@
     }
   }
 
+  function navigateToCommands(target: BazelTarget) {
+    const targetName = target.full || target.name;
+    if (targetName) {
+      // Dispatch event to parent to switch to Commands tab with this target
+      dispatch('navigate-to-commands', { target: targetName });
+    }
+  }
+
   function getBuildFilePath(target: BazelTarget): string | null {
     if (target.location) {
       const match = target.location.match(/^([^:]+)/);
@@ -670,6 +678,13 @@
                 >
                   <GitBranch class="w-4 h-4 text-muted-foreground hover:text-primary" />
                 </button>
+                <button
+                  on:click|stopPropagation={() => navigateToCommands(target)}
+                  class="p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Open in Commands tab"
+                >
+                  <Terminal class="w-4 h-4 text-muted-foreground hover:text-primary" />
+                </button>
                 <CopyButton text={target.full || target.name} size="sm" className="opacity-0 group-hover:opacity-100" />
                 <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
               </div>
@@ -736,6 +751,13 @@
                     title="View in dependency graph"
                   >
                     <GitBranch class="w-4 h-4 text-muted-foreground hover:text-primary" />
+                  </button>
+                  <button
+                    on:click={() => selectedTarget && navigateToCommands(selectedTarget)}
+                    class="p-1 hover:bg-muted rounded transition-colors"
+                    title="Open in Commands tab"
+                  >
+                    <Terminal class="w-4 h-4 text-muted-foreground hover:text-primary" />
                   </button>
                   <CopyButton text={selectedTarget.name || selectedTarget.full || ''} size="sm" />
                 </div>

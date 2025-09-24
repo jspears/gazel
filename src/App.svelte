@@ -10,7 +10,8 @@
     GitBranch,
     Share2,
     Check,
-    Package
+    Package,
+    FolderOpen
   } from 'lucide-svelte';
   import './default.min.css';
   import Workspace from './routes/Workspace.svelte';
@@ -29,8 +30,10 @@
   let fileToOpen: string | null = null;
   let targetToOpen: string | null = null;
   let graphTarget: string | null = null;
+  let commandTarget: string | null = null;
   let showWorkspacePicker = false;
   let currentWorkspace: string | null = null;
+  let currentWorkspaceName: string | null = null;
   let checkingWorkspace = true;
   let showCopied = false;
 
@@ -100,7 +103,8 @@
             // Get workspace name from history if available
             const workspaceHistory = storage.getWorkspaceHistory();
             const historyEntry = workspaceHistory.find(w => w.path === storedWorkspace);
-            const workspaceName = historyEntry?.name;
+            const workspaceName = historyEntry?.name || storedWorkspace.split('/').filter(p => p).pop() || 'Unknown';
+            currentWorkspaceName = workspaceName;
 
             // Set the current workspace for workspace-specific data
             storage.setCurrentWorkspace(storedWorkspace, workspaceName);
@@ -137,6 +141,8 @@
           workspaceName = parts[parts.length - 1];
         }
 
+        currentWorkspaceName = workspaceName || 'Unknown';
+
         // Set the current workspace for workspace-specific data
         storage.setCurrentWorkspace(result.workspace, workspaceName);
       }
@@ -170,6 +176,16 @@
     navigateToTab('graph', { graphTarget: event.detail.target });
   }
 
+  function handleNavigateToCommands(event: CustomEvent<{target: string}>) {
+    commandTarget = event.detail.target;
+    activeTab = 'commands';
+    navigateToTab('commands', { commandTarget: event.detail.target });
+    // Reset after a short delay to allow the component to use it
+    setTimeout(() => {
+      commandTarget = null;
+    }, 100);
+  }
+
   function switchTab(tab: string) {
     activeTab = tab;
     navigateToTab(tab);
@@ -181,9 +197,12 @@
 
   async function handleWorkspaceSelected(workspace: string) {
     currentWorkspace = workspace;
+    // Extract workspace name from path
+    const workspaceName = workspace.split('/').filter(p => p).pop() || 'Unknown';
+    currentWorkspaceName = workspaceName;
     showWorkspacePicker = false;
     // Set the current workspace for workspace-specific data
-    storage.setCurrentWorkspace(workspace);
+    storage.setCurrentWorkspace(workspace, workspaceName);
     // Reload the page to refresh all components with new workspace
     window.location.reload();
   }
@@ -214,7 +233,19 @@
     <header class="border-b">
       <div class="container mx-auto px-4 py-4">
         <div class="flex items-center justify-between">
-          <h1 class="text-2xl font-bold">Gazel - Bazel Explorer</h1>
+          <div class="flex items-center gap-3">
+            <h1 class="text-2xl font-bold">Gazel - Bazel Explorer</h1>
+            {#if currentWorkspaceName}
+              <button
+                class="flex items-center gap-2 px-3 py-1 bg-muted hover:bg-muted/80 rounded-md transition-colors"
+                title={`${currentWorkspace}\n\nClick to change workspace`}
+                on:click={handleOpenWorkspacePicker}
+              >
+                <span class="text-sm text-muted-foreground">Workspace:</span>
+                <span class="text-sm font-medium">{currentWorkspaceName}</span>
+              </button>
+            {/if}
+          </div>
           <div class="flex items-center gap-4">
             <button class="p-2 hover:bg-muted rounded-md">
               <Settings class="w-5 h-5" />
@@ -306,6 +337,7 @@
               initialTarget={targetToOpen}
               on:navigate-to-file={handleNavigateToFile}
               on:navigate-to-graph={handleNavigateToGraph}
+              on:navigate-to-commands={handleNavigateToCommands}
             />
           {:else if activeTab === 'files'}
             <Files bind:fileToOpen />
@@ -316,7 +348,7 @@
           {:else if activeTab === 'graph'}
             <DependencyGraph bind:initialTarget={graphTarget} />
           {:else if activeTab === 'commands'}
-            <Commands />
+            <Commands initialTarget={commandTarget} />
 
           {/if}
         </div>

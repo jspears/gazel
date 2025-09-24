@@ -4,6 +4,8 @@
   import { api } from '$lib/api/client';
   import type { CommandHistory } from '$lib/types';
 
+  export let initialTarget: string | null = null;
+
   let target = '';
   let commandType: 'build' | 'test' | 'run' = 'build';
   let options = '';
@@ -15,6 +17,9 @@
   let cancelStreamRun: (() => void) | null = null;
 
   onMount(() => {
+    if (initialTarget) {
+      target = initialTarget;
+    }
     loadHistory();
   });
 

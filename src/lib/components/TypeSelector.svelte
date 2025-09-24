@@ -59,8 +59,7 @@
     transition={fly}
     transitionConfig={{ duration: 150, y: -5 }}
   >
-    <div class="flex items-center gap-2 px-3 py-2 border-b sticky top-0 bg-background">
-      <Search class="w-4 h-4 text-muted-foreground" />
+    <div class="flex items-center gap-2 p-2 border-b sticky top-0 bg-background">
       <input
         bind:this={searchInput}
         bind:value={searchValue}
