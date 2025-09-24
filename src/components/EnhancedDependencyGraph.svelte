@@ -15,7 +15,6 @@
 
   export let xmlData: string = '';
   export let filter: string = '';
-  export let useEnhancedParsing: boolean = true;
 
   const nodes = writable<Node[]>([]);
   const edges = writable<Edge[]>([]);
@@ -89,7 +88,7 @@
     const edgeList: Edge[] = [];
     
     // Process rules
-    rules.forEach((rule, index) => {
+    rules.forEach((rule) => {
       const name = rule.getAttribute('name') || '';
       const ruleClass = rule.getAttribute('class') || '';
       const location = rule.getAttribute('location') || '';

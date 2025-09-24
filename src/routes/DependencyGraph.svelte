@@ -5,6 +5,7 @@
   import EnhancedDependencyGraph from '../components/EnhancedDependencyGraph.svelte';
   import ElkDependencyGraph from '../components/ElkDependencyGraph.svelte';
   import { api } from '$lib/api/client';
+  import { updateParam } from '$lib/navigation';
 
   export let initialTarget: string | null = null;
 
@@ -17,7 +18,6 @@
   let queryType = 'deps'; // 'deps' or 'direct'
   let maxDepth = 0; // 0 means unlimited
   let useStreaming = false; // Use streaming for very large queries
-  let useEnhancedParsing = true; // Use enhanced parsing for better visualization
 
   // Example targets for quick access
   const exampleTargets = [
@@ -332,11 +332,7 @@
         {/if}
         
         <div class="bg-background rounded-lg" style="height: 600px;">
-          {#if useEnhancedParsing}
             <ElkDependencyGraph {xmlData} filter={filterInput} />
-          {:else}
-            <DependencyGraph {xmlData} targetFilter={filterInput} />
-          {/if}
         </div>
       </div>
     </div>

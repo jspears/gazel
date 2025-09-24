@@ -35,6 +35,70 @@ class ApiClient {
     return response.json();
   }
 
+  // Modules endpoints
+  async getModuleGraph(): Promise<{
+    root: string;
+    modules: Array<{
+      key: string;
+      name: string;
+      version: string;
+      location?: {
+        file?: string;
+        line?: number;
+        column?: number;
+      };
+      compatibility_level?: number;
+      repo_name?: string;
+      bazel_compatibility?: string[];
+      module_rule_exports_all_rules?: boolean;
+      tags?: string[];
+      dependencies?: Array<{
+        key: string;
+        name: string;
+        version: string;
+        dev_dependency?: boolean;
+      }>;
+      resolved_dependencies?: Array<{
+        key: string;
+        name: string;
+        version: string;
+        registry?: string;
+      }>;
+      extension_usages?: Array<{
+        extension_bzl_file: string;
+        extension_name: string;
+        location?: {
+          file?: string;
+          line?: number;
+          column?: number;
+        };
+        imports?: Record<string, string>;
+        dev_dependency?: boolean;
+        isolate?: boolean;
+      }>;
+      dependencyCount: number;
+      extensionCount: number;
+    }>;
+    dependencies: Array<{
+      from: string;
+      to: string;
+      type: 'direct' | 'dev' | 'indirect';
+      version: string;
+    }>;
+    statistics: {
+      totalModules: number;
+      directDependencies: number;
+      devDependencies: number;
+      indirectDependencies: number;
+    };
+  }> {
+    return this.fetchJson('/modules/graph');
+  }
+
+  async getModuleInfo(moduleName: string): Promise<any> {
+    return this.fetchJson(`/modules/info/${encodeURIComponent(moduleName)}`);
+  }
+
   // Workspace endpoints
   async getWorkspaceInfo(): Promise<WorkspaceInfo> {
     return this.fetchJson<WorkspaceInfo>('/workspace/info');

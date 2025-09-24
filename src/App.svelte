@@ -7,7 +7,10 @@
     Search,
     Terminal,
     Settings,
-    GitBranch
+    GitBranch,
+    Share2,
+    Check,
+    Package
   } from 'lucide-svelte';
   import './default.min.css';
   import Workspace from './routes/Workspace.svelte';
@@ -16,9 +19,11 @@
   import Query from './routes/Query.svelte';
   import Commands from './routes/Commands.svelte';
   import DependencyGraph from './routes/DependencyGraph.svelte';
+  import Modules from './routes/Modules.svelte';
   import WorkspacePicker from './components/WorkspacePicker.svelte';
   import { api } from '$lib/api/client';
   import { storage } from '$lib/storage';
+  import { initNavigation, navigateToTab, updateParam, type AppState, copyUrlToClipboard } from '$lib/navigation';
 
   let activeTab = 'workspace';
   let fileToOpen: string | null = null;
@@ -27,10 +32,52 @@
   let showWorkspacePicker = false;
   let currentWorkspace: string | null = null;
   let checkingWorkspace = true;
+  let showCopied = false;
+
+  async function shareUrl() {
+    const success = await copyUrlToClipboard();
+    if (success) {
+      showCopied = true;
+      setTimeout(() => {
+        showCopied = false;
+      }, 2000);
+    }
+  }
 
   onMount(async () => {
     await checkWorkspace();
+
+    // Initialize navigation and restore state from URL
+    const initialState = initNavigation(handleStateChange);
+    if (initialState.tab) {
+      activeTab = initialState.tab;
+    }
+    if (initialState.target) {
+      targetToOpen = initialState.target;
+    }
+    if (initialState.graphTarget) {
+      graphTarget = initialState.graphTarget;
+    }
+    if (initialState.file) {
+      fileToOpen = initialState.file;
+    }
   });
+
+  // Handle state changes from browser navigation (back/forward)
+  function handleStateChange(state: AppState) {
+    if (state.tab) {
+      activeTab = state.tab;
+    }
+    if (state.target) {
+      targetToOpen = state.target;
+    }
+    if (state.graphTarget) {
+      graphTarget = state.graphTarget;
+    }
+    if (state.file) {
+      fileToOpen = state.file;
+    }
+  }
 
   async function checkWorkspace() {
     try {
@@ -104,11 +151,13 @@
   function handleNavigateToFile(event: CustomEvent<{path: string}>) {
     fileToOpen = event.detail.path;
     activeTab = 'files';
+    navigateToTab('files', { file: event.detail.path });
   }
 
   function handleNavigateToTargets(event: CustomEvent<{target: string}>) {
     targetToOpen = event.detail.target;
     activeTab = 'targets';
+    navigateToTab('targets', { target: event.detail.target });
     // Reset after a short delay to allow the component to use it
     setTimeout(() => {
       targetToOpen = null;
@@ -118,6 +167,12 @@
   function handleNavigateToGraph(event: CustomEvent<{target: string}>) {
     graphTarget = event.detail.target;
     activeTab = 'graph';
+    navigateToTab('graph', { graphTarget: event.detail.target });
+  }
+
+  function switchTab(tab: string) {
+    activeTab = tab;
+    navigateToTab(tab);
   }
 
   function handleOpenWorkspacePicker() {
@@ -171,48 +226,71 @@
 
     <main class="container mx-auto px-4 py-6">
       <div class="w-full">
-        <div class="grid w-full grid-cols-7 mb-6 bg-muted p-1 rounded-md">
+        <div class="flex items-center gap-2 mb-6">
+          <div class="grid w-full grid-cols-7 bg-muted p-1 rounded-md flex-1">
           <button
-            on:click={() => activeTab = 'workspace'}
+            on:click={() => switchTab('workspace')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'workspace' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <Home class="w-4 h-4" />
             Workspace
           </button>
           <button
-            on:click={() => activeTab = 'targets'}
+            on:click={() => switchTab('targets')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'targets' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <Target class="w-4 h-4" />
             Targets
           </button>
           <button
-            on:click={() => activeTab = 'files'}
+            on:click={() => switchTab('files')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'files' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <FileText class="w-4 h-4" />
             Files
           </button>
           <button
-            on:click={() => activeTab = 'query'}
+            on:click={() => switchTab('modules')}
+            class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'modules' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
+          >
+            <Package class="w-4 h-4" />
+            Modules
+          </button>
+          <button
+            on:click={() => switchTab('query')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'query' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <Search class="w-4 h-4" />
             Query
           </button>
           <button
-            on:click={() => activeTab = 'graph'}
+            on:click={() => switchTab('graph')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'graph' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <GitBranch class="w-4 h-4" />
             Graph
           </button>
           <button
-            on:click={() => activeTab = 'commands'}
+            on:click={() => switchTab('commands')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'commands' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <Terminal class="w-4 h-4" />
             Commands
+          </button>
+          </div>
+
+          <button
+            on:click={shareUrl}
+            class="px-3 py-2 rounded-md text-sm font-medium transition-colors bg-muted hover:bg-muted/80 flex items-center gap-2"
+            title="Copy shareable URL"
+          >
+            {#if showCopied}
+              <Check class="w-4 h-4 text-green-600" />
+              <span>Copied!</span>
+            {:else}
+              <Share2 class="w-4 h-4" />
+              <span>Share</span>
+            {/if}
           </button>
         </div>
 
@@ -231,13 +309,15 @@
             />
           {:else if activeTab === 'files'}
             <Files bind:fileToOpen />
+          {:else if activeTab === 'modules'}
+            <Modules />
           {:else if activeTab === 'query'}
             <Query />
           {:else if activeTab === 'graph'}
             <DependencyGraph bind:initialTarget={graphTarget} />
           {:else if activeTab === 'commands'}
             <Commands />
-          
+
           {/if}
         </div>
       </div>

@@ -6,6 +6,7 @@
   import { createEventDispatcher } from 'svelte';
   import { storage } from '$lib/storage';
   import CopyButton from '$lib/components/CopyButton.svelte';
+  import { updateParam } from '$lib/navigation';
 
   const dispatch = createEventDispatcher();
 
@@ -174,8 +175,12 @@
       filteredTargets = targets;
       usingFallbackSearch = false;
       error = null;
+      updateParam('searchQuery', undefined);
       return;
     }
+
+    // Update URL with search query
+    updateParam('searchQuery', searchQuery);
 
     // Save to history if it's a user-initiated search
     if (saveToHistory) {
@@ -257,6 +262,10 @@
     selectedTarget = target;
     targetOutputs = [];
     targetReverseDependencies = [];
+
+    // Update URL with selected target
+    const targetName = target.full || target.name || '';
+    updateParam('target', targetName);
 
     // Save to recent targets
     if (target.full || target.name) {
