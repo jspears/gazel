@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Setting up Gazel - Bazel Explorer"
+echo "🚀 Setting up Gazel"
 echo "===================================="
 echo ""
 

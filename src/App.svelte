@@ -219,7 +219,7 @@
     <header class="border-b">
       <div class="container mx-auto px-4 py-4">
         <div class="flex items-center justify-between">
-          <h1 class="text-2xl font-bold">Gazel - Bazel Explorer</h1>
+          <h1 class="text-2xl font-bold">Gazel</h1>
         </div>
       </div>
     </header>
@@ -236,7 +236,7 @@
       <div class="container mx-auto px-4 py-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <h1 class="text-2xl font-bold">Gazel - Bazel Explorer</h1>
+            <h1 class="text-2xl font-bold">Gazel</h1>
             {#if currentWorkspaceName}
               <button
                 class="flex items-center gap-2 px-3 py-1 bg-muted hover:bg-muted/80 rounded-md transition-colors"

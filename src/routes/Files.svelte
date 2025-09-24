@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { FileCode, Search, File, FolderOpen, Target, ChevronRight, Play, TestTube, ExternalLink } from 'lucide-svelte';
+  import { FileCode, Search, File, FolderOpen, Target, ChevronRight, Play, TestTube, ExternalLink, X } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { BuildFile, BazelTarget } from '$lib/types';
   import CopyButton from '$lib/components/CopyButton.svelte';
@@ -37,6 +37,14 @@
   let fileContentTab: 'content' | 'targets' = 'content';
   let buildFileTargets: BazelTarget[] = [];
   let loadingBuildTargets = false;
+
+  // Run modal state
+  let showRunModal = false;
+  let runOutput: string[] = [];
+  let runCommand = '';
+  let runStatus: 'idle' | 'running' | 'success' | 'error' = 'idle';
+  let runEventSource: EventSource | null = null;
+  let outputContainer: HTMLDivElement;
 
   onMount(() => {
     loadBuildFiles();
@@ -254,8 +262,80 @@
   function handleRunTarget(event: CustomEvent) {
     const { target } = event.detail;
     if (target) {
-      dispatch('run-target', { target });
+      // Instead of dispatching, handle the run locally
+      runTargetByName(target);
     }
+  }
+
+  function runTargetByName(targetName: string) {
+    if (!targetName) return;
+
+    runCommand = `bazel run ${targetName}`;
+    runOutput = [];
+    runStatus = 'running';
+    showRunModal = true;
+
+    // Use EventSource for streaming
+    runEventSource = api.streamRun(targetName, [], (data) => {
+      if (data.type === 'stdout' || data.type === 'stderr') {
+        runOutput = [...runOutput, data.data];
+        // Auto-scroll to bottom
+        if (outputContainer) {
+          setTimeout(() => {
+            outputContainer.scrollTop = outputContainer.scrollHeight;
+          }, 0);
+        }
+      } else if (data.type === 'info') {
+        runOutput = [...runOutput, `ℹ️ ${data.data}\n`];
+        // Auto-scroll for info messages too
+        if (outputContainer) {
+          setTimeout(() => {
+            outputContainer.scrollTop = outputContainer.scrollHeight;
+          }, 0);
+        }
+      } else if (data.type === 'exit') {
+        if (data.code === 0) {
+          runStatus = 'success';
+          runOutput = [...runOutput, '\n✅ Command completed successfully'];
+        } else if (data.code === null) {
+          // Process was killed or terminated abnormally
+          runStatus = 'error';
+          runOutput = [...runOutput, '\n⚠️ Command was terminated'];
+        } else {
+          runStatus = 'error';
+          runOutput = [...runOutput, `\n❌ Command failed with exit code ${data.code}`];
+        }
+        // Close the EventSource when process exits
+        if (runEventSource) {
+          runEventSource.close();
+          runEventSource = null;
+        }
+      } else if (data.type === 'error') {
+        // Handle stream errors
+        runStatus = 'error';
+        runOutput = [...runOutput, `\n❌ Error: ${data.data}`];
+        // Close the EventSource on error
+        if (runEventSource) {
+          runEventSource.close();
+          runEventSource = null;
+        }
+      }
+    });
+  }
+
+  function closeRunModal() {
+    if (runEventSource) {
+      // If still running, add a message that we're stopping
+      if (runStatus === 'running') {
+        runOutput = [...runOutput, '\n⚠️ Stopping command...'];
+      }
+      runEventSource.close();
+      runEventSource = null;
+    }
+    showRunModal = false;
+    runStatus = 'idle';
+    runOutput = [];
+    runCommand = '';
   }
 
   function handleNavigateToFile(event: CustomEvent) {
@@ -481,7 +561,7 @@
                   <CopyButton text={target.name} />
                   {#if target.ruleType && (target.ruleType.includes('binary') || target.ruleType.includes('test'))}
                     <button
-                      on:click={() => dispatch('run-target', { target: target.name })}
+                      on:click={() => runTargetByName(target.name)}
                       class="p-1 hover:bg-primary/10 rounded transition-colors"
                       title="Run {target.name}"
                     >
@@ -531,3 +611,55 @@
     </div>
   </div>
 </div>
+
+<!-- Run Modal -->
+{#if showRunModal}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-background border rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="p-4 border-b flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-semibold">Running Target</h2>
+          <p class="text-sm text-muted-foreground font-mono mt-1">{runCommand}</p>
+        </div>
+        <button
+          on:click={closeRunModal}
+          class="p-2 hover:bg-muted rounded-md transition-colors"
+          title="Close"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <!-- Modal Body - Output Log -->
+      <div bind:this={outputContainer} class="flex-1 overflow-y-auto p-4 bg-muted/20">
+        <pre class="font-mono text-sm whitespace-pre-wrap">{runOutput.join('')}</pre>
+        {#if runStatus === 'running'}
+          <div class="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+            <div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
+            <span>Running...</span>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          {#if runStatus === 'success'}
+            <span class="text-green-600 dark:text-green-400 text-sm font-medium">✅ Success</span>
+          {:else if runStatus === 'error'}
+            <span class="text-red-600 dark:text-red-400 text-sm font-medium">❌ Failed</span>
+          {:else if runStatus === 'running'}
+            <span class="text-blue-600 dark:text-blue-400 text-sm font-medium">⏳ Running</span>
+          {/if}
+        </div>
+        <button
+          on:click={closeRunModal}
+          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

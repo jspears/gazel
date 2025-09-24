@@ -81,7 +81,7 @@ Create a service file `/etc/systemd/system/gazel.service`:
 
 ```ini
 [Unit]
-Description=Gazel Bazel Explorer
+Description=Gazel
 After=network.target
 
 [Service]

@@ -1,7 +1,7 @@
 {
   "name": "gazel",
   "version": "1.0.0",
-  "description": "Bazel exploration tool with Svelte frontend and Node.js backend",
+  "description": "A modern web-based UI for exploring and understanding Bazel workspaces",
   "type": "module",
   "scripts": {
     "dev": "$npm_execpath run dev:server & $npm_execpath run dev:client",
