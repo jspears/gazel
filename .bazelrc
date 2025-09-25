@@ -1,0 +1,17 @@
+# Enable bzlmod
+common --enable_bzlmod
+
+# Build options
+build --symlink_prefix=bazel-
+build --incompatible_strict_action_env
+
+# TypeScript settings
+build --@aspect_rules_ts//ts:skipLibCheck=honor_tsconfig
+fetch --@aspect_rules_ts//ts:skipLibCheck=honor_tsconfig
+query --@aspect_rules_ts//ts:skipLibCheck=honor_tsconfig
+
+# Performance
+build --jobs=auto
+
+# Test settings
+test --test_output=errors

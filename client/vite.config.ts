@@ -13,11 +13,11 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '$lib': path.resolve('./src/lib'),
-      '$components': path.resolve('./src/lib/components'),
-      '$stores': path.resolve('./src/lib/stores'),
-      '$utils': path.resolve('./src/lib/utils'),
-      '$types': path.resolve('./src/lib/types')
+      '$lib': path.resolve('./lib'),
+      '$components': path.resolve('./lib/components'),
+      '$stores': path.resolve('./lib/stores'),
+      '$utils': path.resolve('./lib/utils'),
+      '$types': path.resolve('./lib/types')
     }
   },
   server: {
@@ -32,6 +32,6 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    emptyOutDir: false // Don't clear the dist directory to preserve server files
+    emptyOutDir: true
   }
 });

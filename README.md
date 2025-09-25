@@ -84,6 +84,25 @@ Opens:
 - 🌐 **Frontend**: http://localhost:5173
 - 🔧 **API**: http://localhost:3001
 
+### Development with Bazel (Alternative)
+
+You can also use pure Bazel commands to run the application:
+
+**Run both server and client together (recommended):**
+```bash
+bazel run //app:dev
+```
+This starts both the backend server (port 3002) and frontend dev server (port 5173) in a single terminal.
+
+**Or run them separately:**
+```bash
+# Terminal 1 - Backend server
+bazel run //app:server_dev
+
+# Terminal 2 - Frontend dev server
+bazel run //client:dev
+```
+
 ### Production Mode
 
 ```bash
@@ -95,6 +114,34 @@ npm start
 ```
 
 Visit http://localhost:3001
+
+### Production with Bazel (Alternative)
+
+**Build everything for production:**
+```bash
+bazel build //app:prod_build
+```
+
+**Run production mode (both server and preview):**
+```bash
+bazel run //app:prod
+```
+Note: The production mode target needs additional configuration to work properly.
+
+**Or build and run separately:**
+```bash
+# Build the client
+bazel build //client:build
+
+# Build the server
+bazel build //server:server_ts
+
+# Run production server
+bazel run //app:prod_server
+
+# Preview production build
+bazel run //client:preview
+```
 
 ### Configuration
 
@@ -154,11 +201,45 @@ To switch workspaces:
 
 *Coming soon - See [EXAMPLE_USAGE.md](EXAMPLE_USAGE.md) for detailed usage examples*
 
+## Project Structure
+
+```
+gazel/
+├── client/                 # Frontend application (Svelte + Vite)
+│   ├── lib/               # Shared components and utilities
+│   │   ├── components/    # Svelte components
+│   │   ├── stores/        # Svelte stores
+│   │   ├── types/         # TypeScript types
+│   │   └── utils/         # Utility functions
+│   ├── routes/            # Application routes
+│   ├── index.html         # HTML entry point
+│   ├── main.ts           # Application entry
+│   ├── app.css           # Global styles
+│   ├── vite.config.ts    # Vite configuration
+│   ├── svelte.config.js  # Svelte configuration
+│   ├── tailwind.config.js # Tailwind configuration
+│   ├── postcss.config.js # PostCSS configuration
+│   └── BUILD.bazel      # Bazel build configuration
+├── server/               # Backend server (Express + TypeScript)
+│   ├── index.ts         # Server entry point
+│   ├── routes/          # API routes
+│   └── BUILD.bazel     # Bazel build configuration
+├── app/                 # Application launchers
+│   └── BUILD.bazel     # Bazel targets for running apps
+├── MODULE.bazel        # Bazel module configuration (bzlmod)
+├── BUILD.bazel         # Root build configuration
+├── package.json        # npm dependencies
+├── pnpm-lock.yaml     # pnpm lock file
+├── tsconfig.json      # TypeScript configuration
+└── tsconfig.server.json # Server TypeScript configuration
+```
+
 ## Documentation
 
 - 📖 **[Usage Examples](EXAMPLE_USAGE.md)** - Step-by-step guide with examples
 - 🔧 **[Technical Details](TECHNICAL_DETAILS.md)** - Architecture, API, and development notes
 - 🚀 **[Contributing](CONTRIBUTING.md)** - How to contribute to the project
+- 📊 **[ELK Graph Implementation](ELK_GRAPH_IMPLEMENTATION.md)** - Details on the graph visualization
 
 ## Troubleshooting
 

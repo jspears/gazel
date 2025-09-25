@@ -49,13 +49,13 @@ Different dependency types are shown with distinct edge styles:
 
 ### Components Created/Modified
 
-1. **`src/components/ElkDependencyGraph.svelte`**
+1. **`client/components/ElkDependencyGraph.svelte`**
    - Main component using ELK.js for layout
    - Parses Bazel XML and creates nodes with icons
    - Applies ELK layout algorithm
    - Supports layout direction switching
 
-2. **`src/components/CustomNode.svelte`**
+2. **`client/components/CustomNode.svelte`**
    - Custom node component displaying icons
    - Shows node label and type
    - Hover effects and tooltips

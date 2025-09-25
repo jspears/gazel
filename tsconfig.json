@@ -23,23 +23,23 @@
     "types": ["vite/client", "svelte", "node"],
     "baseUrl": ".",
     "paths": {
-      "$lib": ["./src/lib"],
-      "$lib/*": ["./src/lib/*"],
-      "$components": ["./src/lib/components"],
-      "$components/*": ["./src/lib/components/*"],
-      "$stores": ["./src/lib/stores"],
-      "$stores/*": ["./src/lib/stores/*"],
-      "$utils": ["./src/lib/utils"],
-      "$utils/*": ["./src/lib/utils/*"],
-      "$types": ["./src/lib/types"],
-      "$types/*": ["./src/lib/types/*"]
+      "$lib": ["./client/lib"],
+      "$lib/*": ["./client/lib/*"],
+      "$components": ["./client/lib/components"],
+      "$components/*": ["./client/lib/components/*"],
+      "$stores": ["./client/lib/stores"],
+      "$stores/*": ["./client/lib/stores/*"],
+      "$utils": ["./client/lib/utils"],
+      "$utils/*": ["./client/lib/utils/*"],
+      "$types": ["./client/lib/types"],
+      "$types/*": ["./client/lib/types/*"]
     }
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.js",
-    "src/**/*.svelte",
-    "src/**/*.d.ts"
+    "client/**/*.ts",
+    "client/**/*.js",
+    "client/**/*.svelte",
+    "client/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",

@@ -1,0 +1,58 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_binary")
+load("@npm//:vite/package_json.bzl", vite_bin = "bin")
+
+package(default_visibility = ["//visibility:public"])
+
+# Client source files and config
+js_library(
+    name = "client_src",
+    srcs = glob([
+        "**/*.svelte",
+        "**/*.ts",
+        "**/*.css",
+        "**/*.js",
+        "**/*.html",
+        "vite.config.ts",
+        "svelte.config.js",
+        "tailwind.config.js",
+        "postcss.config.js",
+    ], allow_empty = True),
+    deps = [
+        "//:node_modules",
+    ],
+)
+
+# Vite dev server using vite binary
+vite_bin.vite_binary(
+    name = "dev",
+    args = ["--host", "0.0.0.0"],
+    chdir = package_name(),
+    data = [
+        ":client_src",
+        "//:tsconfig",
+        "//:package_json",
+        "//:node_modules",
+    ],
+)
+
+# Vite production build
+vite_bin.vite(
+    name = "build",
+    srcs = [
+        ":client_src",
+        "//:tsconfig",
+        "//:package_json",
+        "//:node_modules",
+    ],
+    args = ["build"],
+    chdir = package_name(),
+    out_dirs = ["dist"],
+)
+
+# Vite preview server (for testing production build)
+vite_bin.vite_binary(
+    name = "preview",
+    args = ["preview", "--host", "0.0.0.0"],
+    chdir = package_name(),
+    data = [":build"],
+)

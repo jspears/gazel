@@ -1,0 +1,28 @@
+"""Gazel - Bazel workspace explorer"""
+
+module(
+    name = "gazel",
+    version = "1.0.0",
+)
+
+# Bazel dependencies
+bazel_dep(name = "aspect_rules_js", version = "2.1.0")
+bazel_dep(name = "aspect_rules_ts", version = "3.2.1")
+bazel_dep(name = "aspect_rules_swc", version = "2.0.0")
+bazel_dep(name = "aspect_bazel_lib", version = "2.9.4")
+bazel_dep(name = "rules_nodejs", version = "6.3.0")
+
+# Configure rules_ts
+rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext")
+rules_ts_ext.deps()
+use_repo(rules_ts_ext, "npm_typescript")
+
+# Configure npm
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
+npm.npm_translate_lock(
+    name = "npm",
+    npmrc = "//:.npmrc",
+    pnpm_lock = "//:pnpm-lock.yaml",
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+use_repo(npm, "npm")

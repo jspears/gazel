@@ -1,0 +1,39 @@
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+load("@aspect_rules_js//js:defs.bzl", "js_binary")
+load("@aspect_rules_swc//swc:defs.bzl", "swc")
+
+package(default_visibility = ["//visibility:public"])
+
+# TypeScript compilation for server
+ts_project(
+    name = "server_ts",
+    srcs = glob([
+        "**/*.ts",
+    ]),
+    declaration = True,
+    declaration_map = True,
+    resolve_json_module = True,
+    source_map = True,
+    transpiler = swc,
+    tsconfig = "tsconfig.json",
+    deps = [
+        "//:node_modules/@types/cors",
+        "//:node_modules/@types/express",
+        "//:node_modules/@types/node",
+        "//:node_modules/@types/sax",
+        "//:node_modules/cors",
+        "//:node_modules/dotenv",
+        "//:node_modules/express",
+        "//:node_modules/sax",
+        "//:node_modules/xml2js",
+    ],
+)
+
+# Server binary
+js_binary(
+    name = "server",
+    data = [
+        ":server_ts",
+    ],
+    entry_point = "index.js",
+)

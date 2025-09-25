@@ -1,0 +1,26 @@
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+
+# Link all npm packages
+npm_link_all_packages(name = "node_modules")
+
+# Export config files
+exports_files([
+    "tsconfig.json",
+    "tsconfig.server.json",
+    "package.json",
+    "pnpm-lock.yaml",
+    ".npmrc",
+])
+
+js_library(
+    name = "tsconfig",
+    srcs = ["tsconfig.json"],
+    visibility = ["//visibility:public"],
+)
+
+js_library(
+    name = "package_json",
+    srcs = ["package.json"],
+    visibility = ["//visibility:public"],
+)

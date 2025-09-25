@@ -18,6 +18,9 @@
     "typecheck": "tsc --noEmit && svelte-check",
     "env": "env"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": []
+  },
   "dependencies": {
     "@types/highlight.js": "^10.1.0",
     "@xyflow/svelte": "0.1.36",

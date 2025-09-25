@@ -1,0 +1,175 @@
+"""Application targets for running Gazel"""
+
+load("@aspect_rules_js//js:defs.bzl", "js_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+# Development mode - runs server only
+js_binary(
+    name = "server_dev",
+    data = [
+        "//server:server_ts",
+        "//:node_modules",
+    ],
+    entry_point = "//server:index.js",
+)
+
+# Create a Node.js script for running both dev servers
+genrule(
+    name = "dev_script_gen",
+    outs = ["dev.cjs"],
+    cmd = """
+cat > $@ << 'EOF'
+const { spawn } = require('child_process');
+const path = require('path');
+
+console.log('Starting Gazel in development mode...');
+console.log('Server: http://localhost:3002');
+console.log('Client: http://localhost:5173');
+console.log('');
+
+const runfilesDir = process.env.RUNFILES_DIR || path.join(__dirname, '..', '..');
+
+// Start the server
+console.log('[server] Starting backend server...');
+const server = spawn('node', [path.join(runfilesDir, '_main/server/index.js')], {
+    stdio: 'inherit',
+    env: { ...process.env, PORT: '3002' }
+});
+
+// Start the client dev server
+console.log('[client] Starting frontend dev server...');
+const client = spawn(path.join(runfilesDir, '_main/client/dev_/dev'), ['--host', '0.0.0.0'], {
+    stdio: 'inherit',
+    shell: true
+});
+
+// Handle process termination
+const cleanup = () => {
+    console.log('\\nShutting down...');
+    server.kill();
+    client.kill();
+    process.exit(0);
+};
+
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
+
+server.on('exit', (code) => {
+    console.log(`Server exited with code $${code}`);
+    client.kill();
+    process.exit(code || 0);
+});
+
+client.on('exit', (code) => {
+    console.log(`Client exited with code $${code}`);
+    server.kill();
+    process.exit(code || 0);
+});
+EOF
+""",
+)
+
+# Combined development mode - runs both server and client
+js_binary(
+    name = "dev",
+    data = [
+        "//server:server_ts",
+        "//client:dev",
+        "//:node_modules",
+    ],
+    entry_point = ":dev_script_gen",
+)
+
+# Production build target
+filegroup(
+    name = "prod_build",
+    srcs = [
+        "//server:server_ts",
+        "//client:build",
+    ],
+)
+
+# Production server only
+js_binary(
+    name = "prod_server",
+    data = [
+        ":prod_build",
+        "//:node_modules",
+    ],
+    entry_point = "//server:index.js",
+    env = {
+        "NODE_ENV": "production",
+        "PORT": "3002",
+    },
+)
+
+# Create a Node.js script for running production mode
+genrule(
+    name = "prod_script_gen",
+    outs = ["prod.cjs"],
+    cmd = """
+cat > $@ << 'EOF'
+const { spawn } = require('child_process');
+const path = require('path');
+
+console.log('Starting Gazel in production mode...');
+console.log('Server: http://localhost:3002');
+console.log('Preview: http://localhost:4173');
+console.log('');
+
+const runfilesDir = process.env.RUNFILES_DIR || path.join(__dirname, '..', '..');
+
+// Start the production server
+console.log('[server] Starting production server...');
+const server = spawn('node', [path.join(runfilesDir, '_main/server/index.js')], {
+    stdio: 'inherit',
+    env: { ...process.env, NODE_ENV: 'production', PORT: '3002' }
+});
+
+// Start the preview server
+console.log('[preview] Starting preview server...');
+const preview = spawn(path.join(runfilesDir, '_main/client/preview_/preview'), ['preview', '--host', '0.0.0.0'], {
+    stdio: 'inherit',
+    shell: true
+});
+
+// Handle process termination
+const cleanup = () => {
+    console.log('\\nShutting down...');
+    server.kill();
+    preview.kill();
+    process.exit(0);
+};
+
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
+
+server.on('exit', (code) => {
+    console.log(`Server exited with code $${code}`);
+    preview.kill();
+    process.exit(code || 0);
+});
+
+preview.on('exit', (code) => {
+    console.log(`Preview exited with code $${code}`);
+    server.kill();
+    process.exit(code || 0);
+});
+EOF
+""",
+)
+
+# Combined production mode - runs both server and client preview
+js_binary(
+    name = "prod",
+    data = [
+        ":prod_build",
+        "//client:preview",
+        "//:node_modules",
+    ],
+    entry_point = ":prod_script_gen",
+    env = {
+        "NODE_ENV": "production",
+    },
+)
