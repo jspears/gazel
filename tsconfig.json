@@ -1,5 +1,4 @@
 {
-  "extends": "@tsconfig/svelte/tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -22,6 +21,7 @@
     "inlineSources": true,
     "types": ["vite/client", "svelte", "node"],
     "baseUrl": ".",
+    "verbatimModuleSyntax": true,
     "paths": {
       "$lib": ["./client/lib"],
       "$lib/*": ["./client/lib/*"],

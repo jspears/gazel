@@ -34,19 +34,37 @@ Watch Gazel in action: [View Demo](docs/gazel-bazel.mov)
 - **npm** >= 9.0.0
 - **Bazel** (any recent version)
 
+### Quick Commands
+
+```bash
+# Development mode with hot reload
+bazel run //app:dev
+
+# Production mode
+bazel run //app:run
+```
+
+Both commands will:
+- ✅ Install all dependencies automatically
+- ✅ Configure the workspace automatically
+- ✅ Open your browser automatically
+- ✅ Start both server and client
+
 ### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/jspears/gazel
 cd gazel
-
-# Install dependencies
-npm install
-
-# Start the application
-npm run dev
 ```
+
+#### Bazel Run
+Well you need bazel anyways so we will just do it with bazel.
+```bash
+# Just run! Bazel automatically handles all dependencies
+bazel run //app:dev
+```
+
 
 **That's it!** Open http://localhost:5173 in your browser.
 
@@ -86,13 +104,27 @@ Opens:
 
 ### Development with Bazel (Alternative)
 
-You can also use pure Bazel commands to run the application:
+You can also use pure Bazel commands to run the application.
+
+#### 🎯 Key Benefits of Using Bazel
+
+**Automatic Dependency Management:**
+- ✅ **No manual `pnpm install` needed** - Bazel handles everything!
+- ✅ Dependencies are installed automatically from `pnpm-lock.yaml`
+- ✅ Bazel caches dependencies for fast subsequent builds
+- ✅ The `//:node_modules` target ensures all packages are available
+- ✅ Clean, reproducible builds every time
+
+**Automatic Workspace Configuration:**
+- ✅ **Client automatically sets the workspace** on startup
+- ✅ When running via `bazel run`, the workspace is detected and configured
+- ✅ No manual workspace selection needed for Bazel users
 
 **Run both server and client together (recommended):**
 ```bash
 bazel run //app:dev
 ```
-This starts both the backend server (port 3002) and frontend dev server (port 5173) in a single terminal.
+This starts both the backend server (port 3002) and frontend dev server (port 5173) in a single terminal with all dependencies automatically installed, workspace automatically configured, and **opens your browser automatically**.
 
 **Or run them separately:**
 ```bash
@@ -117,16 +149,19 @@ Visit http://localhost:3001
 
 ### Production with Bazel (Alternative)
 
-**Build everything for production:**
+**Run production mode (builds and serves the application):**
 ```bash
-bazel build //app:prod_build
+bazel run //app:run
 ```
 
-**Run production mode (both server and preview):**
-```bash
-bazel run //app:prod
-```
-Note: The production mode target needs additional configuration to work properly.
+This command:
+- ✅ Builds the optimized client bundle
+- ✅ Starts the production server on port 3002
+- ✅ Serves the built client files directly from the server
+- ✅ Automatically configures the workspace on client connection
+- ✅ **Opens your browser automatically** at http://localhost:3002
+
+The production server serves both the API and the static client files, providing a complete production-ready deployment.
 
 **Or build and run separately:**
 ```bash

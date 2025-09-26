@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 import config from './config.js';
 import { printStartupBanner, printShutdownMessage } from './utils/console-styles.js';
 
@@ -38,14 +39,43 @@ app.use('/api/modules', modulesRoutes);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
-  console.log(`Serving static files from ${path.join(__dirname, '..', '..', 'dist')}`);
-  const distPath = path.join(__dirname, '..', '..', 'dist');
-  app.use(express.static(distPath));
-  
-  // Handle client-side routing
-  app.get('*', (_req: Request, res: Response) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
+  // In Bazel, the client build output is in a different location
+  // Try multiple possible locations for the built client files
+  const runfilesDir = process.env.RUNFILES_DIR || '';
+
+  const possiblePaths = [
+    path.join(runfilesDir, '_main', 'client', 'dist'),  // Bazel runfiles location
+    path.join(runfilesDir, 'client', 'dist'),  // Alternative runfiles location
+    path.join(__dirname, '..', 'client', 'dist'),  // Relative to server
+    path.join(__dirname, '..', '..', 'client', 'dist'),  // Up two levels
+    path.join(__dirname, '..', '..', 'dist'),  // Traditional location
+  ];
+
+  let distPath = '';
+  for (const p of possiblePaths) {
+    const indexPath = path.join(p, 'index.html');
+    try {
+      if (fs.existsSync(indexPath)) {
+        distPath = p;
+        break;
+      }
+    } catch (e) {
+      // Try next path
+    }
+  }
+
+  if (distPath) {
+    console.log(`Serving static files from: ${path.basename(distPath)}`);
+    app.use(express.static(distPath));
+
+    // Handle client-side routing
+    app.get('*', (_req: Request, res: Response) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  } else {
+    console.warn('Warning: Could not find built client files for production mode');
+    console.warn('Searched in standard locations relative to server');
+  }
 }
 
 // Error handling middleware

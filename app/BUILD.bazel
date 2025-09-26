@@ -37,9 +37,9 @@ const server = spawn('node', [path.join(runfilesDir, '_main/server/index.js')], 
     env: { ...process.env, PORT: '3002' }
 });
 
-// Start the client dev server
+// Start the client dev server (--open flag will open browser automatically)
 console.log('[client] Starting frontend dev server...');
-const client = spawn(path.join(runfilesDir, '_main/client/dev_/dev'), ['--host', '0.0.0.0'], {
+const client = spawn(path.join(runfilesDir, '_main/client/dev_/dev'), ['--host', '127.0.0.1', '--open'], {
     stdio: 'inherit',
     shell: true
 });
@@ -71,12 +71,17 @@ EOF
 )
 
 # Combined development mode - runs both server and client
+# Note: Bazel automatically handles npm dependencies through the pnpm-lock.yaml file.
+# The //:node_modules target ensures all dependencies are installed and available.
+# No need to run 'pnpm install' manually - Bazel manages this automatically.
 js_binary(
     name = "dev",
     data = [
         "//server:server_ts",
         "//client:dev",
-        "//:node_modules",
+        "//:node_modules",  # This ensures all npm dependencies are available
+        "//:package_json",  # Include package.json for reference
+        "//:tsconfig",      # Include TypeScript config
     ],
     entry_point = ":dev_script_gen",
 )
@@ -115,30 +120,48 @@ const path = require('path');
 
 console.log('Starting Gazel in production mode...');
 console.log('Server: http://localhost:3002');
-console.log('Preview: http://localhost:4173');
 console.log('');
 
 const runfilesDir = process.env.RUNFILES_DIR || path.join(__dirname, '..', '..');
 
-// Start the production server
-console.log('[server] Starting production server...');
+// Function to open browser
+function openBrowser(url) {
+    const platform = process.platform;
+    let cmd;
+
+    if (platform === 'darwin') {
+        cmd = 'open';
+    } else if (platform === 'win32') {
+        cmd = 'start';
+    } else {
+        cmd = 'xdg-open';
+    }
+
+    spawn(cmd, [url], { detached: true, stdio: 'ignore' }).unref();
+}
+
+// Start the production server with the built client files
+console.log('[server] Starting production server with built client...');
 const server = spawn('node', [path.join(runfilesDir, '_main/server/index.js')], {
     stdio: 'inherit',
-    env: { ...process.env, NODE_ENV: 'production', PORT: '3002' }
+    env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        PORT: '3002',
+        RUNFILES_DIR: runfilesDir
+    }
 });
 
-// Start the preview server
-console.log('[preview] Starting preview server...');
-const preview = spawn(path.join(runfilesDir, '_main/client/preview_/preview'), ['preview', '--host', '0.0.0.0'], {
-    stdio: 'inherit',
-    shell: true
-});
+// Open browser after a short delay to ensure server is ready
+setTimeout(() => {
+    console.log('Opening browser at http://localhost:3002...');
+    openBrowser('http://localhost:3002');
+}, 2000);
 
 // Handle process termination
 const cleanup = () => {
     console.log('\\nShutting down...');
     server.kill();
-    preview.kill();
     process.exit(0);
 };
 
@@ -147,26 +170,23 @@ process.on('SIGTERM', cleanup);
 
 server.on('exit', (code) => {
     console.log(`Server exited with code $${code}`);
-    preview.kill();
-    process.exit(code || 0);
-});
-
-preview.on('exit', (code) => {
-    console.log(`Preview exited with code $${code}`);
-    server.kill();
     process.exit(code || 0);
 });
 EOF
 """,
 )
 
-# Combined production mode - runs both server and client preview
+# Combined production mode - server serves the built client files
+# The server will serve the static client build from the runfiles directory
+# All npm dependencies are automatically managed by Bazel through //:node_modules
+# Usage: bazel run //app:run
 js_binary(
-    name = "prod",
+    name = "run",
     data = [
-        ":prod_build",
-        "//client:preview",
-        "//:node_modules",
+        "//server:server_ts",
+        "//client:build",  # Include the built client files
+        "//:node_modules",  # This ensures all npm dependencies are available
+        "//:package_json",  # Include package.json for reference
     ],
     entry_point = ":prod_script_gen",
     env = {

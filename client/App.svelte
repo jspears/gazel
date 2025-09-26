@@ -47,6 +47,44 @@
     }
   }
 
+  async function detectBazelWorkspace(): Promise<string | null> {
+    // When running from Bazel, we know the workspace is the gazel repository
+    // Check if we're running on localhost/127.0.0.1 which indicates local development
+    const isLocalDev = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+
+    if (isLocalDev) {
+      // When running from Bazel, prioritize the known workspace path
+      const knownBazelWorkspace = '/Users/justinspears/Documents/augment-projects/gazel';
+
+      // Try the known Bazel workspace first
+      try {
+        const result = await api.switchWorkspace(knownBazelWorkspace);
+        if (result.success) {
+          console.log('Auto-set Bazel workspace:', knownBazelWorkspace);
+          return knownBazelWorkspace;
+        }
+      } catch (err) {
+        console.debug('Known Bazel workspace not valid:', knownBazelWorkspace);
+      }
+
+      // Fall back to stored workspace if the known one doesn't work
+      const storedWorkspace = storage.getPreference('lastWorkspace');
+      if (storedWorkspace && storedWorkspace !== knownBazelWorkspace) {
+        try {
+          const result = await api.switchWorkspace(storedWorkspace);
+          if (result.success) {
+            console.log('Auto-set stored workspace:', storedWorkspace);
+            return storedWorkspace;
+          }
+        } catch (err) {
+          console.debug('Stored workspace not valid:', storedWorkspace);
+        }
+      }
+    }
+
+    return null;
+  }
+
   onMount(async () => {
     await checkWorkspace();
 
@@ -88,6 +126,23 @@
 
       // First check if we have a stored workspace preference
       const storedWorkspace = storage.getPreference('lastWorkspace');
+
+      // Check if we're running from Bazel (localhost/127.0.0.1)
+      const isBazelRun = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+
+      // When running from Bazel, try to auto-detect and set the workspace
+      if (isBazelRun) {
+        const bazelWorkspace = await detectBazelWorkspace();
+        if (bazelWorkspace) {
+          currentWorkspace = bazelWorkspace;
+          showWorkspacePicker = false;
+          const workspaceName = bazelWorkspace.split('/').filter((p: string) => p).pop() || 'Gazel';
+          currentWorkspaceName = workspaceName;
+          storage.setCurrentWorkspace(bazelWorkspace, workspaceName);
+          checkingWorkspace = false;
+          return;
+        }
+      }
 
       // Check current server configuration
       const result = await api.getCurrentWorkspace();

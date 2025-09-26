@@ -166,6 +166,50 @@ router.get('/current', async (_req: Request, res: Response, next: NextFunction) 
 });
 
 /**
+ * Detect Bazel workspace from current working directory
+ */
+router.get('/detect', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Start from the current working directory
+    let currentDir = process.cwd();
+    let foundWorkspace: string | null = null;
+
+    // Walk up the directory tree looking for MODULE.bazel
+    while (currentDir !== path.dirname(currentDir)) {
+      const moduleFile = path.join(currentDir, 'MODULE.bazel');
+
+      if (fsSync.existsSync(moduleFile)) {
+        foundWorkspace = currentDir;
+        break;
+      }
+
+      currentDir = path.dirname(currentDir);
+    }
+
+    if (foundWorkspace) {
+      // Automatically set this as the workspace
+      setWorkspace(foundWorkspace);
+      bazelService.setWorkspace(foundWorkspace);
+      bazelService.clearCache();
+
+      res.json({
+        workspace: foundWorkspace,
+        detected: true,
+        message: 'Bazel workspace detected and set automatically'
+      });
+    } else {
+      res.json({
+        workspace: null,
+        detected: false,
+        message: 'No Bazel workspace found in current directory tree'
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * Scan for available Bazel workspaces
  */
 router.get('/scan', async (_req: Request, res: Response, next: NextFunction) => {
@@ -258,6 +302,9 @@ router.post('/switch', async (req: Request, res: Response, next: NextFunction) =
 
     // Clear any caches
     bazelService.clearCache();
+
+    // Log the workspace update
+    console.log(`✅ Workspace updated to: ${normalized}`);
 
     return res.json({
       success: true,

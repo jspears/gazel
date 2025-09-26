@@ -43,7 +43,7 @@ importers:
         specifier: ^0.5.0
         version: 0.5.10(tailwindcss@3.4.17)
       '@tsconfig/svelte':
-        specifier: ^5.0.0
+        specifier: ^5.0.5
         version: 5.0.5
       '@types/cors':
         specifier: ^2.8.17
