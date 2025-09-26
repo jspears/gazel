@@ -1,0 +1,26 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+# TypeScript project for generating gRPC clients from Bazel proto files
+ts_project(
+    name = "bzl_ts",
+    srcs = glob(["src/**/*.ts"]),
+    declaration = True,
+    tsconfig = ":tsconfig.json",
+    deps = [
+        "//:node_modules/@grpc/grpc-js",
+        "//:node_modules/@grpc/proto-loader",
+        "//:node_modules/@types/node",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Export the tsconfig for reference
+exports_files(["tsconfig.json"])
+
+# Library for the generated gRPC clients
+js_library(
+    name = "grpc_clients",
+    srcs = [":bzl_ts"],
+    visibility = ["//visibility:public"],
+)

@@ -11,7 +11,7 @@
 
 2. **Launch the Electron app:**
    ```bash
-   bazel run //electron-app:gazel-app
+   bazel run //electron:gazel-app
    ```
 
 That's it! The Electron app will automatically detect the dev server and load Gazel.
@@ -54,13 +54,13 @@ bazel run //app:dev          # Opens in browser automatically
 bazel run //app:dev_no_browser
 
 # Terminal 2: Launch Electron app
-bazel run //electron-app:gazel-app
+bazel run //electron:gazel-app
 ```
 
 ### Build Only (No Launch)
 ```bash
-bazel build //electron-app:gazel-app
-# Output: bazel-bin/electron-app/gazel-app.tar
+bazel build //electron:gazel-app
+# Output: bazel-bin/electron/gazel-app.tar
 ```
 
 ## Architecture
@@ -69,7 +69,7 @@ bazel build //electron-app:gazel-app
 gazel/
 ├── MODULE.bazel              # Downloads Electron binaries
 ├── electron.bzl              # Custom Bazel rule for Electron
-├── electron-app/
+├── electron/
 │   ├── BUILD.bazel          # Uses electron_app rule
 │   ├── bundler.py           # Packages app into Electron
 │   ├── main.js              # Electron entry point

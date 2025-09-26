@@ -1,0 +1,5 @@
+# Export the electron.bzl file so it can be loaded by other packages
+exports_files(["electron.bzl"])
+
+# Make the electron.bzl file visible to all packages
+visibility = ["//visibility:public"]

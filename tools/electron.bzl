@@ -2,11 +2,11 @@
 
 def _electron_app_impl(ctx):
     """Implementation of the electron_app rule."""
-    
+
     # Determine which Electron binary to use based on platform
     # For now, we'll use Darwin ARM64 as default (Apple Silicon)
     electron_binary = ctx.file._electron_binary_darwin_arm64
-    
+
     # Run the bundler to create the app
     ctx.actions.run(
         executable = ctx.executable._bundler,
@@ -23,6 +23,9 @@ def _electron_app_impl(ctx):
             electron_binary.path,
         ] + [f.path for f in ctx.files.assets],
         outputs = [ctx.outputs.app_tar],
+        env = {
+            "BAZEL_BINDIR": ".",
+        },
     )
     
     # Create the run script from template
@@ -67,13 +70,13 @@ electron_app = rule(
             doc = "Additional asset files to include in the app",
         ),
         "_bundler": attr.label(
-            default = Label("//electron-app:bundler"),
+            default = Label("//electron:bundler"),
             executable = True,
             cfg = "exec",
             doc = "Bundler tool to package the Electron app",
         ),
         "_run_script_template": attr.label(
-            default = Label("//electron-app:run.sh.tpl"),
+            default = Label("//electron:run.sh.tpl"),
             allow_single_file = True,
             doc = "Template for the run script",
         ),

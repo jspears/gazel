@@ -42,3 +42,11 @@ http_file(
     sha256 = "c0964ee5fdcefb1003ffd7ef574b07e5147856f3a94bb4335f78c409f8cf2eca",
     urls = ["https://github.com/electron/electron/releases/download/v32.2.6/electron-v32.2.6-darwin-x64.zip"],
 )
+
+# Add Bazel repository for gRPC proto definitions
+git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+git_repository(
+    name = "io_bazel",
+    remote = "https://github.com/bazelbuild/bazel.git",
+    commit = "7.4.1",  # Use a stable release tag
+)

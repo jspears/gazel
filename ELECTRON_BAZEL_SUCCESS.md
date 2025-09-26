@@ -77,7 +77,7 @@ electron-app/
 
 ### For Development
 - Start dev server (without browser): `bazel run //app:dev_no_browser`
-- Run Electron: `bazel run //electron-app:run`
+- Run Electron: `bazel run //electron:run`
 - The Electron app will connect to localhost:5173
 
 Note: Use `//app:dev` if you want to open in a web browser instead
