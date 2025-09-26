@@ -37,9 +37,15 @@ const server = spawn('node', [path.join(runfilesDir, '_main/server/index.js')], 
     env: { ...process.env, PORT: '3002' }
 });
 
-// Start the client dev server (--open flag will open browser automatically)
+// Start the client dev server
 console.log('[client] Starting frontend dev server...');
-const client = spawn(path.join(runfilesDir, '_main/client/dev_/dev'), ['--host', '127.0.0.1', '--open'], {
+// Check if running in Electron context (don't open browser if in Electron)
+const isElectron = process.env.ELECTRON_RUN_AS_NODE || process.versions.electron;
+const clientArgs = ['--host', '127.0.0.1'];
+if (!isElectron && process.env.OPEN_BROWSER !== 'false') {
+    clientArgs.push('--open');
+}
+const client = spawn(path.join(runfilesDir, '_main/client/dev_/dev'), clientArgs, {
     stdio: 'inherit',
     shell: true
 });
@@ -84,6 +90,22 @@ js_binary(
         "//:tsconfig",      # Include TypeScript config
     ],
     entry_point = ":dev_script_gen",
+)
+
+# Development mode without opening browser (for Electron)
+js_binary(
+    name = "dev_no_browser",
+    data = [
+        "//server:server_ts",
+        "//client:dev",
+        "//:node_modules",
+        "//:package_json",
+        "//:tsconfig",
+    ],
+    entry_point = ":dev_script_gen",
+    env = {
+        "OPEN_BROWSER": "false",
+    },
 )
 
 # Production build target

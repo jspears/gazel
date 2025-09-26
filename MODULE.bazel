@@ -1,4 +1,4 @@
-"""Gazel - Bazel workspace explorer"""
+"""Gazel - Bazel workspace explorer with Electron support"""
 
 module(
     name = "gazel",
@@ -11,6 +11,7 @@ bazel_dep(name = "aspect_rules_ts", version = "3.2.1")
 bazel_dep(name = "aspect_rules_swc", version = "2.0.0")
 bazel_dep(name = "aspect_bazel_lib", version = "2.9.4")
 bazel_dep(name = "rules_nodejs", version = "6.3.0")
+bazel_dep(name = "rules_python", version = "0.31.0")
 
 # Configure rules_ts
 rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext")
@@ -26,3 +27,18 @@ npm.npm_translate_lock(
     verify_node_modules_ignored = "//:.bazelignore",
 )
 use_repo(npm, "npm")
+
+# Download Electron binary for macOS (Darwin ARM64)
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+http_file(
+    name = "electron_darwin_arm64",
+    sha256 = "fcb6bbb6aa3c1020b4045dbe9f2a5286173d5025248550f55631e70568e91775",
+    urls = ["https://github.com/electron/electron/releases/download/v32.2.6/electron-v32.2.6-darwin-arm64.zip"],
+)
+
+# Download Electron binary for macOS (Darwin x64)
+http_file(
+    name = "electron_darwin_x64",
+    sha256 = "c0964ee5fdcefb1003ffd7ef574b07e5147856f3a94bb4335f78c409f8cf2eca",
+    urls = ["https://github.com/electron/electron/releases/download/v32.2.6/electron-v32.2.6-darwin-x64.zip"],
+)

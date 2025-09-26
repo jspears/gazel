@@ -96,11 +96,16 @@ app.use((err: ErrorWithStatus, _req: Request, res: Response, _next: NextFunction
 
 // Start server
 const server = app.listen(config.port, () => {
-  printStartupBanner(
-    config.port,
-    config.bazelWorkspace,
-    process.env.NODE_ENV || 'development'
-  );
+  // Only print banner if not running in Electron
+  if (!process.env.ELECTRON_APP) {
+    printStartupBanner(
+      config.port,
+      config.bazelWorkspace,
+      process.env.NODE_ENV || 'development'
+    );
+  } else {
+    console.log(`Server running on port ${config.port}`);
+  }
 });
 
 // Graceful shutdown

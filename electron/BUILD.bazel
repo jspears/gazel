@@ -1,0 +1,244 @@
+"""Electron application build rules"""
+
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_binary")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+
+package(default_visibility = ["//visibility:public"])
+
+# Export the electron tsconfig
+exports_files(["tsconfig.json"])
+
+# TypeScript compilation for Electron main process
+ts_project(
+    name = "electron_ts",
+    srcs = [
+        "main.ts",
+        "preload.ts",
+    ],
+    allow_js = True,
+    declaration = True,
+    declaration_map = True,
+    resolve_json_module = True,
+    source_map = True,
+    out_dir = ".",
+    root_dir = ".",
+    transpiler = "tsc",
+    tsconfig = ":tsconfig.json",
+    deps = [
+        "//:node_modules/@types/node",
+        "//:node_modules/electron",
+    ],
+)
+
+# Electron main process library
+js_library(
+    name = "electron_main",
+    srcs = [":electron_ts"],
+    deps = [
+        "//:node_modules/electron",
+    ],
+)
+
+# Development Electron app
+js_binary(
+    name = "dev",
+    data = [
+        ":electron_main",
+        "//server:server_ts",
+        "//client:client_src",
+        "//:node_modules",
+    ],
+    entry_point = "main.js",
+    env = {
+        "NODE_ENV": "development",
+    },
+)
+
+# Production Electron app
+js_binary(
+    name = "run",
+    data = [
+        ":electron_main",
+        "//server:server_ts",
+        "//client:build",
+        "//:node_modules",
+    ],
+    entry_point = "main.js",
+    env = {
+        "NODE_ENV": "production",
+    },
+)
+
+# Create a script to run Electron with proper setup
+genrule(
+    name = "electron_runner_gen",
+    outs = ["electron_runner.cjs"],
+    cmd = """
+cat > $@ << 'EOF'
+const { spawn } = require('child_process');
+const path = require('path');
+
+const runfilesDir = process.env.RUNFILES_DIR || path.join(__dirname, '..', '..');
+const electronPath = path.join(runfilesDir, 'node_modules', '.bin', 'electron');
+const mainPath = path.join(runfilesDir, '_main', 'electron', 'main.js');
+
+console.log('Starting Gazel Electron App...');
+
+const electron = spawn(electronPath, [mainPath], {
+    stdio: 'inherit',
+    env: {
+        ...process.env,
+        NODE_ENV: process.env.NODE_ENV || 'development',
+        RUNFILES_DIR: runfilesDir
+    }
+});
+
+electron.on('exit', (code) => {
+    console.log(`Electron app exited with code $${code}`);
+    process.exit(code || 0);
+});
+
+process.on('SIGINT', () => {
+    electron.kill();
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    electron.kill();
+    process.exit(0);
+});
+EOF
+""",
+)
+
+# Electron app runner
+js_binary(
+    name = "electron",
+    data = [
+        ":electron_main",
+        "//server:server_ts",
+        "//client:build",
+        "//:node_modules",
+    ],
+    entry_point = ":electron_runner_gen",
+)
+
+# Create separate outputs for main.js and preload.js
+genrule(
+    name = "main_js",
+    srcs = [":electron_ts"],
+    outs = ["main_compiled.js"],
+    cmd = "for f in $(locations :electron_ts); do if [[ $$f == */main.js ]]; then cp $$f $@; fi; done",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "preload_js",
+    srcs = [":electron_ts"],
+    outs = ["preload_compiled.js"],
+    cmd = "for f in $(locations :electron_ts); do if [[ $$f == */preload.js ]]; then cp $$f $@; fi; done",
+)
+
+# Note: The electron_app rule is now defined in //electron-app:BUILD.bazel
+
+# Package configuration for electron-builder
+genrule(
+    name = "electron_builder_config_gen",
+    outs = ["electron-builder.json"],
+    cmd = """
+cat > $@ << 'EOF'
+{
+  "appId": "com.gazel.app",
+  "productName": "Gazel",
+  "directories": {
+    "output": "dist-electron"
+  },
+  "files": [
+    "electron/**/*.js",
+    "server/**/*.js",
+    "client/dist/**/*",
+    "node_modules/**/*",
+    "package.json"
+  ],
+  "mac": {
+    "category": "public.app-category.developer-tools",
+    "icon": "assets/icon.icns"
+  },
+  "win": {
+    "target": "nsis",
+    "icon": "assets/icon.ico"
+  },
+  "linux": {
+    "target": "AppImage",
+    "icon": "assets/icon.png",
+    "category": "Development"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  }
+}
+EOF
+""",
+)
+
+# Script to build distributable packages
+genrule(
+    name = "package_script_gen",
+    outs = ["package.cjs"],
+    cmd = """
+cat > $@ << 'EOF'
+const { execSync } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
+const runfilesDir = process.env.RUNFILES_DIR || path.join(__dirname, '..', '..');
+
+// First, build the production assets
+console.log('Building production assets...');
+execSync('bazel build //client:build //server:server_ts //electron:electron_ts', {
+    stdio: 'inherit'
+});
+
+// Copy built files to a staging directory
+const stagingDir = path.join(runfilesDir, 'electron-staging');
+if (!fs.existsSync(stagingDir)) {
+    fs.mkdirSync(stagingDir, { recursive: true });
+}
+
+console.log('Copying files to staging directory...');
+// Copy electron files
+fs.cpSync(path.join(runfilesDir, '_main', 'electron'), path.join(stagingDir, 'electron'), { recursive: true });
+// Copy server files
+fs.cpSync(path.join(runfilesDir, '_main', 'server'), path.join(stagingDir, 'server'), { recursive: true });
+// Copy client build
+fs.cpSync(path.join(runfilesDir, '_main', 'client', 'dist'), path.join(stagingDir, 'client', 'dist'), { recursive: true });
+// Copy package.json
+fs.copyFileSync(path.join(runfilesDir, '_main', 'package.json'), path.join(stagingDir, 'package.json'));
+
+// Run electron-builder
+console.log('Building Electron packages...');
+process.chdir(stagingDir);
+execSync('npx electron-builder', {
+    stdio: 'inherit'
+});
+
+console.log('Electron packages built successfully!');
+console.log(`Output directory: $${path.join(stagingDir, 'dist-electron')}`);
+EOF
+""",
+)
+
+# Target to package the Electron app for distribution
+js_binary(
+    name = "package",
+    data = [
+        ":electron_main",
+        ":electron_builder_config_gen",
+        "//server:server_ts",
+        "//client:build",
+        "//:node_modules",
+        "//:package_json",
+    ],
+    entry_point = ":package_script_gen",
+)

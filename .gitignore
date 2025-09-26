@@ -43,5 +43,5 @@ coverage/
 # Bazel
 bazel-out
 bazel-bin
-bazel-testlogs
+bazel-*
 

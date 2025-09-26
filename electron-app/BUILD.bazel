@@ -1,0 +1,30 @@
+load("//:electron.bzl", "electron_app")
+load("@rules_python//python:defs.bzl", "py_binary")
+
+# Python binary for the bundler
+py_binary(
+    name = "bundler",
+    srcs = ["bundler.py"],
+    visibility = ["//visibility:public"],
+)
+
+# Export the run script template and main.js
+exports_files(["run.sh.tpl", "index.html", "main.js"])
+
+# Build the Electron app using Graham's approach
+electron_app(
+    name = "gazel-app",
+    app_name = "Gazel",
+    main_js = ":main.js",  # Use the simple CommonJS main.js
+    index_html = ":index.html",
+    assets = [
+        # Add any additional assets here
+    ],
+)
+
+# Alias for convenience
+alias(
+    name = "run",
+    actual = ":gazel-app",
+    visibility = ["//visibility:public"],
+)

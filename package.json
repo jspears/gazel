@@ -3,20 +3,29 @@
   "version": "1.0.0",
   "description": "A modern web-based UI for exploring and understanding Bazel workspaces",
   "type": "module",
+  "main": "dist/server/index.js",
   "scripts": {
     "dev": "$npm_execpath run dev:server & $npm_execpath run dev:client",
     "dev:server": "tsx  server/index.ts",
     "dev:client": "vite",
-    "build": "$npm_execpath run build:server && $npm_execpath run build:client && $npm_execpath run build:finalize",
+    "dev:electron": "tsx electron/main.ts",
+    "build": "$npm_execpath run build:server && $npm_execpath run build:client && $npm_execpath run build:electron && $npm_execpath run build:finalize",
     "build:server": "tsc -p tsconfig.server.json",
     "build:client": "vite build",
+    "build:electron": "tsc electron/main.ts electron/preload.ts --outDir electron --module esnext --target es2022 --moduleResolution bundler --esModuleInterop true",
     "build:finalize": "cp package.prod.json dist/package.json && cp .env.example dist/.env.example && cp README.prod.md dist/README.md && echo 'Production build ready in dist/'",
     "preview": "vite preview",
     "start": "node dist/server/index.js",
+    "start:electron": "electron .",
     "build:all": "$npm_execpath run build && npm run start",
     "build:prod": "$npm_execpath run build && echo 'Build complete. To deploy: cd dist && npm install && npm start'",
+    "package:electron": "electron-builder",
     "typecheck": "tsc --noEmit && svelte-check",
-    "env": "env"
+    "env": "env",
+    "electron": "bazel run //electron-app:dev",
+    "electron:package": "bazel run //electron-app:package",
+    "electron:make": "bazel run //electron-app:make",
+    "electron:start": "bazel run //electron-app:start"
   },
   "pnpm": {
     "onlyBuiltDependencies": []
@@ -33,6 +42,12 @@
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.9.0",
+    "@electron-forge/maker-deb": "^7.9.0",
+    "@electron-forge/maker-rpm": "^7.9.0",
+    "@electron-forge/maker-squirrel": "^7.9.0",
+    "@electron-forge/maker-zip": "^7.9.0",
+    "@electron-forge/plugin-vite": "^7.9.0",
     "@sveltejs/vite-plugin-svelte": "^3.0.0",
     "@tailwindcss/forms": "^0.5.0",
     "@tsconfig/svelte": "^5.0.5",
@@ -45,6 +60,8 @@
     "bits-ui": "^0.21.0",
     "clsx": "^2.1.0",
     "concurrently": "^8.2.0",
+    "electron": "^38.1.2",
+    "electron-builder": "^26.0.12",
     "lucide-svelte": "^0.395.0",
     "postcss": "^8.4.0",
     "svelte": "^4.2.0",
@@ -63,8 +80,39 @@
     "exploration",
     "svelte",
     "nodejs",
-    "typescript"
+    "typescript",
+    "electron"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "build": {
+    "appId": "com.gazel.app",
+    "productName": "Gazel",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*.js",
+      "server/**/*.js",
+      "client/dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icon.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Development"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
 }
