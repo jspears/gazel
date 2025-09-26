@@ -1,11 +1,12 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ES2020",
+    "module": "commonjs",
     "lib": ["ES2020"],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
+    "rootDir": "./generated",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,6 +15,6 @@
     "moduleResolution": "node",
     "types": ["node"]
   },
-  "include": ["src/**/*", "generated/**/*", "examples/**/*"],
-  "exclude": ["node_modules"]
+  "include": ["generated/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

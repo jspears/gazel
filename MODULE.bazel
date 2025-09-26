@@ -6,12 +6,14 @@ module(
 )
 
 # Bazel dependencies
-bazel_dep(name = "aspect_rules_js", version = "2.1.0")
-bazel_dep(name = "aspect_rules_ts", version = "3.2.1")
-bazel_dep(name = "aspect_rules_swc", version = "2.0.0")
-bazel_dep(name = "aspect_bazel_lib", version = "2.9.4")
-bazel_dep(name = "rules_nodejs", version = "6.3.0")
-bazel_dep(name = "rules_python", version = "0.31.0")
+bazel_dep(name = "aspect_rules_js", version = "2.6.0")
+bazel_dep(name = "aspect_rules_swc", version = "2.4.4")
+bazel_dep(name = "aspect_bazel_lib", version = "2.21.2")
+bazel_dep(name = "aspect_rules_ts", version = "3.6.3")
+bazel_dep(name = "rules_nodejs", version = "6.5.0")
+bazel_dep(name = "rules_proto", version = "7.0.2")
+bazel_dep(name = "rules_python", version = "0.40.0")
+bazel_dep(name = "protobuf", version = "29.2")
 
 # Configure rules_ts
 rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext")
@@ -30,6 +32,9 @@ use_repo(npm, "npm")
 
 # Download Electron binary for macOS (Darwin ARM64)
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+
 http_file(
     name = "electron_darwin_arm64",
     sha256 = "fcb6bbb6aa3c1020b4045dbe9f2a5286173d5025248550f55631e70568e91775",
@@ -43,10 +48,12 @@ http_file(
     urls = ["https://github.com/electron/electron/releases/download/v32.2.6/electron-v32.2.6-darwin-x64.zip"],
 )
 
-# Add Bazel repository for gRPC proto definitions
-git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
-git_repository(
+# Download Bazel source code for proto files
+http_archive(
     name = "io_bazel",
-    remote = "https://github.com/bazelbuild/bazel.git",
-    commit = "7.4.1",  # Use a stable release tag
+    sha256 = "eaf34e896d006949b45fb8653707144dca1223814c4259cf2b494c6bd04a6d89",
+    strip_prefix = "bazel-7.4.1",
+    urls = ["https://github.com/bazelbuild/bazel/archive/refs/tags/7.4.1.tar.gz"],
 )
+
+

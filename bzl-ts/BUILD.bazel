@@ -1,26 +1,137 @@
-load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_binary")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+load("@aspect_rules_swc//swc:defs.bzl", "swc")
 
-# TypeScript project for generating gRPC clients from Bazel proto files
+# TypeScript project for pre-generated proto stubs
+# These were generated using the generate-simple-stubs.cjs script
+# from the Bazel proto files
+ts_project(
+    name = "proto_ts",
+    srcs = glob(["generated/**/*.ts"]),
+    declaration = True,
+    declaration_map = True,
+    resolve_json_module = True,
+    source_map = True,
+    tsconfig = "//bzl-ts:tsconfig.json",
+    transpiler = swc,
+    visibility = ["//visibility:public"],
+)
+
+# TypeScript project for the bzl-ts client library
 ts_project(
     name = "bzl_ts",
     srcs = glob(["src/**/*.ts"]),
     declaration = True,
-    tsconfig = ":tsconfig.json",
+    declaration_map = True,
+    resolve_json_module = True,
+    source_map = True,
+    tsconfig = "//bzl-ts:tsconfig.json",
+    transpiler = swc,
     deps = [
+        ":proto_ts",
         "//:node_modules/@grpc/grpc-js",
         "//:node_modules/@grpc/proto-loader",
         "//:node_modules/@types/node",
+        "//:node_modules/chokidar",
     ],
     visibility = ["//visibility:public"],
 )
 
-# Export the tsconfig for reference
-exports_files(["tsconfig.json"])
+# TypeScript examples
+ts_project(
+    name = "examples",
+    srcs = glob(["examples/**/*.ts"]),
+    declaration = True,
+    declaration_map = True,
+    resolve_json_module = True,
+    source_map = True,
+    tsconfig = "//bzl-ts:tsconfig.json",
+    transpiler = swc,
+    deps = [
+        ":bzl_ts",
+        "//:node_modules/@types/node",
+    ],
+)
 
-# Library for the generated gRPC clients
-js_library(
-    name = "grpc_clients",
-    srcs = [":bzl_ts"],
+# Export proto files for reference
+filegroup(
+    name = "protos",
+    srcs = glob(["protos/**/*.proto"]),
     visibility = ["//visibility:public"],
+)
+
+# Binary to run basic build example
+js_binary(
+    name = "example_basic_build",
+    entry_point = "examples/basic-build.js",
+    data = [
+        ":examples",
+        ":bzl_ts",
+        ":proto_ts",
+    ],
+)
+
+# Binary to run event streaming example
+js_binary(
+    name = "example_event_streaming",
+    entry_point = "examples/event-streaming.js",
+    data = [
+        ":examples",
+        ":bzl_ts",
+        ":proto_ts",
+    ],
+)
+
+# Binary to run query graph example
+js_binary(
+    name = "example_query_graph",
+    entry_point = "examples/query-graph.js",
+    data = [
+        ":examples",
+        ":bzl_ts",
+        ":proto_ts",
+    ],
+)
+
+# Binary to run simple test
+js_binary(
+    name = "example_simple_test",
+    entry_point = "examples/simple-test.js",
+    data = [
+        ":examples",
+        ":bzl_ts",
+        ":proto_ts",
+    ],
+)
+
+# Binary to run remote execution example
+js_binary(
+    name = "example_remote_execution",
+    entry_point = "examples/remote-execution.js",
+    data = [
+        ":examples",
+        ":bzl_ts",
+        ":proto_ts",
+    ],
+)
+
+# Binary to run command server example
+js_binary(
+    name = "example_command_server",
+    entry_point = "examples/command-server.js",
+    data = [
+        ":examples",
+        ":bzl_ts",
+        ":proto_ts",
+    ],
+)
+
+js_binary(
+    name = "example_electron_ipc_grpc",
+    entry_point = "examples/electron-ipc-grpc.js",
+    data = [
+        ":examples",
+        ":bzl_ts",
+        ":proto_ts",
+    ],
 )

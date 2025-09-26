@@ -203,7 +203,7 @@ EOF
 # All npm dependencies are automatically managed by Bazel through //:node_modules
 # Usage: bazel run //app:run
 js_binary(
-    name = "run",
+    name = "main",
     data = [
         "//server:server_ts",
         "//client:build",  # Include the built client files
