@@ -142,7 +142,7 @@ export class RemoteExecutionService {
 
     const digest: remoteExecution.Digest = {
       hash,
-      sizeBytes
+      size_bytes: sizeBytes
     };
 
     // Upload to CAS
@@ -177,7 +177,7 @@ export class RemoteExecutionService {
           if (err) {
             reject(err);
           } else {
-            resolve();
+            resolve(response);
           }
         }
       );

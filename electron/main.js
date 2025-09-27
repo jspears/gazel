@@ -2,6 +2,9 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
+// TODO: Add bazel service once build is configured
+// const BazelIPCService = require('./services/bazel-ipc-service');
+// let bazelService = null;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -11,6 +14,8 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             webSecurity: false // Allow loading local resources
+            // TODO: Add preload script once configured
+            // preload: path.join(__dirname, 'preload.js')
         },
         icon: path.join(__dirname, '../assets/icon.png'),
         title: 'Gazel - Bazel Workspace Explorer'
@@ -30,6 +35,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    // TODO: Initialize Bazel IPC service once build is configured
+    // bazelService = new BazelIPCService();
+    // bazelService.initialize();
+
     createWindow();
 
     app.on('activate', () => {
@@ -40,6 +49,12 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+    // TODO: Cleanup Bazel service once configured
+    // if (bazelService) {
+    //     bazelService.cleanup();
+    //     bazelService = null;
+    // }
+
     if (process.platform !== 'darwin') {
         app.quit();
     }

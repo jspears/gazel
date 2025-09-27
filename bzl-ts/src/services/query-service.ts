@@ -3,7 +3,7 @@
  */
 
 import { spawn } from 'child_process';
-import { analysisV2, build } from '../../generated/index.js';
+import { analysisV2, build } from '../../generated/index';
 
 export interface QueryOptions {
   config?: string;
@@ -22,7 +22,7 @@ export interface GraphNode {
   label: string;
   ruleClass?: string;
   location?: string;
-  attributes?: Record<string, any>;
+  attributes?: Record<string, string>;
 }
 
 export interface GraphEdge {
@@ -288,18 +288,27 @@ export class QueryService {
   /**
    * Build dependency graph from query results
    */
-  private buildDependencyGraph(targets: any, graphData: any): DependencyGraph {
+  private buildDependencyGraph(targets:(string | {name:string; ruleClass: string; location: string; })[], graphData: {
+    edges: [from:string, to:string];
+  }): DependencyGraph {
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];
 
     // Create nodes from targets
     for (const target of targets) {
-      nodes.push({
-        id: target.name || target,
-        label: target.name || target,
-        ruleClass: target.ruleClass,
-        location: target.location
-      });
+      if (typeof target === 'string') {
+        nodes.push({
+          id: target,
+          label: target
+        });
+      }else{
+        nodes.push({
+          id: target.name ,
+          label: target.name,
+          ruleClass: target.ruleClass,
+          location: target.location
+        });
+    }
     }
 
     // Create edges from graph data
@@ -319,7 +328,22 @@ export class QueryService {
   /**
    * Build action graph from aquery results
    */
-  private buildActionGraph(data: any): ActionGraph {
+  private buildActionGraph(data: {
+    artifacts: {
+      id: string;
+      execPath: string;
+      isTreeArtifact: boolean;
+      targetId: string;
+    }[];
+    actions:{
+      id: string;
+      mnemonic: string;
+      targetId: string;
+      arguments: string[];
+      inputDepSetIds: string[];
+      outputIds: string[];
+    }[];
+  }): ActionGraph {
     const actions: Action[] = [];
     const artifacts: Artifact[] = [];
 

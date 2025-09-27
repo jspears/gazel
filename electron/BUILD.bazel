@@ -9,7 +9,14 @@ py_binary(
 )
 
 # Export the run script template and main.js
-exports_files(["run.sh.tpl", "index.html", "main.js"])
+exports_files([
+    "run.sh.tpl",
+    "index.html",
+    "main.js",
+    # Service files (for future integration)
+    # "services/bazel-ipc-service.js",
+    # "preload.js",
+])
 
 # Build the Electron app using Graham's approach
 electron_app(
