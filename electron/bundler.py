@@ -52,18 +52,48 @@ def create_app_bundle(temp_dir, app_name, main_js_path, index_html_path, asset_p
     
     # Copy main.js
     shutil.copy2(main_js_path, os.path.join(app_resources_dir, 'main.js'))
-    
-    # Copy index.html
-    shutil.copy2(index_html_path, os.path.join(app_resources_dir, 'index.html'))
+
+    # Handle index.html - could be a file or a directory (prepared app)
+    if os.path.isdir(index_html_path):
+        # It's a prepared app directory (app-dist)
+        # Copy all contents to the app resources directory
+        for item in os.listdir(index_html_path):
+            src = os.path.join(index_html_path, item)
+            if os.path.isfile(src):
+                shutil.copy2(src, app_resources_dir)
+            elif os.path.isdir(src):
+                dst = os.path.join(app_resources_dir, item)
+                if os.path.exists(dst):
+                    shutil.rmtree(dst)
+                shutil.copytree(src, dst)
+    else:
+        # It's a regular index.html file
+        shutil.copy2(index_html_path, os.path.join(app_resources_dir, 'index.html'))
     
     # Copy additional assets
     for asset_path in asset_paths:
         if os.path.isfile(asset_path):
             shutil.copy2(asset_path, app_resources_dir)
         elif os.path.isdir(asset_path):
-            # Copy directory contents
-            dest_dir = os.path.join(app_resources_dir, os.path.basename(asset_path))
-            shutil.copytree(asset_path, dest_dir)
+            # Special handling for 'dist' folder - copy its contents to 'assets'
+            if os.path.basename(asset_path) == 'dist':
+                # Copy the assets subdirectory from dist
+                dist_assets = os.path.join(asset_path, 'assets')
+                if os.path.exists(dist_assets):
+                    dest_assets = os.path.join(app_resources_dir, 'assets')
+                    if os.path.exists(dest_assets):
+                        shutil.rmtree(dest_assets)
+                    shutil.copytree(dist_assets, dest_assets)
+                # Copy any other files from dist (except index.html which is handled separately)
+                for item in os.listdir(asset_path):
+                    if item != 'assets' and item != 'index.html':
+                        src = os.path.join(asset_path, item)
+                        if os.path.isfile(src):
+                            shutil.copy2(src, app_resources_dir)
+            else:
+                # Copy directory as-is
+                dest_dir = os.path.join(app_resources_dir, os.path.basename(asset_path))
+                shutil.copytree(asset_path, dest_dir)
     
     # Create package.json
     package_json = {

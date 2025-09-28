@@ -22,6 +22,17 @@
       loading = true;
       error = null;
       moduleGraph = await api.getModuleGraph();
+      console.log('Module graph loaded:', moduleGraph);
+
+      // Ensure statistics exists
+      if (moduleGraph && !moduleGraph.statistics) {
+        moduleGraph.statistics = {
+          totalModules: moduleGraph.modules?.length || 0,
+          directDependencies: 0,
+          devDependencies: 0,
+          indirectDependencies: 0
+        };
+      }
     } catch (err: any) {
       console.error('Failed to load module graph:', err);
       // Check if it's a bazel command error
@@ -226,19 +237,19 @@
         <!-- Statistics -->
         <div class="grid grid-cols-4 gap-4">
           <div class="bg-muted/50 rounded-lg p-3">
-            <div class="text-2xl font-bold">{moduleGraph.statistics.totalModules}</div>
+            <div class="text-2xl font-bold">{moduleGraph.statistics?.totalModules || 0}</div>
             <div class="text-sm text-muted-foreground">Total Modules</div>
           </div>
           <div class="bg-muted/50 rounded-lg p-3">
-            <div class="text-2xl font-bold">{moduleGraph.statistics.directDependencies}</div>
+            <div class="text-2xl font-bold">{moduleGraph.statistics?.directDependencies || 0}</div>
             <div class="text-sm text-muted-foreground">Direct Deps</div>
           </div>
           <div class="bg-muted/50 rounded-lg p-3">
-            <div class="text-2xl font-bold">{moduleGraph.statistics.devDependencies}</div>
+            <div class="text-2xl font-bold">{moduleGraph.statistics?.devDependencies || 0}</div>
             <div class="text-sm text-muted-foreground">Dev Deps</div>
           </div>
           <div class="bg-muted/50 rounded-lg p-3">
-            <div class="text-2xl font-bold">{moduleGraph.statistics.indirectDependencies}</div>
+            <div class="text-2xl font-bold">{moduleGraph.statistics?.indirectDependencies || 0}</div>
             <div class="text-sm text-muted-foreground">Indirect Deps</div>
           </div>
         </div>

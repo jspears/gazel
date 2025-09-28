@@ -9,7 +9,7 @@
 
   export let target: BazelTarget | null = null;
   export let showActions = true;
-  export let showNavigation = true;
+  export let showNavigation = false; // Default to false to hide navigation
   export let compact = false;
 
   let targetDependencies: BazelTarget[] = [];

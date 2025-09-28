@@ -9,6 +9,6 @@ trap 'rm -rf "$TMPDIR"' EXIT
 echo "Extracting {{app_name}} to $TMPDIR"
 tar -xf {{app_tar}} -C "$TMPDIR"
 
-# Run the app
+# Run the app directly to see console output
 echo "Starting {{app_name}}..."
-open -W "$TMPDIR/{{app_name}}.app"
+"$TMPDIR/{{app_name}}.app/Contents/MacOS/Electron" 2>&1

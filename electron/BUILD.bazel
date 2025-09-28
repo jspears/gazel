@@ -8,30 +8,60 @@ py_binary(
     visibility = ["//visibility:public"],
 )
 
+# Python binary for preparing the app
+py_binary(
+    name = "prepare_app",
+    srcs = ["prepare-app.py"],
+)
+
+# Prepare the client app index.html for Electron
+genrule(
+    name = "prepared_index",
+    srcs = ["//client:build"],
+    outs = ["app-index.html"],
+    cmd = """
+        # Copy index.html from the dist folder
+        cp $(location //client:build)/index.html $@
+        # Update paths to be relative - the paths already contain /assets/
+        sed -i.bak 's|="/assets/|="./assets/|g' $@
+        sed -i.bak 's|="/vite|="./vite|g' $@
+        sed -i.bak 's|from "/|from "./|g' $@
+        # Remove the highlight.js reference
+        sed -i.bak 's|<link rel="stylesheet" href="[^"]*styles/default.min.css">||g' $@
+        # Clean up
+        rm -f $@.bak
+    """,
+)
+
 # Export the run script template and main.js
 exports_files([
     "run.sh.tpl",
     "index.html",
+    "index-app.html",
     "main.js",
+    "load-app.js",
     # Service files (for future integration)
     # "services/bazel-ipc-service.js",
     # "preload.js",
 ])
 
-# Build the Electron app using Graham's approach
+# Build the Electron app with the bundled client
 electron_app(
-    name = "gazel-app",
+    name = "app",
     app_name = "Gazel",
-    main_js = ":main.js",  # Use the simple CommonJS main.js
-    index_html = ":index.html",
+    main_js = ":main.js",
+    index_html = ":prepared_index",  # Use the prepared index.html
     assets = [
-        # Add any additional assets here
+        "preload.js",
+        "services/bazel-ipc-service.js",
+        "services/gazel-service.js",
+        "//client:build",  # Include the built client assets
     ],
 )
 
 # Alias for convenience
 alias(
     name = "run",
-    actual = ":gazel-app",
+    actual = ":app",
     visibility = ["//visibility:public"],
 )

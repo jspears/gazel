@@ -163,8 +163,8 @@
 
             // Set the current workspace for workspace-specific data
             storage.setCurrentWorkspace(storedWorkspace, workspaceName);
-            // Reload to ensure all components use the new workspace
-            window.location.reload();
+            // Don't reload - let the reactive updates handle it
+            checkingWorkspace = false;
             return;
           }
         } catch (err) {
@@ -260,8 +260,8 @@
     showWorkspacePicker = false;
     // Set the current workspace for workspace-specific data
     storage.setCurrentWorkspace(workspace, workspaceName);
-    // Reload the page to refresh all components with new workspace
-    window.location.reload();
+    // Don't reload - the reactive components will update automatically
+    // since currentWorkspace is a reactive variable
   }
 </script>
 

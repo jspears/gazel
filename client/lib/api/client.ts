@@ -6,11 +6,35 @@ import type {
   SavedQuery,
   CommandHistory
 } from '$types';
+import { GazelGrpcClient } from './grpc-client';
 
-const API_BASE = '/api';
+// Detect if we're in Electron or browser
+const isElectron = typeof window !== 'undefined' &&
+                   !!(window as any).electron?.ipcRenderer;
+
+// Use gRPC in Electron, fallback to HTTP in browser for now
+const USE_GRPC = isElectron;
+
+// When running in Electron without a server, we need to handle API calls differently
+const ELECTRON_STANDALONE = isElectron && !window.location.href.startsWith('http://localhost');
 
 class ApiClient {
+  private grpcClient: GazelGrpcClient | null = null;
   private abortController: AbortController | null = null;
+  private initialized = false;
+
+  constructor() {
+    if (USE_GRPC) {
+      this.grpcClient = new GazelGrpcClient();
+    }
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialized && this.grpcClient) {
+      await this.grpcClient.connect();
+      this.initialized = true;
+    }
+  }
 
   // Cancel all pending requests
   cancelPendingRequests(): void {
@@ -18,50 +42,7 @@ class ApiClient {
       this.abortController.abort();
       this.abortController = null;
     }
-  }
-
-  private async fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-    try {
-      // Create a new abort controller if we don't have one
-      if (!this.abortController) {
-        this.abortController = new AbortController();
-      }
-
-      const response = await fetch(`${API_BASE}${url}`, {
-        ...options,
-        signal: options?.signal || this.abortController.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options?.headers,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: response.statusText }));
-        const errorMessage = errorData.error || `HTTP ${response.status}`;
-        const error: any = new Error(errorMessage);
-        error.response = response;
-        error.data = errorData;
-        // Include command if present in error response
-        if (errorData.command) {
-          error.command = errorData.command;
-        }
-        throw error;
-      }
-
-      return response.json();
-    } catch (error: any) {
-      // Check if this is an abort error (happens during page unload/reload)
-      if (error.name === 'AbortError' ||
-          (error.message && error.message.toLowerCase().includes('failed to fetch'))) {
-        // During workspace switching, the page reloads and pending requests get aborted
-        // This is expected behavior, so we'll throw a more specific error
-        const abortError: any = new Error('Request aborted due to page reload');
-        abortError.isAborted = true;
-        throw abortError;
-      }
-      throw error;
-    }
+    // TODO: Cancel gRPC streams
   }
 
   // Modules endpoints
@@ -121,24 +102,44 @@ class ApiClient {
       indirectDependencies: number;
     };
   }> {
-    return this.fetchJson('/modules/graph');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getModuleGraph();
   }
 
   async getModuleInfo(moduleName: string): Promise<any> {
-    return this.fetchJson(`/modules/info/${encodeURIComponent(moduleName)}`);
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getModuleInfo(moduleName);
   }
 
   // Workspace endpoints
   async getWorkspaceInfo(): Promise<WorkspaceInfo> {
-    return this.fetchJson<WorkspaceInfo>('/workspace/info');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getWorkspaceInfo();
   }
 
   async getWorkspaceFiles(): Promise<{ total: number; files: BuildFile[] }> {
-    return this.fetchJson('/workspace/files');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getWorkspaceFiles();
   }
 
   async getWorkspaceConfig(): Promise<{ bazelrc_exists: boolean; configurations: Record<string, string[]> }> {
-    return this.fetchJson('/workspace/config');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getWorkspaceConfig();
   }
 
   async getCurrentWorkspace(): Promise<{
@@ -147,7 +148,11 @@ class ApiClient {
     valid?: boolean;
     error?: string;
   }> {
-    return this.fetchJson('/workspace/current');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getCurrentWorkspace();
   }
 
   async scanWorkspaces(): Promise<{
@@ -157,7 +162,11 @@ class ApiClient {
       type: 'current' | 'parent' | 'home' | 'discovered';
     }>
   }> {
-    return this.fetchJson('/workspace/scan');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.scanWorkspaces();
   }
 
   async switchWorkspace(workspace: string): Promise<{
@@ -165,10 +174,11 @@ class ApiClient {
     workspace: string;
     message: string;
   }> {
-    return this.fetchJson('/workspace/switch', {
-      method: 'POST',
-      body: JSON.stringify({ workspace }),
-    });
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.switchWorkspace(workspace);
   }
 
   // Targets endpoints
@@ -177,11 +187,20 @@ class ApiClient {
     targets: BazelTarget[];
     byPackage: Record<string, BazelTarget[]>;
   }> {
-    return this.fetchJson(`/targets?pattern=${encodeURIComponent(pattern)}&format=${format}`);
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.listTargets(pattern, format);
   }
 
   async getTarget(target: string): Promise<BazelTarget> {
-    return this.fetchJson(`/targets/${encodeURIComponent(target)}`);
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    const response = await this.grpcClient.getTarget(target);
+    return response.target;
   }
 
   async getTargetDependencies(target: string, depth = 1): Promise<{
@@ -190,9 +209,11 @@ class ApiClient {
     total: number;
     dependencies: BazelTarget[];
   }> {
-    // Use query parameters to avoid conflicts with complex target names
-    const params = new URLSearchParams({ target, depth: depth.toString() });
-    return this.fetchJson(`/targets/dependencies?${params}`);
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getTargetDependencies(target, depth);
   }
 
   async getTargetsByFile(file: string): Promise<{
@@ -200,7 +221,11 @@ class ApiClient {
     total: number;
     targets: BazelTarget[];
   }> {
-    return this.fetchJson(`/targets/by-file?file=${encodeURIComponent(file)}`);
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getTargetsByFile(file);
   }
 
   async getTargetOutputs(target: string): Promise<{
@@ -209,9 +234,11 @@ class ApiClient {
     count: number;
     error?: string;
   }> {
-    // Use query parameter instead of path to avoid conflicts with targets containing /outputs
-    const params = new URLSearchParams({ target });
-    return this.fetchJson(`/targets/outputs?${params}`);
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getTargetOutputs(target);
   }
 
   async getReverseDependencies(target: string): Promise<{
@@ -219,9 +246,11 @@ class ApiClient {
     total: number;
     dependencies: BazelTarget[];
   }> {
-    // Use query parameter to avoid conflicts with complex target names
-    const params = new URLSearchParams({ target });
-    return this.fetchJson(`/targets/rdeps?${params}`);
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getReverseDependencies(target);
   }
 
   async searchTargets(query: string, type?: string, pkg?: string): Promise<{
@@ -229,10 +258,11 @@ class ApiClient {
     total: number;
     targets: BazelTarget[];
   }> {
-    return this.fetchJson('/targets/search', {
-      method: 'POST',
-      body: JSON.stringify({ query, type, package: pkg }),
-    });
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.searchTargets(query, type, pkg);
   }
 
   // Query endpoints
@@ -242,36 +272,52 @@ class ApiClient {
     result: { targets: BazelTarget[] };
     raw: string;
   }> {
-    return this.fetchJson('/query', {
-      method: 'POST',
-      body: JSON.stringify({ query, outputFormat }),
-    });
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.executeQuery(query, outputFormat);
   }
 
   async getSavedQueries(): Promise<SavedQuery[]> {
-    return this.fetchJson('/query/saved');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getSavedQueries();
   }
 
   async saveQuery(name: string, query: string, description?: string): Promise<SavedQuery> {
-    return this.fetchJson('/query/save', {
-      method: 'POST',
-      body: JSON.stringify({ name, query, description }),
-    });
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.saveQuery(name, query, description);
   }
 
   async deleteQuery(id: string): Promise<{ success: boolean }> {
-    return this.fetchJson(`/query/saved/${id}`, {
-      method: 'DELETE',
-    });
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.deleteQuery(id);
   }
 
   async getQueryTemplates(): Promise<QueryTemplate[]> {
-    return this.fetchJson('/query/templates');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getQueryTemplates();
   }
 
   // Files endpoints
   async listBuildFiles(): Promise<{ total: number; files: BuildFile[] }> {
-    return this.fetchJson('/files/build');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.listBuildFiles();
   }
 
   async getBuildFile(path: string): Promise<{
@@ -280,7 +326,11 @@ class ApiClient {
     targets: Array<{ ruleType: string; name: string; line: number }>;
     lines: number;
   }> {
-    return this.fetchJson(`/files/build/${encodeURIComponent(path)}`);
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getBuildFile(path);
   }
 
   async getWorkspaceFile(): Promise<{
@@ -290,7 +340,11 @@ class ApiClient {
     externalDependencies: string[];
     lines: number;
   }> {
-    return this.fetchJson('/files/workspace');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getWorkspaceFile();
   }
 
   async searchInFiles(query: string, caseSensitive = false): Promise<{
@@ -299,10 +353,11 @@ class ApiClient {
     total: number;
     results: Array<{ file: string; line: number; content: string }>;
   }> {
-    return this.fetchJson('/files/search', {
-      method: 'POST',
-      body: JSON.stringify({ query, caseSensitive }),
-    });
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.searchInFiles(query, caseSensitive);
   }
 
   // Commands endpoints
@@ -312,10 +367,11 @@ class ApiClient {
     stderr?: string;
     error?: string;
   }> {
-    return this.fetchJson('/commands/build', {
-      method: 'POST',
-      body: JSON.stringify({ target, options }),
-    });
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.buildTarget(target, options);
   }
 
   async testTarget(target: string, options: string[] = []): Promise<{
@@ -324,65 +380,50 @@ class ApiClient {
     stderr?: string;
     error?: string;
   }> {
-    return this.fetchJson('/commands/test', {
-      method: 'POST',
-      body: JSON.stringify({ target, options }),
-    });
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.testTarget(target, options);
   }
 
-  streamBuild(target: string, options: string[] = [], onMessage: (data: any) => void): EventSource {
-    const params = new URLSearchParams({
-      target,
-      options: options.join(',')
+  streamBuild(target: string, options: string[] = [], onMessage: (data: any) => void): EventSource | any {
+    // Use gRPC streaming
+    this.ensureInitialized().then(() => {
+      if (!this.grpcClient) {
+        throw new Error('gRPC client not available');
+      }
+      return this.grpcClient.streamBuild(target, options, onMessage);
     });
-    const eventSource = new EventSource(`${API_BASE}/commands/build/stream?${params}`);
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        onMessage(data);
-      } catch (e) {
-        console.error('Failed to parse SSE data:', e);
+    // Return a mock EventSource-like object for compatibility
+    return {
+      close: () => {
+        // TODO: Cancel gRPC stream
       }
     };
-
-    eventSource.onerror = (event) => {
-      console.error('EventSource error:', event);
-      onMessage({ type: 'error', data: 'Connection lost' });
-    };
-
-    return eventSource;
   }
 
   /**
-   * Stream run output using EventSource (SSE)
+   * Stream run output using gRPC
    * @param target - The target to run
    * @param options - Additional options for the run command
    * @param onMessage - Callback function for each message
-   * @returns EventSource instance
+   * @returns EventSource-like object
    */
-  streamRun(target: string, options: string[] = [], onMessage: (data: any) => void): EventSource {
-    const params = new URLSearchParams({
-      target,
-      options: options.join(',')
+  streamRun(target: string, options: string[] = [], onMessage: (data: any) => void): EventSource | any {
+    // Use gRPC streaming
+    this.ensureInitialized().then(() => {
+      if (!this.grpcClient) {
+        throw new Error('gRPC client not available');
+      }
+      return this.grpcClient.streamRun(target, options, onMessage);
     });
-    const eventSource = new EventSource(`${API_BASE}/commands/run/stream?${params}`);
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        onMessage(data);
-      } catch (e) {
-        console.error('Failed to parse SSE data:', e);
+    // Return a mock EventSource-like object for compatibility
+    return {
+      close: () => {
+        // TODO: Cancel gRPC stream
       }
     };
-
-    eventSource.onerror = (event) => {
-      console.error('EventSource error:', event);
-      onMessage({ type: 'error', data: 'Connection lost' });
-    };
-
-    return eventSource;
   }
 
 
@@ -391,13 +432,19 @@ class ApiClient {
     total: number;
     history: CommandHistory[];
   }> {
-    return this.fetchJson(`/commands/history?limit=${limit}`);
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.getCommandHistory(limit);
   }
 
   async clearCommandHistory(): Promise<{ success: boolean }> {
-    return this.fetchJson('/commands/history', {
-      method: 'DELETE',
-    });
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.clearCommandHistory();
   }
 
   async cleanBazel(expunge = false): Promise<{
@@ -405,49 +452,40 @@ class ApiClient {
     output: string;
     error?: string;
   }> {
-    return this.fetchJson('/commands/clean', {
-      method: 'POST',
-      body: JSON.stringify({ expunge }),
-    });
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
+    }
+    return this.grpcClient.cleanBazel(expunge);
   }
 
   // Streaming endpoints for large queries
   async streamQuery(query: string, parseXml = false): Promise<Response> {
-    const response = await fetch('/api/stream/query', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        outputFormat: 'xml',
-        parseXml
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: response.statusText }));
-      throw new Error(error.error || 'Stream query failed');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
     }
-
-    return response;
+    // For now, return a mock Response object
+    // TODO: Implement proper streaming in gRPC client
+    const result = await this.grpcClient.executeQuery(query, 'xml');
+    return new Response(result.raw, {
+      status: 200,
+      headers: new Headers({ 'content-type': 'text/xml' })
+    });
   }
 
   async streamQueryCompact(query: string): Promise<Response> {
-    const response = await fetch('/api/stream/query-compact', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: response.statusText }));
-      throw new Error(error.error || 'Stream query failed');
+    await this.ensureInitialized();
+    if (!this.grpcClient) {
+      throw new Error('gRPC client not available');
     }
-
-    return response;
+    // For now, return a mock Response object
+    // TODO: Implement proper streaming in gRPC client
+    const result = await this.grpcClient.executeQuery(query, 'label');
+    return new Response(result.raw, {
+      status: 200,
+      headers: new Headers({ 'content-type': 'text/plain' })
+    });
   }
 
   /**

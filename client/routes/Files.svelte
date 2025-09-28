@@ -499,7 +499,7 @@
                     {target}
                     compact={true}
                     showActions={true}
-                    showNavigation={true}
+                    showNavigation={false}
                     on:navigate-to-file={handleNavigateToFile}
                     on:navigate-to-graph={handleNavigateToGraph}
                     on:navigate-to-commands={handleNavigateToCommands}

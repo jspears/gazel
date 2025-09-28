@@ -748,20 +748,6 @@
                 <h4 class="text-sm font-medium text-muted-foreground mb-1">Name</h4>
                 <div class="flex items-center gap-2">
                   <p class="font-mono text-sm">{selectedTarget.name || selectedTarget.full}</p>
-                  <button
-                    on:click={() => selectedTarget && navigateToGraph(selectedTarget)}
-                    class="p-1 hover:bg-muted rounded transition-colors"
-                    title="View in dependency graph"
-                  >
-                    <GitBranch class="w-4 h-4 text-muted-foreground hover:text-primary" />
-                  </button>
-                  <button
-                    on:click={() => selectedTarget && navigateToCommands(selectedTarget)}
-                    class="p-1 hover:bg-muted rounded transition-colors"
-                    title="Open in Commands tab"
-                  >
-                    <Terminal class="w-4 h-4 text-muted-foreground hover:text-primary" />
-                  </button>
                   <CopyButton text={selectedTarget.name || selectedTarget.full || ''} size="sm" />
                 </div>
               </div>
