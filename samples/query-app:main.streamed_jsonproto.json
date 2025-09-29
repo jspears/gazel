@@ -1,0 +1,418 @@
+{
+  "type": "RULE",
+  "rule": {
+    "name": "//app:main",
+    "ruleClass": "js_binary",
+    "location": "/Users/justinspears/Documents/augment-projects/gazel/app/BUILD.bazel:205:10",
+    "attribute": [
+      {
+        "name": "$config_dependencies",
+        "type": "LABEL_LIST",
+        "stringListValue": [
+          "@aspect_bazel_lib//lib:enable_runfiles"
+        ],
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "$is_executable",
+        "type": "BOOLEAN",
+        "intValue": 1,
+        "stringValue": "true",
+        "explicitlySpecified": false,
+        "booleanValue": true
+      },
+      {
+        "name": "$launcher_template",
+        "type": "LABEL",
+        "stringValue": "@aspect_rules_js//js/private:js_binary.sh.tpl",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "$node_patches",
+        "type": "LABEL",
+        "stringValue": "@aspect_rules_js//js/private/node-patches:register.cjs",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "$node_patches_files",
+        "type": "LABEL_LIST",
+        "stringListValue": [
+          "@aspect_rules_js//js/private/node-patches:fs.cjs"
+        ],
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "$node_wrapper_bat",
+        "type": "LABEL",
+        "stringValue": "@aspect_rules_js//js/private:node_wrapper.bat",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "$node_wrapper_sh",
+        "type": "LABEL",
+        "stringValue": "@aspect_rules_js//js/private:node_wrapper.sh",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "$npm_wrapper_bat",
+        "type": "LABEL",
+        "stringValue": "@aspect_rules_js//js/private:npm_wrapper.bat",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "$npm_wrapper_sh",
+        "type": "LABEL",
+        "stringValue": "@aspect_rules_js//js/private:npm_wrapper.sh",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "$windows_constraint",
+        "type": "LABEL",
+        "stringValue": "@@platforms//os:windows",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": ":action_listener",
+        "type": "LABEL_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "args",
+        "type": "STRING_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "aspect_hints",
+        "type": "LABEL_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "chdir",
+        "type": "STRING",
+        "stringValue": "",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "compatible_with",
+        "type": "LABEL_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "copy_data_to_bin",
+        "type": "BOOLEAN",
+        "intValue": 1,
+        "stringValue": "true",
+        "explicitlySpecified": false,
+        "booleanValue": true
+      },
+      {
+        "name": "data",
+        "type": "LABEL_LIST",
+        "stringListValue": [
+          "//server:server_ts",
+          "//client:build",
+          "//:node_modules",
+          "//:package_json"
+        ],
+        "explicitlySpecified": true,
+        "nodep": false
+      },
+      {
+        "name": "deprecation",
+        "type": "STRING",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "enable_runfiles",
+        "type": "BOOLEAN",
+        "explicitlySpecified": true
+      },
+      {
+        "name": "entry_point",
+        "type": "LABEL",
+        "stringValue": "//app:prod_script_gen",
+        "explicitlySpecified": true,
+        "nodep": false
+      },
+      {
+        "name": "env",
+        "type": "STRING_DICT",
+        "stringDictValue": [
+          {
+            "key": "NODE_ENV",
+            "value": "production"
+          }
+        ],
+        "explicitlySpecified": true
+      },
+      {
+        "name": "exec_compatible_with",
+        "type": "LABEL_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "exec_properties",
+        "type": "STRING_DICT",
+        "explicitlySpecified": false
+      },
+      {
+        "name": "expand_args",
+        "type": "BOOLEAN",
+        "intValue": 1,
+        "stringValue": "true",
+        "explicitlySpecified": false,
+        "booleanValue": true
+      },
+      {
+        "name": "expand_env",
+        "type": "BOOLEAN",
+        "intValue": 1,
+        "stringValue": "true",
+        "explicitlySpecified": false,
+        "booleanValue": true
+      },
+      {
+        "name": "expect_failure",
+        "type": "STRING",
+        "stringValue": "",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "expected_exit_code",
+        "type": "INTEGER",
+        "intValue": 0,
+        "explicitlySpecified": false
+      },
+      {
+        "name": "features",
+        "type": "STRING_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "fixed_args",
+        "type": "STRING_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "generator_function",
+        "type": "STRING",
+        "stringValue": "js_binary",
+        "explicitlySpecified": true,
+        "nodep": false
+      },
+      {
+        "name": "generator_location",
+        "type": "STRING",
+        "stringValue": "app/BUILD.bazel:205:10",
+        "explicitlySpecified": true,
+        "nodep": false
+      },
+      {
+        "name": "generator_name",
+        "type": "STRING",
+        "stringValue": "main",
+        "explicitlySpecified": true,
+        "nodep": false
+      },
+      {
+        "name": "include_npm",
+        "type": "BOOLEAN",
+        "intValue": 0,
+        "stringValue": "false",
+        "explicitlySpecified": false,
+        "booleanValue": false
+      },
+      {
+        "name": "include_npm_sources",
+        "type": "BOOLEAN",
+        "intValue": 1,
+        "stringValue": "true",
+        "explicitlySpecified": true,
+        "booleanValue": true
+      },
+      {
+        "name": "include_sources",
+        "type": "BOOLEAN",
+        "intValue": 1,
+        "stringValue": "true",
+        "explicitlySpecified": false,
+        "booleanValue": true
+      },
+      {
+        "name": "include_transitive_sources",
+        "type": "BOOLEAN",
+        "intValue": 1,
+        "stringValue": "true",
+        "explicitlySpecified": false,
+        "booleanValue": true
+      },
+      {
+        "name": "include_transitive_types",
+        "type": "BOOLEAN",
+        "intValue": 0,
+        "stringValue": "false",
+        "explicitlySpecified": false,
+        "booleanValue": false
+      },
+      {
+        "name": "include_types",
+        "type": "BOOLEAN",
+        "intValue": 0,
+        "stringValue": "false",
+        "explicitlySpecified": true,
+        "booleanValue": false
+      },
+      {
+        "name": "log_level",
+        "type": "STRING",
+        "stringValue": "error",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "name",
+        "type": "STRING",
+        "stringValue": "main",
+        "explicitlySpecified": true,
+        "nodep": false
+      },
+      {
+        "name": "no_copy_to_bin",
+        "type": "LABEL_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "node_options",
+        "type": "STRING_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "node_toolchain",
+        "type": "LABEL",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "output_licenses",
+        "type": "LICENSE",
+        "license": {
+          "licenseType": [
+            "NONE"
+          ]
+        },
+        "explicitlySpecified": false
+      },
+      {
+        "name": "package_metadata",
+        "type": "LABEL_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "patch_node_fs",
+        "type": "BOOLEAN",
+        "intValue": 1,
+        "stringValue": "true",
+        "explicitlySpecified": false,
+        "booleanValue": true
+      },
+      {
+        "name": "preserve_symlinks_main",
+        "type": "BOOLEAN",
+        "intValue": 1,
+        "stringValue": "true",
+        "explicitlySpecified": false,
+        "booleanValue": true
+      },
+      {
+        "name": "restricted_to",
+        "type": "LABEL_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "tags",
+        "type": "STRING_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "target_compatible_with",
+        "type": "LABEL_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "testonly",
+        "type": "BOOLEAN",
+        "intValue": 0,
+        "stringValue": "false",
+        "explicitlySpecified": false,
+        "booleanValue": false
+      },
+      {
+        "name": "toolchains",
+        "type": "LABEL_LIST",
+        "explicitlySpecified": false,
+        "nodep": false
+      },
+      {
+        "name": "transitive_configs",
+        "type": "STRING_LIST",
+        "explicitlySpecified": false,
+        "nodep": true
+      },
+      {
+        "name": "visibility",
+        "type": "STRING_LIST",
+        "stringListValue": [
+          "//visibility:public"
+        ],
+        "explicitlySpecified": false,
+        "nodep": true
+      },
+      {
+        "name": "$rule_implementation_hash",
+        "type": "STRING",
+        "stringValue": "649db1e27ddc668e22123f0c2e0ec03ed83237bda370376ec8b5e1021fca3444"
+      }
+    ],
+    "ruleInput": [
+      "//:node_modules",
+      "//:package_json",
+      "//app:prod_script_gen",
+      "//client:build",
+      "//server:server_ts",
+      "@aspect_bazel_lib//lib:enable_runfiles",
+      "@aspect_rules_js//js/private:js_binary.sh.tpl",
+      "@aspect_rules_js//js/private:node_wrapper.bat",
+      "@aspect_rules_js//js/private:node_wrapper.sh",
+      "@aspect_rules_js//js/private:npm_wrapper.bat",
+      "@aspect_rules_js//js/private:npm_wrapper.sh",
+      "@aspect_rules_js//js/private/node-patches:fs.cjs",
+      "@aspect_rules_js//js/private/node-patches:register.cjs",
+      "@@platforms//os:windows"
+    ]
+  }
+}

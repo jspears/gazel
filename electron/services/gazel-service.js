@@ -245,6 +245,7 @@ class GazelGrpcService {
               const label = `${pkg}:${name}`;
               const target = {
                 label,
+                full: label,     // Add full field
                 kind,
                 ruleType: kind,  // Add ruleType for compatibility
                 type: kind,      // Add type for compatibility
@@ -267,6 +268,7 @@ class GazelGrpcService {
                 const label = `${pkg}:${name}`;
                 const target = {
                   label,
+                  full: label,        // Add full field
                   kind: 'unknown',
                   ruleType: 'unknown',  // Add ruleType for compatibility
                   type: 'unknown',      // Add type for compatibility
@@ -329,23 +331,87 @@ class GazelGrpcService {
           resolve({ target: null, error: error.message });
         } else {
           // Parse XML output to extract target info
-          // For now, return basic info
-          const match = targetName.match(/^(\/\/[^:]+):(.+)$/);
-          if (match) {
-            const [, pkg, name] = match;
-            resolve({
-              target: {
-                label: targetName,
-                name,
-                package: pkg,
-                type: 'unknown',
-                ruleType: 'unknown',
-                kind: 'unknown'
-              }
-            });
-          } else {
-            resolve({ target: null, error: 'Invalid target format' });
+          const xmlContent = stdout.trim();
+
+          // Extract rule class/type
+          const ruleMatch = xmlContent.match(/class="([^"]+)"/);
+          const ruleType = ruleMatch ? ruleMatch[1] : 'unknown';
+
+          // Extract location
+          const locationMatch = xmlContent.match(/location="([^"]+)"/);
+          const location = locationMatch ? locationMatch[1] : null;
+
+          // Extract name
+          const nameMatch = xmlContent.match(/name="([^"]+)"/);
+          const ruleName = nameMatch ? nameMatch[1] : null;
+
+          // Parse attributes from XML
+          const attributes = {};
+
+          // Extract string attributes
+          const stringAttrs = xmlContent.matchAll(/<string name="([^"]+)" value="([^"]+)"\/>/g);
+          for (const match of stringAttrs) {
+            attributes[match[1]] = match[2];
           }
+
+          // Extract list attributes
+          const listMatches = xmlContent.matchAll(/<list name="([^"]+)">(.*?)<\/list>/gs);
+          for (const match of listMatches) {
+            const attrName = match[1];
+            const listContent = match[2];
+            const items = [];
+
+            // Extract labels from list
+            const labelMatches = listContent.matchAll(/<label value="([^"]+)"\/>/g);
+            for (const labelMatch of labelMatches) {
+              items.push(labelMatch[1]);
+            }
+
+            // Extract strings from list
+            const stringMatches = listContent.matchAll(/<string value="([^"]+)"\/>/g);
+            for (const stringMatch of stringMatches) {
+              items.push(stringMatch[1]);
+            }
+
+            if (items.length > 0) {
+              attributes[attrName] = items;
+            }
+          }
+
+          // Extract boolean attributes
+          const boolAttrs = xmlContent.matchAll(/<boolean name="([^"]+)" value="([^"]+)"\/>/g);
+          for (const match of boolAttrs) {
+            attributes[match[1]] = match[2] === 'true';
+          }
+
+          // Extract integer attributes
+          const intAttrs = xmlContent.matchAll(/<int name="([^"]+)" value="([^"]+)"\/>/g);
+          for (const match of intAttrs) {
+            attributes[match[1]] = parseInt(match[2], 10);
+          }
+
+          // Parse target name to get package and name
+          const targetMatch = targetName.match(/^(\/\/[^:]+):(.+)$/);
+          let pkg = '';
+          let name = targetName;
+
+          if (targetMatch) {
+            [, pkg, name] = targetMatch;
+          }
+
+          resolve({
+            target: {
+              label: targetName,
+              full: targetName,
+              name: ruleName || name,
+              package: pkg,
+              type: ruleType,
+              ruleType: ruleType,
+              kind: ruleType,
+              location: location,
+              attributes: attributes
+            }
+          });
         }
       });
     });
@@ -416,6 +482,7 @@ class GazelGrpcService {
               const label = `${pkg}:${name}`;
               dependencies.push({
                 label,
+                full: label,     // Add full field
                 kind,
                 ruleType: kind,
                 type: kind,
@@ -648,6 +715,7 @@ class GazelGrpcService {
               const label = `${pkg}:${name}`;
               targets.push({
                 label,
+                full: label,     // Add full field
                 kind,
                 ruleType: kind,  // Add ruleType for compatibility
                 type: kind,      // Add type for compatibility
@@ -725,6 +793,7 @@ class GazelGrpcService {
                 const label = `${pkg}:${name}`;
                 targets.push({
                   label,
+                  full: label,     // Add full field
                   kind,
                   ruleType: kind,
                   type: kind,
@@ -742,6 +811,7 @@ class GazelGrpcService {
                 const label = `${pkg}:${name}`;
                 targets.push({
                   label,
+                  full: label,     // Add full field
                   kind: 'unknown',
                   ruleType: 'unknown',
                   type: 'unknown',

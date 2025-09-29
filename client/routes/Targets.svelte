@@ -290,6 +290,15 @@
     }
 
     if (target.full) {
+      // Load full target details with attributes
+      try {
+        const fullTargetResult = await api.getTarget(target.full);
+        if (fullTargetResult) {
+          selectedTarget = fullTargetResult;
+        }
+      } catch (err) {
+        console.error('Failed to load target details:', err);
+      }
       // Load direct dependencies
       try {
         const deps = await api.getTargetDependencies(target.full, 1);

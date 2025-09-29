@@ -12,15 +12,17 @@
   export let showNavigation = false; // Default to false to hide navigation
   export let compact = false;
 
+  let fullTarget: BazelTarget | null = null;
   let targetDependencies: BazelTarget[] = [];
   let targetReverseDependencies: BazelTarget[] = [];
   let targetOutputs: Array<{path: string; filename: string; type: string}> = [];
+  let loadingTarget = false;
   let loadingOutputs = false;
   let loadingReverseDeps = false;
   let loadingDeps = false;
 
-  $: if (target?.full) {
-    loadTargetDetails(target.full);
+  $: if (target?.full || target?.label) {
+    loadTargetDetails(target.full || target.label || target.name);
   }
 
   async function loadTargetDetails(targetName: string) {
@@ -28,6 +30,21 @@
     targetDependencies = [];
     targetReverseDependencies = [];
     targetOutputs = [];
+    fullTarget = target;
+
+    // Load full target details with attributes
+    loadingTarget = true;
+    try {
+      const targetResult = await api.getTarget(targetName);
+      if (targetResult) {
+        fullTarget = targetResult;
+      }
+    } catch (err) {
+      console.error('Failed to load target details:', err);
+      fullTarget = target;
+    } finally {
+      loadingTarget = false;
+    }
 
     // Load direct dependencies
     loadingDeps = true;
@@ -134,23 +151,7 @@
     }
   }
 
-  function navigateToGraph() {
-    if (target) {
-      const targetName = target.full || target.name;
-      if (targetName) {
-        dispatch('navigate-to-graph', { target: targetName });
-      }
-    }
-  }
 
-  function navigateToCommands() {
-    if (target) {
-      const targetName = target.full || target.name;
-      if (targetName) {
-        dispatch('navigate-to-commands', { target: targetName });
-      }
-    }
-  }
 
   function runTarget() {
     if (target) {
@@ -168,24 +169,8 @@
     <div>
       <h4 class="text-sm font-medium text-muted-foreground mb-1">Name</h4>
       <div class="flex items-center gap-2">
-        <p class="font-mono {compact ? 'text-sm' : ''}">{target.name || target.full}</p>
-        {#if showNavigation}
-          <button
-            on:click={navigateToGraph}
-            class="p-1 hover:bg-muted rounded transition-colors"
-            title="View in dependency graph"
-          >
-            <GitBranch class="w-4 h-4 text-muted-foreground hover:text-primary" />
-          </button>
-          <button
-            on:click={navigateToCommands}
-            class="p-1 hover:bg-muted rounded transition-colors"
-            title="Open in Commands tab"
-          >
-            <Terminal class="w-4 h-4 text-muted-foreground hover:text-primary" />
-          </button>
-        {/if}
-        <CopyButton text={target.name || target.full || ''} size="sm" />
+        <p class="font-mono {compact ? 'text-sm' : ''}">{target.full}</p>
+        <CopyButton text={ target.full || ''} size="sm" />
       </div>
     </div>
     
@@ -264,18 +249,28 @@
       </div>
     {/if}
 
-    {#if target.attributes && Object.keys(target.attributes).length > 0}
-      <div>
-        <h4 class="text-sm font-medium text-muted-foreground mb-1">Attributes</h4>
-        <div class="space-y-1 max-h-40 overflow-y-auto">
-          {#each Object.entries(target.attributes) as [key, value]}
+    <div class="border-l-4 border-purple-500 pl-4">
+      <h4 class="text-sm font-medium text-purple-600 mb-1">Attributes</h4>
+      {#if loadingTarget}
+        <div class="text-sm text-muted-foreground">Loading attributes...</div>
+      {:else if fullTarget?.attributes && Object.keys(fullTarget.attributes).length > 0}
+        <div class="space-y-1 max-h-40 overflow-y-auto bg-muted/30 p-2 rounded">
+          {#each Object.entries(fullTarget.attributes) as [key, value]}
             <div class="text-sm">
               <span class="font-mono text-muted-foreground">{key}:</span>
               <span class="font-mono ml-2">
                 {#if Array.isArray(value)}
-                  [{value.length} items]
+                  {#if value.length === 0}
+                    []
+                  {:else if value.length <= 3}
+                    [{value.join(', ')}]
+                  {:else}
+                    [{value.slice(0, 3).join(', ')}, ... +{value.length - 3} more]
+                  {/if}
                 {:else if typeof value === 'object'}
                   {JSON.stringify(value)}
+                {:else if typeof value === 'boolean'}
+                  <span class={value ? 'text-green-600' : 'text-red-600'}>{value}</span>
                 {:else}
                   {value}
                 {/if}
@@ -283,54 +278,56 @@
             </div>
           {/each}
         </div>
-      </div>
-    {/if}
+      {:else}
+        <div class="text-sm text-muted-foreground">No attributes found</div>
+      {/if}
+    </div>
     
-    {#if targetDependencies.length > 0 || loadingDeps}
-      <div>
-        <h4 class="text-sm font-medium text-muted-foreground mb-1">
-          Direct Dependencies {#if !loadingDeps}({targetDependencies.length}){/if}
-        </h4>
-        {#if loadingDeps}
-          <div class="text-sm text-muted-foreground">Loading...</div>
-        {:else if targetDependencies.length > 0}
-          <div class="space-y-1 max-h-40 overflow-y-auto">
-            {#each targetDependencies as dep}
-              <button
-                on:click={() => navigateToTarget(dep)}
-                class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
-              >
-                <ChevronRight class="w-3 h-3" />
-                {dep.full || dep.name}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {/if}
+    <div class="border-l-4 border-blue-500 pl-4">
+      <h4 class="text-sm font-medium text-blue-600 mb-1">
+        Direct Dependencies {#if !loadingDeps}({targetDependencies.length}){/if}
+      </h4>
+      {#if loadingDeps}
+        <div class="text-sm text-muted-foreground">Loading...</div>
+      {:else if targetDependencies.length > 0}
+        <div class="space-y-1 max-h-40 overflow-y-auto bg-muted/30 p-2 rounded">
+          {#each targetDependencies as dep}
+            <button
+              on:click={() => navigateToTarget(dep)}
+              class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
+            >
+              <ChevronRight class="w-3 h-3" />
+              {dep.full || dep.name}
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <div class="text-sm text-muted-foreground">No dependencies</div>
+      {/if}
+    </div>
 
-    {#if targetReverseDependencies.length > 0 || loadingReverseDeps}
-      <div>
-        <h4 class="text-sm font-medium text-muted-foreground mb-1">
-          Used By {#if !loadingReverseDeps}({targetReverseDependencies.length}){/if}
-        </h4>
-        {#if loadingReverseDeps}
-          <div class="text-sm text-muted-foreground">Loading...</div>
-        {:else if targetReverseDependencies.length > 0}
-          <div class="space-y-1 max-h-40 overflow-y-auto">
-            {#each targetReverseDependencies as rdep}
-              <button
-                on:click={() => navigateToTarget(rdep)}
-                class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
-              >
-                <ChevronRight class="w-3 h-3" />
-                {rdep.full || rdep.name}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {/if}
+    <div class="border-l-4 border-green-500 pl-4">
+      <h4 class="text-sm font-medium text-green-600 mb-1">
+        Reverse Dependencies (Used By) {#if !loadingReverseDeps}({targetReverseDependencies.length}){/if}
+      </h4>
+      {#if loadingReverseDeps}
+        <div class="text-sm text-muted-foreground">Loading...</div>
+      {:else if targetReverseDependencies.length > 0}
+        <div class="space-y-1 max-h-40 overflow-y-auto bg-muted/30 p-2 rounded">
+          {#each targetReverseDependencies as rdep}
+            <button
+              on:click={() => navigateToTarget(rdep)}
+              class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
+            >
+              <ChevronRight class="w-3 h-3" />
+              {rdep.full || rdep.name}
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <div class="text-sm text-muted-foreground">No reverse dependencies</div>
+      {/if}
+    </div>
   </div>
 {:else}
   <p class="text-muted-foreground">Select a target to view details</p>
