@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test gRPC Client</title>
+</head>
+<body>
+    <h1>Testing gRPC Client</h1>
+    <button onclick="testGrpc()">Test gRPC</button>
+    <pre id="output"></pre>
+    
+    <script type="module">
+        import { api } from './lib/api/client.ts';
+        
+        window.testGrpc = async function() {
+            const output = document.getElementById('output');
+            output.textContent = 'Testing gRPC client...\n';
+            
+            try {
+                output.textContent += 'Calling getCurrentWorkspace...\n';
+                const result = await api.getCurrentWorkspace();
+                output.textContent += 'Success!\n';
+                output.textContent += JSON.stringify(result, null, 2);
+            } catch (error) {
+                output.textContent += 'Error: ' + error.message + '\n';
+                output.textContent += 'Stack: ' + error.stack;
+            }
+        }
+        
+        // Test immediately on load
+        window.addEventListener('load', () => {
+            console.log('Page loaded, api:', api);
+        });
+    </script>
+</body>
+</html>

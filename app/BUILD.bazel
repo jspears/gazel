@@ -10,7 +10,9 @@ js_binary(
     data = [
         "//server:server_ts",
         "//:node_modules",
+        "//client:dev",
     ],
+    
     entry_point = "//server:index.js",
 )
 
@@ -37,14 +39,16 @@ const server = spawn('node', [path.join(runfilesDir, '_main/server/index.js')], 
     env: { ...process.env, PORT: '3002' }
 });
 
-// Start the client dev server
-console.log('[client] Starting frontend dev server...');
+// Start the client dev server (Vite)
+console.log('[client] Starting Vite dev server...');
 // Check if running in Electron context (don't open browser if in Electron)
 const isElectron = process.env.ELECTRON_RUN_AS_NODE || process.versions.electron;
 const clientArgs = ['--host', '127.0.0.1'];
 if (!isElectron && process.env.OPEN_BROWSER !== 'false') {
     clientArgs.push('--open');
 }
+
+// Use the Vite dev server from the client/dev target
 const client = spawn(path.join(runfilesDir, '_main/client/dev_/dev'), clientArgs, {
     stdio: 'inherit',
     shell: true
@@ -72,6 +76,7 @@ client.on('exit', (code) => {
     server.kill();
     process.exit(code || 0);
 });
+
 EOF
 """,
 )
@@ -101,6 +106,8 @@ js_binary(
         "//:node_modules",
         "//:package_json",
         "//:tsconfig",
+                "//proto:index",
+
     ],
     entry_point = ":dev_script_gen",
     env = {
@@ -114,6 +121,7 @@ filegroup(
     srcs = [
         "//server:server_ts",
         "//client:build",
+        "//proto:index",
     ],
 )
 

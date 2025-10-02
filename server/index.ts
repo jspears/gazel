@@ -14,6 +14,7 @@ import filesRoutes from './routes/files.js';
 import commandsRoutes from './routes/commands.js';
 import streamRoutes from './routes/stream.js';
 import modulesRoutes from './routes/modules.js';
+import connectRoutes from './routes/connect.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,6 +37,10 @@ app.use('/api/files', filesRoutes);
 app.use('/api/commands', commandsRoutes);
 app.use('/api/stream', streamRoutes);
 app.use('/api/modules', modulesRoutes);
+
+// Connect Protocol Routes (gRPC-web)
+// These routes handle the Connect protocol for browser-based gRPC
+app.use('/', connectRoutes);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

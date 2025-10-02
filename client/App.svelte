@@ -121,6 +121,7 @@
   }
 
   async function checkWorkspace() {
+    console.log('[App] checkWorkspace called');
     try {
       checkingWorkspace = true;
 
@@ -145,7 +146,9 @@
       }
 
       // Check current server configuration
+      console.log('[App] Checking current workspace...');
       const result = await api.getCurrentWorkspace();
+      console.log('[App] Current workspace result:', result);
 
       // If server has no workspace but we have one stored, try to switch to it
       if (!result.configured && storedWorkspace) {
@@ -202,7 +205,12 @@
         storage.setCurrentWorkspace(result.workspace, workspaceName);
       }
     } catch (err) {
-      console.error('Failed to check workspace:', err);
+      console.error('[App] Failed to check workspace:', err);
+      console.error('[App] Error details:', {
+        message: err.message,
+        stack: err.stack,
+        error: err
+      });
       showWorkspacePicker = true;
     } finally {
       checkingWorkspace = false;

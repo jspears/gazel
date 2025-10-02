@@ -23,24 +23,9 @@
     "baseUrl": ".",
     "verbatimModuleSyntax": true,
     "paths": {
-      "$lib": ["./client/lib"],
-      "$lib/*": ["./client/lib/*"],
-      "$components": ["./client/lib/components"],
-      "$components/*": ["./client/lib/components/*"],
-      "$stores": ["./client/lib/stores"],
-      "$stores/*": ["./client/lib/stores/*"],
-      "$utils": ["./client/lib/utils"],
-      "$utils/*": ["./client/lib/utils/*"],
-      "$types": ["./client/lib/types"],
-      "$types/*": ["./client/lib/types/*"]
-    }
+      "$/*":["./bazel-bin/*", "../../*"]
+    },
   },
-  "include": [
-    "client/**/*.ts",
-    "client/**/*.js",
-    "client/**/*.svelte",
-    "client/**/*.d.ts"
-  ],
   "exclude": [
     "node_modules",
     "dist",

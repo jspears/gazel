@@ -11,15 +11,20 @@ bazel_dep(name = "aspect_rules_swc", version = "2.4.4")
 bazel_dep(name = "aspect_bazel_lib", version = "2.21.2")
 bazel_dep(name = "aspect_rules_ts", version = "3.6.3")
 bazel_dep(name = "rules_nodejs", version = "6.5.0")
-bazel_dep(name = "rules_proto", version = "7.0.2")
-bazel_dep(name = "rules_python", version = "0.40.0")
-bazel_dep(name = "protobuf", version = "29.2")
+bazel_dep(name = "rules_python", version = "1.6.3")
+bazel_dep(name = "rules_proto", version = "7.1.0")
+bazel_dep(name = "rules_proto_grpc", version = "5.7.0")
+bazel_dep(name = "rules_proto_grpc_js",  version = "5.7.0")
+
+bazel_dep(name = "protobuf", version = "31.1",  repo_name = "com_google_protobuf")
+#bazel_dep(name = "protobuf", version = "21.7", repo_name = "com_google_protobuf")
+
+
 
 # Configure rules_ts
 rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext")
 rules_ts_ext.deps()
 use_repo(rules_ts_ext, "npm_typescript")
-
 # Configure npm
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
 npm.npm_translate_lock(
@@ -29,6 +34,7 @@ npm.npm_translate_lock(
     verify_node_modules_ignored = "//:.bazelignore",
 )
 use_repo(npm, "npm")
+use_repo(npm, "rules_proto_grpc_js_npm")
 
 # Download Electron binary for macOS (Darwin ARM64)
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
@@ -49,11 +55,26 @@ http_file(
 )
 
 # Download Bazel source code for proto files
-http_archive(
-    name = "io_bazel",
-    sha256 = "eaf34e896d006949b45fb8653707144dca1223814c4259cf2b494c6bd04a6d89",
-    strip_prefix = "bazel-7.4.1",
-    urls = ["https://github.com/bazelbuild/bazel/archive/refs/tags/7.4.1.tar.gz"],
+# http_archive(
+#     name = "io_bazel",
+#     sha256 = "eaf34e896d006949b45fb8653707144dca1223814c4259cf2b494c6bd04a6d89",
+#     strip_prefix = "bazel-7.4.1",
+#     urls = ["https://github.com/bazelbuild/bazel/archive/refs/tags/7.4.1.tar.gz"],
+# )
+
+
+
+#BAZEL protos
+bazel_dep(name = "bazel_features", version = "1.36.0")
+
+
+# Dependencies needed for proto compilation
+bazel_dep(name = "rules_cc", version = "0.1.1")
+bazel_dep(name = "rules_java", version = "8.14.0")
+
+# Add custom repository for Bazel protos
+bazel_protos = use_repo_rule("//:bazel_protos.bzl", "bazel_protos")
+
+bazel_protos(
+    name = "bazel_protos",
 )
-
-

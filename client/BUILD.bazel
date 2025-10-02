@@ -3,21 +3,20 @@ load("@npm//:vite/package_json.bzl", vite_bin = "bin")
 
 package(default_visibility = ["//visibility:public"])
 
+
 # Client source files and config
 js_library(
     name = "client_src",
-    srcs = glob([
-        "**/*.svelte",
-        "**/*.ts",
-        "**/*.css",
-        "**/*.js",
-        "**/*.html",
-        "vite.config.ts",
-        "svelte.config.js",
-        "tailwind.config.js",
-        "postcss.config.js",
-    ], allow_empty = True),
+    srcs =  glob([
+    "**/*.svelte",
+    "**/*.ts",
+    "**/*.css",
+    "**/*.js",
+    "**/*.html",
+   
+], exclude = ["**/client.web.ts", "**/client.ipc.ts"]),
     deps = [
+        "//proto:index",
         "//:node_modules",
     ],
 )
@@ -32,6 +31,7 @@ vite_bin.vite_binary(
         "//:tsconfig",
         "//:package_json",
         "//:node_modules",
+        "client.web.ts"
     ],
 )
 
@@ -43,7 +43,24 @@ vite_bin.vite(
         "//:tsconfig",
         "//:package_json",
         "//:node_modules",
+        "client.web.ts"
     ],
+    args = ["build"],
+    chdir = package_name(),
+    out_dirs = ["dist"],
+)
+
+vite_bin.vite(
+    name = "build_electron",
+    srcs = [
+        ":client_src",
+        "//:tsconfig",
+        "//:package_json",
+        "//:node_modules",
+    ],
+    env = {
+        "VITE_ELECTRON": "1",
+    },
     args = ["build"],
     chdir = package_name(),
     out_dirs = ["dist"],

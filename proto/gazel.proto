@@ -4,8 +4,6 @@ package gazel.api.v1;
 
 option go_package = "github.com/jspears/gazel/api/v1;gazelv1";
 
-// Import standard types
-import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 // ============================================================================
@@ -190,6 +188,24 @@ message GetTargetDependenciesResponse {
   repeated BazelTarget dependencies = 4;
 }
 
+message GetTargetOutputsRequest {
+  string target = 1;
+}
+message GetTargetOutputsResponse {
+  string target = 1;
+  repeated string outputs = 2;
+  int32 count = 3;
+}
+
+message GetReverseDependenciesRequest {
+  string target = 1;
+}
+message GetReverseDependenciesResponse {
+  string target = 1;
+  int32 total = 2;
+  repeated BazelTarget dependencies = 3;
+}
+
 message SearchTargetsRequest {
   string query = 1;
   string type = 2;
@@ -298,6 +314,8 @@ service GazelService {
   rpc ListTargets(ListTargetsRequest) returns (ListTargetsResponse);
   rpc GetTarget(GetTargetRequest) returns (GetTargetResponse);
   rpc GetTargetDependencies(GetTargetDependenciesRequest) returns (GetTargetDependenciesResponse);
+  rpc GetTargetOutputs(GetTargetOutputsRequest) returns (GetTargetOutputsResponse);
+  rpc GetReverseDependencies(GetReverseDependenciesRequest) returns (GetReverseDependenciesResponse);
   rpc SearchTargets(SearchTargetsRequest) returns (SearchTargetsResponse);
   
   // Query operations

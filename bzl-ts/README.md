@@ -21,6 +21,7 @@ bzl-ts is a comprehensive TypeScript client that interfaces with the Bazel daemo
 - 🔄 **File Watch Integration** - Watch for changes and trigger builds
 - 🌐 **Remote Execution** - Support for remote build execution and caching
 - 💾 **Server Lifecycle** - Manage Bazel server state (start/stop/restart)
+- 🎯 **Proto Type Generation** - Generate TypeScript types from Bazel's internal proto definitions
 
 ## Installation
 
@@ -244,6 +245,36 @@ import {
 } from 'bzl-ts/types';
 ```
 
+## Proto Generation from Bazel Internal Types
+
+This project includes support for generating TypeScript types from Bazel's internal proto definitions without copying them into your project. This is achieved through a custom repository rule that fetches Bazel's source and exposes the proto files.
+
+### Using Bazel Proto Types
+
+```protobuf
+// Import Bazel's internal proto types
+import "src/main/protobuf/build.proto";
+import "src/main/protobuf/spawn.proto";
+import "src/main/java/com/google/devtools/build/lib/buildeventstream/proto/build_event_stream.proto";
+
+message MyBazelInfo {
+  build_event_stream.BuildEvent build_event = 1;
+  tools.protos.ExecLogEntry.Spawn spawn_info = 2;
+  blaze_query.Target target = 3;
+}
+```
+
+### Build Commands
+
+```bash
+# Build proto with Bazel dependencies
+bazel build //bzl-ts:bazel_example_proto
+bazel build //bzl-ts:bazel_example_ts_proto
+
+# Generated TypeScript files will be in:
+# bazel-bin/bzl-ts/protos/*.{js,d.ts}
+```
+
 ## Examples
 
 See the `examples/` directory for complete examples:
@@ -254,6 +285,7 @@ See the `examples/` directory for complete examples:
 - `remote-execution.ts` - Remote execution setup
 - `watch-mode.ts` - File watching and auto-rebuild
 - `performance-analysis.ts` - Build performance analysis
+- `example-usage.ts` - Using generated Bazel proto types
 
 ## Contributing
 

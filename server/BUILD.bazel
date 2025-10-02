@@ -7,15 +7,23 @@ package(default_visibility = ["//visibility:public"])
 # TypeScript compilation for server
 ts_project(
     name = "server_ts",
-    srcs = glob([
-        "**/*.ts",
-    ]),
+    srcs = glob(
+        ["**/*.ts"],
+        exclude = [
+            "**/*.d.ts",
+            "**/*.test.ts",
+            "**/*.spec.ts",
+            "dist/**/*",
+            "node_modules/**/*",
+        ],
+    ),
     declaration = True,
     declaration_map = True,
+    out_dir = "dist",
     resolve_json_module = True,
     source_map = True,
     transpiler = swc,
-    tsconfig = "tsconfig.json",
+    tsconfig = "//:tsconfig_server",
     deps = [
         "//:node_modules/@types/cors",
         "//:node_modules/@types/express",

@@ -1,20 +1,127 @@
 load("@aspect_rules_js//js:defs.bzl", "js_library", "js_binary")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("@aspect_rules_swc//swc:defs.bzl", "swc")
+load("@aspect_rules_js//js:defs.bzl", "js_test")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+load("@aspect_rules_ts//ts:proto.bzl", "ts_proto_library")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+npm_link_all_packages(name = "node_modules")
 
-# TypeScript project for pre-generated proto stubs
-# These were generated using the generate-simple-stubs.cjs script
-# from the Bazel proto files
-ts_project(
-    name = "proto_ts",
-    srcs = glob(["generated/**/*.ts"]),
-    declaration = True,
-    declaration_map = True,
-    resolve_json_module = True,
-    source_map = True,
-    tsconfig = "//bzl-ts:tsconfig.json",
-    transpiler = swc,
+
+
+FILES = [
+    "action_cache",
+    "bazel_flags",
+    "builtin",
+    "crash_debugging",
+    "crosstool_config",
+    "deps",
+    "desugar_deps",
+    "execution_statistics",
+    "extra_actions_base",
+    "java_compilation",
+    "memory_pressure",
+    "strategy_policy",
+    "test_status",
+    "worker_protocol",
+    "execution_graph",
+]
+
+# see [https://github.com/aspect-build/rules_ts/tree/main/examples]
+# Export proto files for reference
+protos = glob(["protos/**/*.proto"])
+# Define the proto library
+proto_library(
+    name = "bzl_proto",
+    srcs = ["@protobuf//src/google/protobuf:descriptor_proto"],
     visibility = ["//visibility:public"],
+    deps = [
+       "@com_google_protobuf//:any_proto",
+       "@com_google_protobuf//:timestamp_proto",
+        
+    ],
+)
+
+deps = [
+    "action_cache",
+    "bazel_flags",
+    "builtin",
+    "crash_debugging",
+    "crosstool_config",
+    "deps",
+    "desugar_deps",
+    "execution_statistics",
+    "extra_actions_base",
+    "java_compilation",
+    "memory_pressure",
+    "strategy_policy",
+    "test_status",
+    "worker_protocol",
+    "execution_graph",
+    "file_invalidation_data",
+]
+
+[proto_library(
+    name = s + "_proto",
+    srcs = [s + ".proto"],
+) for s in FILES]
+
+proto_library(
+    name = "bzl_proto",
+    srcs = ["@protobuf//src/google/protobuf:descriptor_proto"],
+    visibility = ["//visibility:public"],
+    deps = [
+       "@com_google_protobuf//:any_proto",
+       "@com_google_protobuf//:timestamp_proto",
+        
+    ],
+) for dep in deps
+
+# Your BUILD.bazel
+proto_library(
+    name = "my_proto",
+    srcs = ["protos/my.proto"],  # YOUR .proto files only
+)
+
+# Proto library that uses Bazel's internal protos
+proto_library(
+    name = "bazel_example_proto",
+    srcs = ["protos/bazel_example.proto"],
+    deps = [
+        # External proto_library dependencies from bazel_protos repository
+        "@bazel_protos//:build_proto",
+        "@bazel_protos//:spawn_proto",
+        "@bazel_protos//:build_event_stream_proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+ts_proto_library(
+    name = "my_ts_proto",
+    node_modules = ":node_modules",
+    proto = ":my_proto",
+    copy_files = False,
+    visibility = ["//visibility:public"],
+)
+
+# TypeScript proto library for Bazel example
+ts_proto_library(
+    name = "bazel_example_ts_proto",
+    node_modules = ":node_modules",
+    proto = ":bazel_example_proto",
+    copy_files = False,
+    visibility = ["//visibility:public"],
+)
+ts_proto_library(
+    name = "bzl_ts_proto",
+    node_modules = ":node_modules",
+    proto = ":bzl_proto",
+    proto_srcs = protos,
+    # See https://github.com/connectrpc/connect-es/blob/main/MIGRATING.md#update-plugin-options
+ #   protoc_gen_options = {"import_extension": "js"},
+    visibility = ["//visibility:public"],
+#    deps = ["//examples/connect_node/proto"],
 )
 
 # TypeScript project for the bzl-ts client library
@@ -25,10 +132,11 @@ ts_project(
     declaration_map = True,
     resolve_json_module = True,
     source_map = True,
+    out_dir = "dist",
     tsconfig = "//bzl-ts:tsconfig.json",
     transpiler = swc,
     deps = [
-        ":proto_ts",
+        ":bzl_ts_proto",
         "//:node_modules/@grpc/grpc-js",
         "//:node_modules/@grpc/proto-loader",
         "//:node_modules/@types/node",
@@ -53,12 +161,7 @@ ts_project(
     ],
 )
 
-# Export proto files for reference
-filegroup(
-    name = "protos",
-    srcs = glob(["protos/**/*.proto"]),
-    visibility = ["//visibility:public"],
-)
+
 
 # Binary to run basic build example
 js_binary(

@@ -7,14 +7,11 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BazelService } from './services/bazel.js';
-import type { 
+import bazelService from './services/bazel.js';
+import type {
   WorkspaceInfo,
   BazelTarget,
-  BuildFile,
-  QueryTemplate,
-  SavedQuery,
-  CommandHistory 
+  BuildFile
 } from './types/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,13 +33,13 @@ const gazelProto = grpc.loadPackageDefinition(packageDefinition) as any;
 
 export class GazelGrpcServer {
   private server: grpc.Server;
-  private bazelService: BazelService;
+  private bazelService: typeof bazelService;
   private port: number;
 
   constructor(port = 50051) {
     this.port = port;
     this.server = new grpc.Server();
-    this.bazelService = new BazelService();
+    this.bazelService = bazelService;
     
     // Add the Gazel service implementation
     this.server.addService(gazelProto.gazel.api.v1.GazelService.service, {

@@ -2,52 +2,57 @@
 /**
  * Standalone Bazel Web Server
  * Provides HTTP/WebSocket API for Bazel operations
+ * Now with gRPC-web support for browser compatibility
  */
 
-import { BazelWebAdapter } from './bazel-web-adapter.js';
+import GrpcWebServer from './grpc-web-server.js';
 import { program } from 'commander';
 
 // Parse command line arguments
 program
   .name('bazel-web-server')
-  .description('Web server for Bazel operations')
+  .description('Web server for Bazel operations with gRPC-web support')
   .option('-p, --port <port>', 'Server port', '8080')
   .option('-w, --workspace <path>', 'Initial workspace path')
+  .option('--grpc', 'Use gRPC-web server (default)', true)
+  .option('--legacy', 'Use legacy HTTP/WebSocket server', false)
   .parse();
 
 const options = program.opts();
 
 async function main() {
   const port = parseInt(options.port, 10);
-  const adapter = new BazelWebAdapter(port);
-  
+
+  // Use gRPC-web server by default
+  const server = new GrpcWebServer(port);
+
   // Handle shutdown gracefully
   process.on('SIGINT', async () => {
     console.log('\n[Server] Shutting down...');
-    await adapter.stop();
+    await server.stop();
     process.exit(0);
   });
-  
+
   process.on('SIGTERM', async () => {
     console.log('\n[Server] Shutting down...');
-    await adapter.stop();
+    await server.stop();
     process.exit(0);
   });
-  
+
   // Start the server
-  await adapter.start();
-  
+  await server.start();
+
   console.log(`
 ╔════════════════════════════════════════╗
-║     Bazel Web Server Started           ║
+║   Bazel gRPC-Web Server Started        ║
 ╠════════════════════════════════════════╣
-║  HTTP API:  http://localhost:${port}    ║
-║  WebSocket: ws://localhost:${port}/ws   ║
+║  HTTP API:  http://localhost:${port}/api ║
+║  Health:    http://localhost:${port}/health ║
 ║                                        ║
 ║  Press Ctrl+C to stop                  ║
 ╚════════════════════════════════════════╝
   `);
-  
+
   // If initial workspace provided, set it
   if (options.workspace) {
     console.log(`[Server] Setting initial workspace: ${options.workspace}`);

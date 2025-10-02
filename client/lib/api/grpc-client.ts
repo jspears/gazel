@@ -12,7 +12,15 @@ import type {
   CommandHistory
 } from '$types';
 
-// For browser environment, we'll use grpc-web
+// Import Connect client for browser
+// TODO: Fix generated proto exports before enabling these imports
+// import { createClient, type Client } from '@connectrpc/connect';
+// import { createConnectTransport } from '@connectrpc/connect-web';
+// import { GazelService } from './generated/gazel_connect.js';
+// import { create } from '@bufbuild/protobuf';
+// import * as schemas from './generated/gazel_pb.js';
+
+// For browser environment, we'll use Connect (gRPC-web)
 // For Electron, we can use native gRPC through IPC
 
 interface GazelServiceClient {
@@ -45,21 +53,27 @@ interface GazelServiceClient {
 export class GazelGrpcClient {
   private client: GazelServiceClient | null = null;
   private isElectron: boolean;
-  private abortController: AbortController | null = null;
 
   constructor() {
     // Detect if we're running in Electron
-    this.isElectron = typeof window !== 'undefined' && 
+    this.isElectron = typeof window !== 'undefined' &&
                       !!(window as any).electron?.ipcRenderer;
   }
 
-  async connect(host = 'localhost', port = 50051): Promise<void> {
-    if (this.isElectron) {
-      // In Electron, use IPC to communicate with main process gRPC client
-      await this.connectElectron();
-    } else {
-      // In browser, use grpc-web
-      await this.connectBrowser(host, port);
+  async connect(host = 'localhost', port = 8080): Promise<void> {
+    console.log(`[GazelGrpcClient] Connecting... isElectron: ${this.isElectron}, host: ${host}, port: ${port}`);
+    try {
+      if (this.isElectron) {
+        // In Electron, use IPC to communicate with main process gRPC client
+        await this.connectElectron();
+      } else {
+        // In browser, use grpc-web on port 8080
+        await this.connectBrowser(host, Number(window.location.port || port));
+      }
+      console.log('[GazelGrpcClient] Connection successful');
+    } catch (error) {
+      console.error('[GazelGrpcClient] Connection failed:', error);
+      throw error;
     }
   }
 
@@ -211,10 +225,115 @@ export class GazelGrpcClient {
   }
 
   private async connectBrowser(host: string, port: number): Promise<void> {
-    // For browser, we need grpc-web with an Envoy proxy
-    // For now, we'll create a mock implementation
-    console.warn('[GazelGrpcClient] Browser gRPC-web not yet implemented, using mock');
-    this.client = this.createMockClient();
+    console.log(`[GazelGrpcClient] Connecting to gRPC-web server at http://${host}:${port}`);
+
+    // Use direct HTTP calls to the gRPC-web server
+    const baseUrl = `http://${host}:${port}`;
+
+    // Helper function to make gRPC-web calls
+    const callMethod = async (method: string, request: any) => {
+      const response = await fetch(`${baseUrl}/gazel.GazelService/${method}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request || {})
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`gRPC-web call failed: ${error}`);
+      }
+
+      return response.json();
+    };
+
+    // Create a client that uses direct HTTP calls
+    this.client = {
+      getWorkspaceInfo: (request, callback) => {
+        callMethod('GetWorkspaceInfo', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      getCurrentWorkspace: (request, callback) => {
+        callMethod('GetCurrentWorkspace', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      scanWorkspaces: (request, callback) => {
+        callMethod('ScanWorkspaces', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      switchWorkspace: (request, callback) => {
+        callMethod('SwitchWorkspace', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      listTargets: (request, callback) => {
+        callMethod('ListTargets', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      getTarget: (request, callback) => {
+        callMethod('GetTarget', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      getTargetDependencies: (request, callback) => {
+        callMethod('GetTargetDependencies', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      getTargetOutputs: (request, callback) => {
+        callMethod('GetTargetOutputs', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      getReverseDependencies: (request, callback) => {
+        callMethod('GetReverseDependencies', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      searchTargets: (request, callback) => {
+        callMethod('SearchTargets', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      executeQuery: (request, callback) => {
+        callMethod('ExecuteQuery', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      streamQuery: (_request) => {
+        // Streaming not yet implemented for HTTP
+        console.warn('[GazelGrpcClient] Streaming not yet implemented in HTTP client');
+        return {
+          on: () => {},
+          cancel: () => {}
+        };
+      },
+      buildTarget: (request, callback) => {
+        callMethod('BuildTarget', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      },
+      streamBuild: (_request) => {
+        // Streaming not yet implemented for HTTP
+        console.warn('[GazelGrpcClient] Streaming not yet implemented in HTTP client');
+        return {
+          on: () => {},
+          cancel: () => {}
+        };
+      },
+      getModuleGraph: (request, callback) => {
+        callMethod('GetModuleGraph', request)
+          .then(response => callback(null, response))
+          .catch(error => callback(error, null));
+      }
+    };
+
+    console.log('[GazelGrpcClient] Connected via HTTP to gRPC-web server at', baseUrl);
   }
 
   private createMockClient(): GazelServiceClient {

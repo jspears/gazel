@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package logger;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+// Logging level enumeration
+enum LogLevel {
+  // Default unspecified level
+  LOG_LEVEL_UNSPECIFIED = 0;
+
+  // Trace level - most verbose, for detailed debugging
+  LOG_LEVEL_TRACE = 1;
+
+  // Debug level - debugging information
+  LOG_LEVEL_DEBUG = 2;
+
+  // Info level - informational messages
+  LOG_LEVEL_INFO = 3;
+
+  // Warning level - warning messages
+  LOG_LEVEL_WARN = 4;
+
+  // Error level - error messages
+  LOG_LEVEL_ERROR = 5;
+
+  // Fatal level - fatal errors that cause termination
+  LOG_LEVEL_FATAL = 6;
+}
+
+service Logger {
+  rpc SendLogMessage(LogMessage) returns (Empty) {}
+}
+
+
+message LogMessage {
+  string message = 1;
+  google.protobuf.Timestamp time = 2;
+  google.protobuf.Any details = 3;
+  LogLevel level = 4;  // Log level for this message
+}
+
+message Empty {}
