@@ -41,6 +41,12 @@ class BazelService {
       finalArgs = [command, ...args];
     }
 
+    // Add --noblock_for_lock to avoid waiting for locks from parent Bazel processes
+    // This is important when running Bazel commands from within a Bazel-launched app
+    // if (!finalArgs.includes('--noblock_for_lock')) {
+    //   finalArgs.unshift('--noblock_for_lock');
+    // }
+
     // Build command string with proper escaping
     const cmdStr = `${this.executable} ${finalArgs.map(arg => {
       // Skip escaping for flags that start with --
@@ -59,7 +65,7 @@ class BazelService {
       return arg;
     }).join(' ')}`;
 
-
+    console.log(`Executing: ${cmdStr} in ${this.workspace}`);
     try {
       const result = await execAsync(cmdStr, {
         cwd: this.workspace,

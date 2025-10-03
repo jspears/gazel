@@ -144,6 +144,14 @@
     expandedModules = expandedModules;
   }
 
+  function handleModuleActivation(event: KeyboardEvent, moduleKey: string) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleModule(moduleKey);
+    }
+  }
+
+
   function getModuleIcon(module: any) {
     if (module.isRoot) {
       return 'root';
@@ -292,8 +300,11 @@
           {#each filteredModules as module}
             {#if !module.isRoot}
               <div class="bg-card border rounded-lg">
-                <button
+                <div
+                  role="button"
+                  tabindex={0}
                   on:click={() => toggleModule(module.key)}
+                  on:keydown={(event) => handleModuleActivation(event, module.key)}
                   class="w-full p-4 flex items-start justify-between hover:bg-muted/50 transition-colors"
                 >
                   <div class="flex items-start gap-3">
@@ -344,7 +355,7 @@
                       <ChevronRight class="w-5 h-5 text-muted-foreground" />
                     {/if}
                   </div>
-                </button>
+                </div>
 
                 {#if expandedModules.has(module.key)}
                   <div class="px-4 pb-4 border-t">

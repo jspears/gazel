@@ -9,3 +9,4 @@ client/node_modules
 server/node_modules
 electron/node_modules
 bzl-ts/node_modules
+bazel-out/darwin_arm64-fastbuild/bin/electron/node_modules

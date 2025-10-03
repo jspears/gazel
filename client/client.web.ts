@@ -1,5 +1,5 @@
 import { createGrpcWebTransport } from "@connectrpc/connect-web";
-import { GazelService } from "../proto/gazel_pb";
+import { GazelService } from "proto/gazel_pb";
 import { createClient, type Transport } from "@connectrpc/connect";
 import  { setClient } from './client.impl';
 export * from './client.impl';

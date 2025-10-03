@@ -1,2 +1,2 @@
-export * from './gazel_pb';
-export * from './logging_pb';
+export * from './gazel_pb.js';
+export * from './logging_pb.js';

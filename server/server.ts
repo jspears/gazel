@@ -1,7 +1,7 @@
-import { ServiceImpl } from "@connectrpc/connect";
+import { type ServiceImpl } from "@connectrpc/connect";
 import { create } from "@bufbuild/protobuf";
-import { GazelService } from "../proto/index.js";
 import {
+  GazelService,
   type GetWorkspaceInfoRequest,
   type GetWorkspaceInfoResponse,
   GetWorkspaceInfoResponseSchema,
@@ -16,6 +16,14 @@ import {
   type SwitchWorkspaceRequest,
   type SwitchWorkspaceResponse,
   SwitchWorkspaceResponseSchema,
+  type GetWorkspaceFilesRequest,
+  type GetWorkspaceFilesResponse,
+  GetWorkspaceFilesResponseSchema,
+  GetWorkspaceFilesResponse_WorkspaceFileSchema,
+  type GetBazelInfoRequest,
+  type GetBazelInfoResponse,
+  GetBazelInfoResponseSchema,
+  BazelInfoSchema,
   type ListTargetsRequest,
   type ListTargetsResponse,
   ListTargetsResponseSchema,
@@ -54,13 +62,13 @@ import {
   type GetModuleGraphResponse,
   GetModuleGraphResponseSchema,
   ModuleSchema,
-} from "../proto/gazel_pb.js";
+} from "proto/gazel_pb.js";
 import bazelService from "./services/bazel.js";
 import parserService from "./services/parser.js";
 import config, { setWorkspace } from "./config.js";
-import fs from "fs/promises";
-import fsSync from "node:fs";
-import path from "path";
+import * as fs from "fs/promises";
+import * as fsSync from "node:fs";
+import * as path from "path";
 
 export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   /**
@@ -70,10 +78,8 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
     _request: GetWorkspaceInfoRequest
   ): Promise<GetWorkspaceInfoResponse> {
     try {
-      const [info, bazelVersion] = await Promise.all([
-        bazelService.getWorkspaceInfo(),
-        bazelService.getBazelVersion(),
-      ]);
+      const  info = await bazelService.getWorkspaceInfo();
+      
 
       // Add additional workspace info
       const moduleFile = path.join(config.bazelWorkspace, "MODULE.bazel");
@@ -89,8 +95,9 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
         console.log("No MODULE.bazel file found");
       }
 
-      // Extract module name from content
+      // Extract module name and version from content
       let workspaceName = "unknown";
+      let workspaceVersion = "";
       if (workspaceContent) {
         // Look for module name in MODULE.bazel
         const moduleMatch = workspaceContent.match(
@@ -99,16 +106,25 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
         if (moduleMatch) {
           workspaceName = moduleMatch[1];
         }
+
+        // Look for version in MODULE.bazel
+        const versionMatch = workspaceContent.match(
+          /version\s*=\s*["']([^"']+)["']/
+        );
+        if (versionMatch) {
+          workspaceVersion = versionMatch[1];
+        }
       }
 
       const workspaceInfo = create(WorkspaceInfoSchema, {
         path: config.bazelWorkspace,
-        name: workspaceName,
+        name: info.workspace_name,
         valid: workspaceExists,
         error: workspaceExists ? "" : "No MODULE.bazel file found",
         packages: Array.isArray(info.packages) ? info.packages : [],
         targetCount: typeof info.target_count === 'number' ? info.target_count : 0,
         fileCount: typeof info.file_count === 'number' ? info.file_count : 0,
+        workspaceVersion,
       });
 
       return create(GetWorkspaceInfoResponseSchema, {
@@ -245,32 +261,42 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   ): Promise<SwitchWorkspaceResponse> {
     const { workspace } = request;
 
+    console.log(`[switchWorkspace] Attempting to switch to: ${workspace}`);
+
     if (!workspace) {
+      const msg = "Workspace path is required";
+      console.error(`[switchWorkspace] Error: ${msg}`);
       return create(SwitchWorkspaceResponseSchema, {
         success: false,
         workspace: "",
-        message: "Workspace path is required",
+        message: msg,
       });
     }
 
     // Validate the workspace path
     const normalized = path.resolve(workspace);
+    console.log(`[switchWorkspace] Normalized path: ${normalized}`);
 
     if (!fsSync.existsSync(normalized)) {
+      const msg = `Workspace directory does not exist: ${normalized}`;
+      console.error(`[switchWorkspace] Error: ${msg}`);
       return create(SwitchWorkspaceResponseSchema, {
         success: false,
         workspace: "",
-        message: "Workspace directory does not exist",
+        message: msg,
       });
     }
+ 
+    const moduleFile = ["MODULE","MODULE.bazel", "WORKSPACE.bazel", "WORKSPACE"].find(f => fsSync.existsSync(path.join(normalized, f)));
+    console.log(`[switchWorkspace] Checking for MODULE.bazel at: ${moduleFile}`);
 
-    const moduleFile = path.join(normalized, "MODULE.bazel");
-
-    if (!fsSync.existsSync(moduleFile)) {
+    if (!moduleFile) {
+      const msg = `Not a valid Bazel workspace (no MODULE.bazel file found at ${moduleFile})`;
+      console.error(`[switchWorkspace] Error: ${msg}`);
       return create(SwitchWorkspaceResponseSchema, {
         success: false,
         workspace: "",
-        message: "Not a valid Bazel workspace (no MODULE.bazel file found)",
+        message: msg,
       });
     }
 
@@ -294,11 +320,154 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   }
 
   /**
+   * Get workspace files (BUILD.bazel, MODULE.bazel, etc.)
+   */
+  async getWorkspaceFiles(
+    _request: GetWorkspaceFilesRequest
+  ): Promise<GetWorkspaceFilesResponse> {
+    try {
+      const workspaceRoot = config.bazelWorkspace;
+      const files: Array<{
+        path: string;
+        name: string;
+        type: string;
+        targets: number;
+        lastModified: bigint;
+      }> = [];
+
+      // Helper function to recursively find BUILD files
+      async function findBuildFiles(dir: string, relativePath = ""): Promise<void> {
+        try {
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            const relPath = relativePath ? path.join(relativePath, entry.name) : entry.name;
+
+            // Skip common directories that shouldn't be scanned
+            if (entry.isDirectory()) {
+              if (
+                entry.name === "node_modules" ||
+                entry.name === ".git" ||
+                entry.name === "bazel-out" ||
+                entry.name === "bazel-bin" ||
+                entry.name === "bazel-testlogs" ||
+                entry.name.startsWith("bazel-")
+              ) {
+                continue;
+              }
+              await findBuildFiles(fullPath, relPath);
+            } else if (entry.isFile()) {
+              // Check for BUILD files
+              if (
+                entry.name === "BUILD" ||
+                entry.name === "BUILD.bazel" ||
+                entry.name === "MODULE.bazel" ||
+                entry.name === "WORKSPACE" ||
+                entry.name === "WORKSPACE.bazel"
+              ) {
+                const stats = await fs.stat(fullPath);
+                let fileType = "build";
+                if (entry.name === "MODULE.bazel") {
+                  fileType = "module";
+                } else if (entry.name === "WORKSPACE" || entry.name === "WORKSPACE.bazel") {
+                  fileType = "workspace";
+                }
+
+                files.push({
+                  path: relPath,
+                  name: entry.name,
+                  type: fileType,
+                  targets: 0, // We could parse the file to count targets, but that's expensive
+                  lastModified: BigInt(Math.floor(stats.mtimeMs)),
+                });
+              }
+            }
+          }
+        } catch (error: any) {
+          // Skip directories we can't read
+          console.warn(`Cannot read directory ${dir}: ${error.message}`);
+        }
+      }
+
+      await findBuildFiles(workspaceRoot);
+
+      // Sort files by path
+      files.sort((a, b) => a.path.localeCompare(b.path));
+
+      // Convert to proto messages
+      const protoFiles = files.map((file) =>
+        create(GetWorkspaceFilesResponse_WorkspaceFileSchema, {
+          path: file.path,
+          name: file.name,
+          type: file.type,
+          targets: file.targets,
+          lastModified: file.lastModified,
+        })
+      );
+
+      return create(GetWorkspaceFilesResponseSchema, {
+        files: protoFiles,
+      });
+    } catch (error: any) {
+      throw new Error(`Failed to get workspace files: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get Bazel information
+   */
+  async getBazelInfo(
+    _request: GetBazelInfoRequest
+  ): Promise<GetBazelInfoResponse> {
+    try {
+      // Execute `bazel info` to get all Bazel information
+      const result = await bazelService.execute(['info']);
+
+      // Parse the output into key-value pairs
+      const infoMap: Record<string, string> = {};
+      const lines = result.stdout.split('\n');
+
+      for (const line of lines) {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 0) {
+          const key = line.substring(0, colonIndex).trim();
+          const value = line.substring(colonIndex + 1).trim();
+          infoMap[key] = value;
+        }
+      }
+
+      const bazelInfo = create(BazelInfoSchema, {
+        version: infoMap['release'] || '',
+        release: infoMap['release'] || '',
+        workspace: infoMap['workspace'] || config.bazelWorkspace,
+        executionRoot: infoMap['execution_root'] || '',
+        outputBase: infoMap['output_base'] || '',
+        outputPath: infoMap['output_path'] || '',
+        serverPid: infoMap['server_pid'] || '',
+        serverLog: infoMap['server_log'] || '',
+        commandLog: infoMap['command_log'] || '',
+        usedHeapSizeAfterGc: false, // This is a boolean in proto but string in output
+        maxHeapSize: infoMap['max-heap-size'] || '',
+        committedHeapSize: infoMap['committed-heap-size'] || '',
+      });
+
+      return create(GetBazelInfoResponseSchema, {
+        info: bazelInfo,
+      });
+    } catch (error: any) {
+      throw new Error(`Failed to get Bazel info: ${error.message}`);
+    }
+  }
+
+  /**
    * List all targets
    */
   async listTargets(request: ListTargetsRequest): Promise<ListTargetsResponse> {
     try {
-      const { pattern = "//...", format = "label_kind" } = request;
+      // Ensure we have valid defaults for pattern and format
+      const pattern = request.pattern || "//...";
+      const format = request.format || "label_kind";
 
       const result = await bazelService.query(pattern, format);
 

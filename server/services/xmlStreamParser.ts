@@ -1,4 +1,4 @@
-import sax from 'sax';
+import * as sax from 'sax';
 import { Transform } from 'stream';
 
 export interface BazelRule {

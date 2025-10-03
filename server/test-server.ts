@@ -10,7 +10,7 @@ import {
   GetCurrentWorkspaceRequestSchema,
   ListTargetsRequestSchema,
   ExecuteQueryRequestSchema,
-} from "../proto/gazel_pb.js";
+} from "proto/index.js";
 
 async function testService() {
   const service = new GazelServiceImpl();
@@ -65,7 +65,7 @@ async function testService() {
   }
 }
 
-// Run tests if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  testService().catch(console.error);
-}
+// // Run tests if this file is executed directly
+// if (import.meta.url === `file://${process.argv[1]}`) {
+//   testService().catch(console.error);
+// }

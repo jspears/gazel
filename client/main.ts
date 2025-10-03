@@ -1,10 +1,7 @@
-import './app.css';
+console.log('Mounting app', import.meta.env.VITE_ELECTRON ? 'in Electron' : 'in browser');
+import {mount} from 'svelte';
 import App from './App.svelte';
-
-console.log('Booting %s', process.env.VITE_ELECTRON ? 'Electron' : 'Web');
-
-const app = new App({
-  target: document.getElementById('app')!,
+import './app.css';
+mount(App, {
+    target: document.getElementById('app')!,
 });
-
-export default app;

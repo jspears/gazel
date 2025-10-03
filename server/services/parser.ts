@@ -1,4 +1,4 @@
-import xml2js from 'xml2js';
+import * as xml2js from 'xml2js';
 import { promisify } from 'util';
 import type { BazelTarget, BazelQueryResult, ParsedTarget } from '../types/index.js';
 

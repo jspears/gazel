@@ -119,7 +119,7 @@
           bind:value={query}
           placeholder="Enter your Bazel query expression..."
           class="w-full h-32 px-3 py-2 border rounded-md bg-background font-mono text-sm"
-        />
+        ></textarea>
       </div>
 
       <div class="flex gap-4">
@@ -316,7 +316,7 @@
               bind:value={queryDescription}
               class="w-full h-20 px-3 py-2 border rounded-md bg-background"
               placeholder="What does this query do?"
-            />
+            ></textarea>
           </div>
           <div class="flex gap-2 justify-end">
             <button

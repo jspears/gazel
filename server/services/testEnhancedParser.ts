@@ -1,21 +1,18 @@
 import { parseEnhancedXmlToJson } from './enhancedXmlParser.js';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const scriptDir = dirname(process.argv[1] ?? '');
+const xmlPath = resolve(scriptDir || process.cwd(), '..', 'samples', 'graph-deps.xml');
 
 async function testEnhancedParser() {
   console.log('Testing Enhanced XML Parser with samples/graph-deps.xml\n');
   console.log('='.repeat(60));
-  
+
   try {
     // Read the sample XML file
-    const xmlPath = join(__dirname, '..', '..', 'samples', 'graph-deps.xml');
     const xmlContent = readFileSync(xmlPath, 'utf-8');
-    
+
     // Parse with enhanced parser
     const result = await parseEnhancedXmlToJson(xmlContent);
     

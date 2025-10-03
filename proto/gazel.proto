@@ -18,6 +18,22 @@ message WorkspaceInfo {
   repeated string packages = 5;
   int32 target_count = 6;
   int32 file_count = 7;
+  string workspace_version = 8; // Version from MODULE.bazel or WORKSPACE
+}
+
+message BazelInfo {
+  string version = 1;
+  string release = 2;
+  string workspace = 3;
+  string execution_root = 4;
+  string output_base = 5;
+  string output_path = 6;
+  string server_pid = 7;
+  string server_log = 8;
+  string command_log = 9;
+  bool used_heap_size_after_gc = 10;
+  string max_heap_size = 11;
+  string committed_heap_size = 12;
 }
 
 message BazelTarget {
@@ -153,6 +169,23 @@ message SwitchWorkspaceResponse {
   bool success = 1;
   string workspace = 2;
   string message = 3;
+}
+
+message GetWorkspaceFilesRequest {}
+message GetWorkspaceFilesResponse {
+  message WorkspaceFile {
+    string path = 1;
+    string name = 2;
+    string type = 3; // "workspace", "build", "module"
+    int32 targets = 4;
+    int64 last_modified = 5;
+  }
+  repeated WorkspaceFile files = 1;
+}
+
+message GetBazelInfoRequest {}
+message GetBazelInfoResponse {
+  BazelInfo info = 1;
 }
 
 // Target Service Messages
@@ -309,6 +342,8 @@ service GazelService {
   rpc GetCurrentWorkspace(GetCurrentWorkspaceRequest) returns (GetCurrentWorkspaceResponse);
   rpc ScanWorkspaces(ScanWorkspacesRequest) returns (ScanWorkspacesResponse);
   rpc SwitchWorkspace(SwitchWorkspaceRequest) returns (SwitchWorkspaceResponse);
+  rpc GetWorkspaceFiles(GetWorkspaceFilesRequest) returns (GetWorkspaceFilesResponse);
+  rpc GetBazelInfo(GetBazelInfoRequest) returns (GetBazelInfoResponse);
   
   // Target operations
   rpc ListTargets(ListTargetsRequest) returns (ListTargetsResponse);

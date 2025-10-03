@@ -1,17 +1,16 @@
 import { defineConfig } from 'vite';
+
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import sveltePreprocess from 'svelte-preprocess';
-import path from 'path';
+import path from 'node:path';
+
 
 export default defineConfig({
   plugins: [
     svelte({
-      preprocess: sveltePreprocess({
-        typescript: true
-      })
+      
     })
   ],
-  
+
   resolve: {
     alias: {
       '$lib': path.resolve('./lib'),
@@ -19,7 +18,7 @@ export default defineConfig({
       '$stores': path.resolve('./lib/stores'),
       '$utils': path.resolve('./lib/utils'),
       '$types': path.resolve('./lib/types'),
-      './client.ts': process.env.ELECTRON ? path.resolve('./client.ipc.ts') : path.resolve('./client.web.ts'),
+      'client': process.env.VITE_ELECTRON ? path.resolve('./client.ipc.ts') : path.resolve('./client.web.ts'),
     }
   },
   server: {

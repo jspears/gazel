@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
-  import { Folder, FileCode, Package, ExternalLink, Target, Clock, ChevronDown, ChevronRight, RefreshCw } from 'lucide-svelte';
+  import { Folder, FileCode, Package, ExternalLink, Target, Clock, ChevronDown, ChevronRight, RefreshCw, Info } from 'lucide-svelte';
   import { api } from '$lib/api/client';
-  import type { WorkspaceInfo, BuildFile } from '$lib/types';
+//  import type { WorkspaceInfo, BuildFile } from '$lib/types';
   import { storage } from '$lib/storage';
+  import type { BuildFile, WorkspaceInfo, BazelInfo } from 'proto/gazel_pb.js';
 
   const dispatch = createEventDispatcher();
 
   let workspaceInfo: WorkspaceInfo | null = null;
+  let bazelInfo: BazelInfo | null = null;
   let buildFiles: BuildFile[] = [];
   let loading = true;
   let error: string | null = null;
@@ -18,13 +20,15 @@
   onMount(async () => {
     try {
       loading = true;
-      const [info, files] = await Promise.all([
+      const [info, files, bzlInfo] = await Promise.all([
         api.getWorkspaceInfo(),
-        api.getWorkspaceFiles()
+        api.getWorkspaceFiles(),
+        api.getBazelInfo()
       ]);
 
       workspaceInfo = info;
       buildFiles = files.files;
+      bazelInfo = bzlInfo.info;
     } catch (err: any) {
       // Don't show error if request was aborted due to page reload (workspace switching)
       if (!err.isAborted) {
@@ -71,8 +75,14 @@
         <dl class="space-y-2 text-sm">
           <div>
             <dt class="text-muted-foreground">Name</dt>
-            <dd class="font-mono">{workspaceInfo.workspace_name}</dd>
+            <dd class="font-mono">{workspaceInfo.name}</dd>
           </div>
+          {#if workspaceInfo.workspaceVersion}
+          <div>
+            <dt class="text-muted-foreground">Version</dt>
+            <dd class="font-mono">{workspaceInfo.workspaceVersion}</dd>
+          </div>
+          {/if}
           <div>
             <dt class="text-muted-foreground">Path</dt>
             <dd class="font-mono text-xs break-all">
@@ -81,14 +91,10 @@
                 class="text-left hover:text-primary transition-colors cursor-pointer group flex items-center gap-1"
                 title="Click to switch workspace"
               >
-                <span>{workspaceInfo.workspace_path}</span>
+                <span>{workspaceInfo.path}</span>
                 <RefreshCw class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
             </dd>
-          </div>
-          <div>
-            <dt class="text-muted-foreground">Bazel Version</dt>
-            <dd class="font-mono">{workspaceInfo.bazel_version}</dd>
           </div>
         </dl>
         {#if buildFiles.some(f => f.type === 'workspace' || f.type === 'module')}
@@ -117,6 +123,35 @@
           </div>
         </dl>
       </div>
+
+      {#if bazelInfo}
+      <div class="bg-card p-6 rounded-lg border">
+        <div class="flex items-center gap-3 mb-4">
+          <Info class="w-5 h-5 text-primary" />
+          <h3 class="font-semibold">Bazel Info</h3>
+        </div>
+        <dl class="space-y-2 text-sm">
+          <div>
+            <dt class="text-muted-foreground">Version</dt>
+            <dd class="font-mono text-xs">{bazelInfo.version}</dd>
+          </div>
+          {#if bazelInfo.serverPid}
+          <div>
+            <dt class="text-muted-foreground">Server PID</dt>
+            <dd class="font-mono text-xs">{bazelInfo.serverPid}</dd>
+          </div>
+          {/if}
+          {#if bazelInfo.outputBase}
+          <div>
+            <dt class="text-muted-foreground">Output Base</dt>
+            <dd class="font-mono text-xs break-all" title={bazelInfo.outputBase}>
+              {bazelInfo.outputBase.split('/').slice(-2).join('/')}
+            </dd>
+          </div>
+          {/if}
+        </dl>
+      </div>
+      {/if}
     </div>
 
     <div class="bg-card p-6 rounded-lg border">

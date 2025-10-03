@@ -64,7 +64,7 @@
   async function loadBuildFiles() {
     try {
       loading = true;
-      const result = await api.listBuildFiles();
+      const result = (await api.getWorkspaceFiles());
       buildFiles = result.files;
     } catch (err: any) {
       error = err.message;
@@ -399,7 +399,7 @@
                 <div class="font-mono text-sm truncate">{file.path}</div>
                 {#if file.lastModified}
                   <div class="text-xs text-muted-foreground">
-                    {new Date(file.lastModified).toLocaleDateString()}
+                    {new Date(Number(file.lastModified)).toLocaleDateString()}
                   </div>
                 {/if}
               </div>

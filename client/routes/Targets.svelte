@@ -12,7 +12,7 @@
   const dispatch = createEventDispatcher();
 
   export let initialTarget: string | null = null;
-  
+
   let targets: BazelTarget[] = [];
   let filteredTargets: BazelTarget[] = [];
   let byPackage: Record<string, BazelTarget[]> = {};
@@ -331,6 +331,13 @@
       } finally {
         loadingOutputs = false;
       }
+    }
+  }
+
+  function handleTargetActivation(event: KeyboardEvent, target: BazelTarget) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      selectTarget(target);
     }
   }
 
@@ -667,8 +674,11 @@
         </div>
         <div class="max-h-[600px] overflow-y-auto">
           {#each visibleTargets.slice(0, displayLimit) as target}
-            <button
+            <div
+              role="button"
+              tabindex={0}
               on:click={() => selectTarget(target)}
+              on:keydown={(event) => handleTargetActivation(event, target)}
               data-target={target.full || target.name}
               class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 flex items-center justify-between group"
               class:bg-muted={selectedTarget === target}
@@ -700,7 +710,7 @@
                 <CopyButton text={target.full || target.name} size="sm" className="opacity-0 group-hover:opacity-100" />
                 <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
               </div>
-            </button>
+            </div>
           {/each}
           {#if visibleTargets.length > displayLimit}
             <div bind:this={loadMoreElement} class="p-4 text-center text-sm">
@@ -760,7 +770,7 @@
                   <CopyButton text={selectedTarget.name || selectedTarget.full || ''} size="sm" />
                 </div>
               </div>
-              
+
               {#if selectedTarget.ruleType}
                 <div>
                   <h4 class="text-sm font-medium text-muted-foreground mb-1">Type</h4>
@@ -799,7 +809,7 @@
                   {/if}
                 </div>
               {/if}
-              
+
               {#if selectedTarget.location}
                 <div>
                   <h4 class="text-sm font-medium text-muted-foreground mb-1">Location</h4>
@@ -847,7 +857,7 @@
                   </div>
                 </div>
               {/if}
-              
+
               {#if targetDependencies.length > 0}
                 <div>
                   <h4 class="text-sm font-medium text-muted-foreground mb-1">

@@ -1,34 +1,27 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "checkJs": true,
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "skipLibCheck": true,
-    "sourceMap": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "inlineSources": true,
-    "types": ["vite/client", "svelte", "node"],
+    "module": "node16",
+    "moduleResolution": "node16",
     "baseUrl": ".",
-    "verbatimModuleSyntax": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "svelte", "node"],
+//    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "emitDeclarationOnly": false,
+  //  "outDir": "dist",
+    // "sourceMap": true,
+    // "declaration": false,
+    // "declarationMap": false,
+    // "allowJs": false,
     "paths": {
-      "$/*":["./bazel-bin/*", "../../*"]
-    },
+      "proto/*": ["./bazel-bin/proto/*", "./proto/*"]
+    }
+
   },
   "exclude": [
     "node_modules",
     "dist",
-    "server"
   ]
+  
 }

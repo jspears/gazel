@@ -128,13 +128,7 @@ ts_proto_library(
 ts_project(
     name = "bzl_ts",
     srcs = glob(["src/**/*.ts"]),
-    declaration = True,
-    declaration_map = True,
-    resolve_json_module = True,
-    source_map = True,
-    out_dir = "dist",
-    tsconfig = "//bzl-ts:tsconfig.json",
-    transpiler = swc,
+    tsconfig = "//:tsconfig",
     deps = [
         ":bzl_ts_proto",
         "//:node_modules/@grpc/grpc-js",
@@ -149,12 +143,7 @@ ts_project(
 ts_project(
     name = "examples",
     srcs = glob(["examples/**/*.ts"]),
-    declaration = True,
-    declaration_map = True,
-    resolve_json_module = True,
-    source_map = True,
-    tsconfig = "//bzl-ts:tsconfig.json",
-    transpiler = swc,
+    tsconfig = "//:tsconfig",
     deps = [
         ":bzl_ts",
         "//:node_modules/@types/node",

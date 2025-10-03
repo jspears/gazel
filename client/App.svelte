@@ -58,7 +58,7 @@
 
       // Try the known Bazel workspace first
       try {
-        const result = await api.switchWorkspace(knownBazelWorkspace);
+        const result = await api.switchWorkspace({workspace:knownBazelWorkspace});
         if (result.success) {
           console.log('Auto-set Bazel workspace:', knownBazelWorkspace);
           return knownBazelWorkspace;
@@ -256,7 +256,7 @@
 
   function handleOpenWorkspacePicker() {
     // Cancel any pending API requests before showing workspace picker
-    api.cancelPendingRequests();
+   // api.cancelPendingRequests();
     showWorkspacePicker = true;
   }
 

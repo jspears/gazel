@@ -1,47 +1,58 @@
 load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
-load("@aspect_rules_js//js:defs.bzl", "js_binary")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_library")
 load("@aspect_rules_swc//swc:defs.bzl", "swc")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_config")
 
 package(default_visibility = ["//visibility:public"])
 
+npm_link_all_packages(name = "node_modules")
+
+ts_config(
+    name = "tsconfig",
+    src = "tsconfig.json",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//:tsconfig"
+    ],
+)
 # TypeScript compilation for server
 ts_project(
     name = "server_ts",
-    srcs = glob(
-        ["**/*.ts"],
-        exclude = [
-            "**/*.d.ts",
-            "**/*.test.ts",
-            "**/*.spec.ts",
-            "dist/**/*",
-            "node_modules/**/*",
-        ],
-    ),
-    declaration = True,
+    tsconfig = ":tsconfig",
+    allow_js=True,
     declaration_map = True,
-    out_dir = "dist",
-    resolve_json_module = True,
+    declaration = True,
     source_map = True,
-    transpiler = swc,
-    tsconfig = "//:tsconfig_server",
+
     deps = [
-        "//:node_modules/@types/cors",
-        "//:node_modules/@types/express",
-        "//:node_modules/@types/node",
-        "//:node_modules/@types/sax",
-        "//:node_modules/cors",
-        "//:node_modules/dotenv",
-        "//:node_modules/express",
-        "//:node_modules/sax",
-        "//:node_modules/xml2js",
+        "//proto:index",
+        "//:node_modules",
+        ":node_modules",
+        ":node_modules/@bufbuild/protobuf",
+        ":node_modules/@connectrpc/connect",
+        ":node_modules/@connectrpc/connect-node",
+        ":node_modules/@types/node",
+        ":node_modules/dotenv",
+    ],
+)
+
+# Server library for use by Electron
+js_library(
+    name = "server_lib",
+    srcs = [":server_ts"],
+    deps = [
+        "//proto:index",
+        "//:node_modules/@bufbuild/protobuf",
+        "//:node_modules/@connectrpc/connect",
     ],
 )
 
 # Server binary
 js_binary(
-    name = "server",
+    name = "run",
     data = [
         ":server_ts",
     ],
-    entry_point = "index.js",
+    entry_point = "main.js",
 )

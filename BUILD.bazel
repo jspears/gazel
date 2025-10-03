@@ -1,35 +1,31 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@aspect_rules_js//js:defs.bzl", "js_library")
 load("@aspect_bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_config")
 
 # Link all npm packages
 npm_link_all_packages(name = "node_modules")
 
+ts_config(
+    name = "tsconfig",
+    src = "tsconfig.json",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//:node_modules",
+    ],
+)
 # Export config files
 exports_files([
     "tsconfig.json",
-    "tsconfig.server.json",
     "package.json",
     "pnpm-lock.yaml",
     ".npmrc",
-    "node_modules/@electron-forge/cli/dist/electron-forge.js",
-    "node_modules/vite/bin/vite.js",
+
 ])
 
-js_library(
-    name = "tsconfig",
-    srcs = ["tsconfig.json"],
-    visibility = ["//visibility:public"],
-)
 
 js_library(
     name = "package_json",
     srcs = ["package.json"],
-    visibility = ["//visibility:public"],
-)
-
-copy_to_bin(
-    name = "tsconfig_server",
-    srcs = ["tsconfig.server.json"],
     visibility = ["//visibility:public"],
 )

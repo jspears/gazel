@@ -14,7 +14,7 @@ js_library(
     "**/*.js",
     "**/*.html",
    
-], exclude = ["**/client.web.ts", "**/client.ipc.ts"]),
+]),
     deps = [
         "//proto:index",
         "//:node_modules",
@@ -31,11 +31,10 @@ vite_bin.vite_binary(
         "//:tsconfig",
         "//:package_json",
         "//:node_modules",
-        "client.web.ts"
     ],
 )
 
-# Vite production build
+# Vite production build for web
 vite_bin.vite(
     name = "build",
     srcs = [
@@ -43,13 +42,13 @@ vite_bin.vite(
         "//:tsconfig",
         "//:package_json",
         "//:node_modules",
-        "client.web.ts"
     ],
     args = ["build"],
     chdir = package_name(),
     out_dirs = ["dist"],
 )
 
+# Vite production build for Electron
 vite_bin.vite(
     name = "build_electron",
     srcs = [

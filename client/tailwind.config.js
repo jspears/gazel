@@ -1,8 +1,13 @@
+import forms from '@tailwindcss/forms';
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
     './index.html',
+    './App.svelte',
     './**/*.{svelte,js,ts,jsx,tsx,html}',
+    '!./node_modules/**',
+    '!../node_modules/**',
   ],
   theme: {
     extend: {
@@ -49,6 +54,6 @@ export default {
     },
   },
   plugins: [
-    require('@tailwindcss/forms'),
+    forms,
   ],
-}
+};
