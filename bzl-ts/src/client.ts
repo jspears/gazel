@@ -106,7 +106,7 @@ export class BuildStream extends EventEmitter {
     });
 
     // Start build process
-    this.process = spawn('bazel', args, {
+    this.process = spawn('bazelisk', args, {
       cwd: this.client.workspace,
       stdio: ['ignore', 'pipe', 'pipe']
     });
@@ -323,7 +323,7 @@ export class BazelClient {
    */
   private runBazelCommand(args: string[], options: any = {}): Promise<any> {
     return new Promise((resolve, reject) => {
-      const process = spawn('bazel', args, {
+      const process = spawn('bazelisk', args, {
         cwd: this.workspace,
         stdio: ['ignore', 'pipe', 'pipe']
       });

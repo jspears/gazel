@@ -14,7 +14,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '$lib': path.resolve('./lib'),
-      '$components': path.resolve('./lib/components'),
+      '$components': path.resolve('./components'),
       '$stores': path.resolve('./lib/stores'),
       '$utils': path.resolve('./lib/utils'),
       '$types': path.resolve('./lib/types'),

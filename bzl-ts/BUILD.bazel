@@ -43,40 +43,10 @@ proto_library(
     ],
 )
 
-deps = [
-    "action_cache",
-    "bazel_flags",
-    "builtin",
-    "crash_debugging",
-    "crosstool_config",
-    "deps",
-    "desugar_deps",
-    "execution_statistics",
-    "extra_actions_base",
-    "java_compilation",
-    "memory_pressure",
-    "strategy_policy",
-    "test_status",
-    "worker_protocol",
-    "execution_graph",
-    "file_invalidation_data",
-]
-
 [proto_library(
     name = s + "_proto",
     srcs = [s + ".proto"],
 ) for s in FILES]
-
-proto_library(
-    name = "bzl_proto",
-    srcs = ["@protobuf//src/google/protobuf:descriptor_proto"],
-    visibility = ["//visibility:public"],
-    deps = [
-       "@com_google_protobuf//:any_proto",
-       "@com_google_protobuf//:timestamp_proto",
-        
-    ],
-) for dep in deps
 
 # Your BUILD.bazel
 proto_library(

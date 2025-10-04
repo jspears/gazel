@@ -3,8 +3,8 @@
   import { FileCode, Search, File, FolderOpen, Target, ChevronRight, Play, TestTube, ExternalLink, X } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { BuildFile, BazelTarget } from '$lib/types';
-  import CopyButton from '$lib/components/CopyButton.svelte';
-  import TargetDetails from '$lib/components/TargetDetails.svelte';
+  import CopyButton from '$components/CopyButton.svelte';
+  import TargetDetails from '$components/TargetDetails.svelte';
   import hljs from 'highlight.js/lib/core';
   import python from 'highlight.js/lib/languages/python';
   import bash from 'highlight.js/lib/languages/bash';

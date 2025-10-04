@@ -161,7 +161,7 @@ export class QueryService {
    */
   private runQuery(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
-      const process = spawn('bazel', args, {
+      const process = spawn('bazelisk', args, {
         cwd: this.client.workspace,
         stdio: ['ignore', 'pipe', 'pipe']
       });

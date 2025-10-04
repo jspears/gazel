@@ -15,7 +15,12 @@
     // "declarationMap": false,
     // "allowJs": false,
     "paths": {
-      "proto/*": ["./bazel-bin/proto/*", "./proto/*"]
+      "proto/*": ["./bazel-bin/proto/*", "./proto/*"],
+      "$components": ["./client/components"],
+      "$lib": ["./client/lib"],
+      "$stores": ["./client/lib/stores"],
+      "$utils": ["./client/lib/utils"],
+      "$types": ["./client/lib/types"]
     }
 
   },

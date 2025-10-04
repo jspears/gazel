@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink, Play, X, Clock, ChevronDown, GitBranch, Terminal } from 'lucide-svelte';
+  import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink, Play, X, Clock, ChevronDown, GitBranch, Terminal, List, Network } from 'lucide-svelte';
   import { api } from '$lib/api/client';
   import type { BazelTarget } from '$lib/types';
   import { createEventDispatcher } from 'svelte';
   import { storage } from '$lib/storage';
-  import CopyButton from '$lib/components/CopyButton.svelte';
-  import TypeSelector from '$lib/components/TypeSelector.svelte';
+  import CopyButton from '$components/CopyButton.svelte';
+  import TypeSelector from '$components/TypeSelector.svelte';
+  import TargetTreeView from '$components/TargetTreeView.svelte';
   import { updateParam } from '$lib/navigation';
 
   const dispatch = createEventDispatcher();
@@ -50,6 +51,9 @@
 
   // Navigation breadcrumb state
   let navigationHistory: BazelTarget[] = [];
+
+  // View mode state
+  let viewMode: 'list' | 'tree' = 'list';
 
   onMount(async () => {
     await loadTargets();
@@ -668,65 +672,98 @@
               <span class="text-xs text-muted-foreground ml-1">(+{hiddenCount} hidden)</span>
             {/if}
           </h3>
-          {#if usingFallbackSearch}
-            <span class="text-xs text-amber-600 dark:text-amber-400">Text Search</span>
-          {/if}
+          <div class="flex items-center gap-2">
+            {#if usingFallbackSearch}
+              <span class="text-xs text-amber-600 dark:text-amber-400">Text Search</span>
+            {/if}
+            <div class="flex items-center gap-1 border rounded-md p-1">
+              <button
+                on:click={() => viewMode = 'list'}
+                class="p-1 rounded transition-colors"
+                class:bg-muted={viewMode === 'list'}
+                class:text-primary={viewMode === 'list'}
+                title="List view"
+              >
+                <List class="w-4 h-4" />
+              </button>
+              <button
+                on:click={() => viewMode = 'tree'}
+                class="p-1 rounded transition-colors"
+                class:bg-muted={viewMode === 'tree'}
+                class:text-primary={viewMode === 'tree'}
+                title="Tree view"
+              >
+                <Network class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="max-h-[600px] overflow-y-auto">
-          {#each visibleTargets.slice(0, displayLimit) as target}
-            <div
-              role="button"
-              tabindex={0}
-              on:click={() => selectTarget(target)}
-              on:keydown={(event) => handleTargetActivation(event, target)}
-              data-target={target.full || target.name}
-              class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 flex items-center justify-between group"
-              class:bg-muted={selectedTarget === target}
-            >
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <Target class="w-4 h-4 text-muted-foreground" />
-                  <span class="font-mono text-sm truncate">{target.full || target.name}</span>
+        {#if viewMode === 'list'}
+          <div class="max-h-[600px] overflow-y-auto">
+            {#each visibleTargets.slice(0, displayLimit) as target}
+              <div
+                role="button"
+                tabindex={0}
+                on:click={() => selectTarget(target)}
+                on:keydown={(event) => handleTargetActivation(event, target)}
+                data-target={target.full || target.name}
+                class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 flex items-center justify-between group"
+                class:bg-muted={selectedTarget === target}
+              >
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <Target class="w-4 h-4 text-muted-foreground" />
+                    <span class="font-mono text-sm truncate">{target.full || target.name}</span>
+                  </div>
+                  {#if target.ruleType}
+                    <span class="text-xs text-muted-foreground">{target.ruleType}</span>
+                  {/if}
                 </div>
-                {#if target.ruleType}
-                  <span class="text-xs text-muted-foreground">{target.ruleType}</span>
+                <div class="flex items-center gap-1">
+                  <button
+                    on:click|stopPropagation={() => navigateToGraph(target)}
+                    class="p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="View in dependency graph"
+                  >
+                    <GitBranch class="w-4 h-4 text-muted-foreground hover:text-primary" />
+                  </button>
+                  <button
+                    on:click|stopPropagation={() => navigateToCommands(target)}
+                    class="p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Open in Commands tab"
+                  >
+                    <Terminal class="w-4 h-4 text-muted-foreground hover:text-primary" />
+                  </button>
+                  <CopyButton text={target.full || target.name} size="sm" className="opacity-0 group-hover:opacity-100" />
+                  <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                </div>
+              </div>
+            {/each}
+            {#if visibleTargets.length > displayLimit}
+              <div bind:this={loadMoreElement} class="p-4 text-center text-sm">
+                {#if loadingMore}
+                  <div class="flex items-center justify-center gap-2">
+                    <div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
+                    <span class="text-muted-foreground">Loading more targets...</span>
+                  </div>
+                {:else}
+                  <span class="text-muted-foreground">
+                    Showing {displayLimit} of {visibleTargets.length} targets
+                  </span>
                 {/if}
               </div>
-              <div class="flex items-center gap-1">
-                <button
-                  on:click|stopPropagation={() => navigateToGraph(target)}
-                  class="p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="View in dependency graph"
-                >
-                  <GitBranch class="w-4 h-4 text-muted-foreground hover:text-primary" />
-                </button>
-                <button
-                  on:click|stopPropagation={() => navigateToCommands(target)}
-                  class="p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Open in Commands tab"
-                >
-                  <Terminal class="w-4 h-4 text-muted-foreground hover:text-primary" />
-                </button>
-                <CopyButton text={target.full || target.name} size="sm" className="opacity-0 group-hover:opacity-100" />
-                <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
-              </div>
-            </div>
-          {/each}
-          {#if visibleTargets.length > displayLimit}
-            <div bind:this={loadMoreElement} class="p-4 text-center text-sm">
-              {#if loadingMore}
-                <div class="flex items-center justify-center gap-2">
-                  <div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
-                  <span class="text-muted-foreground">Loading more targets...</span>
-                </div>
-              {:else}
-                <span class="text-muted-foreground">
-                  Showing {displayLimit} of {visibleTargets.length} targets
-                </span>
-              {/if}
-            </div>
-          {/if}
-        </div>
+            {/if}
+          </div>
+        {:else}
+          <TargetTreeView
+            targets={visibleTargets}
+            {selectedTarget}
+            {displayLimit}
+            onselecttarget={(e) => selectTarget(e.detail.target)}
+            onnavigateToGraph={(e) => navigateToGraph(e.detail.target)}
+            onnavigateToCommands={(e) => navigateToCommands(e.detail.target)}
+          />
+        {/if}
       </div>
 
       <div class="bg-card rounded-lg border">

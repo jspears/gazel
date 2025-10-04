@@ -21,7 +21,8 @@
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.2",
     "@connectrpc/connect": "^2.0.0-rc.3",
-    "electron": "^38.2.1"
+    "electron": "^38.2.1",
+    "vite-tsconfig-paths": "^5.1.4"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

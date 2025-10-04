@@ -36,7 +36,7 @@ export class CommandServer extends EventEmitter {
     // For this simplified version, we just verify Bazel is available
     try {
       const { execSync } = await import('child_process');
-      execSync('bazel version', {
+      execSync('bazelisk version', {
         cwd: this.workspace,
         encoding: 'utf8'
       });
@@ -75,7 +75,7 @@ export class CommandServer extends EventEmitter {
     const { execSync } = await import('child_process');
 
     try {
-      const fullCommand = ['bazel', command, ...args].join(' ');
+      const fullCommand = ['bazelisk', command, ...args].join(' ');
       const result = execSync(fullCommand, {
         cwd: this.workspace,
         encoding: 'utf8',
@@ -136,7 +136,7 @@ export class CommandServer extends EventEmitter {
     // Try to get output base from bazel info command
     const { execSync } = await import('child_process');
     try {
-      const outputBase = execSync('bazel info output_base', {
+      const outputBase = execSync('bazelisk info output_base', {
         cwd: this.workspace,
         encoding: 'utf8'
       }).trim();

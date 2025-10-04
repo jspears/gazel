@@ -7,7 +7,7 @@ dotenv.config();
 export const config: Config = {
   port: parseInt(process.env.PORT || '3002', 10),
   bazelWorkspace:'',
-  bazelExecutable: process.env.BAZEL_EXECUTABLE || 'bazel',
+  bazelExecutable: process.env.BAZEL_EXECUTABLE || 'bazelisk',
   cors: {
     origin: process.env.NODE_ENV === 'production'
       ? false

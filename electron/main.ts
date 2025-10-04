@@ -244,32 +244,38 @@ async function createWindow() {
 
   // Determine if we're in development or production
   // Electron Forge sets MAIN_WINDOW_VITE_DEV_SERVER_URL in development
-  // For now, check if Vite dev server is running on port 5173
-  const devServerUrl = 'http://localhost:5173';
-  let isDev = false;
+  // If not set, try to detect dev server by checking common ports
+  let devServerUrl = process.env.MAIN_WINDOW_VITE_DEV_SERVER_URL;
 
-  // Try to detect if we're in development by checking if the dev server is accessible
-  try {
-    const http = await import('http');
-    await new Promise<void>((resolve, reject) => {
-      const req = http.request(devServerUrl, { method: 'HEAD', timeout: 1000 }, (res) => {
-        isDev = res.statusCode === 200;
-        resolve();
-      });
-      req.on('error', () => {
-        isDev = false;
-        resolve();
-      });
-      req.on('timeout', () => {
-        isDev = false;
-        req.destroy();
-        resolve();
-      });
-      req.end();
-    });
-  } catch (error) {
-    isDev = false;
+  // If environment variable is not set, try to detect dev server
+  if (!devServerUrl) {
+    const portsToTry = [5173, 5174, 5175, 5176];
+    for (const port of portsToTry) {
+      const testUrl = `http://localhost:${port}`;
+      try {
+        const http = await import('http');
+        const isAvailable = await new Promise<boolean>((resolve) => {
+          const req = http.request(testUrl, { method: 'HEAD', timeout: 500 }, (res) => {
+            resolve(res.statusCode === 200);
+          });
+          req.on('error', () => resolve(false));
+          req.on('timeout', () => {
+            req.destroy();
+            resolve(false);
+          });
+          req.end();
+        });
+        if (isAvailable) {
+          devServerUrl = testUrl;
+          break;
+        }
+      } catch (error) {
+        // Continue to next port
+      }
+    }
   }
+
+  const isDev = !!devServerUrl;
 
   logToFile('Environment resolved', {
     NODE_ENV: process.env.NODE_ENV,
@@ -277,7 +283,7 @@ async function createWindow() {
     isDev,
   });
 
-  if (isDev) {
+  if (isDev && devServerUrl) {
     // In development, load from Vite dev server
     logToFile('Loading renderer from dev server', { url: devServerUrl });
     mainWindow.loadURL(devServerUrl).catch(error => {
