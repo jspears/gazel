@@ -25,74 +25,88 @@ cat > $@ << 'EOF'
 const { spawn } = require('child_process');
 const path = require('path');
 
-console.log('Starting Gazel in development mode...');
-console.log('Server: http://localhost:3002');
-console.log('Client: http://localhost:5173');
+console.log('🚀 Starting Gazel in development mode...');
+console.log('');
+console.log('📡 Server: http://localhost:3002');
+console.log('🌐 Client: http://localhost:5173');
 console.log('');
 
-const runfilesDir = process.env.RUNFILES_DIR || path.join(__dirname, '..', '..');
+// Determine the workspace root - use BUILD_WORKSPACE_DIRECTORY if available
+// This is set by bazel run and points to the actual workspace
+const workspaceRoot = process.env.BUILD_WORKSPACE_DIRECTORY;
 
-// Start the server
-console.log('[server] Starting backend server...');
-const server = spawn('node', [path.join(runfilesDir, '_main/server/index.js')], {
+if (!workspaceRoot) {
+    console.error('❌ Error: BUILD_WORKSPACE_DIRECTORY not set');
+    console.error('   This script must be run with: bazel run //app:dev');
+    process.exit(1);
+}
+
+console.log('📂 Workspace:', workspaceRoot);
+console.log('');
+
+// Determine which bazel command to use (bazelisk or bazel)
+const bazelCmd = process.env.BAZEL_REAL || 'bazelisk';
+
+// Start the server using bazel run
+console.log('🔧 [server] Starting backend server...');
+const server = spawn(bazelCmd, ['run', '//server:run'], {
     stdio: 'inherit',
+    cwd: workspaceRoot,
     env: { ...process.env, PORT: '3002' }
 });
 
-// Start the client dev server (Vite)
-console.log('[client] Starting Vite dev server...');
-// Check if running in Electron context (don't open browser if in Electron)
-const isElectron = process.env.ELECTRON_RUN_AS_NODE || process.versions.electron;
-const clientArgs = ['--host', '127.0.0.1'];
-if (!isElectron && process.env.OPEN_BROWSER !== 'false') {
-    clientArgs.push('--open');
-}
+// Give the server a moment to start
+setTimeout(() => {
+    // Start the client dev server (Vite) using bazel run
+    console.log('🔧 [client] Starting Vite dev server...');
 
-// Use the Vite dev server from the client/dev target
-const client = spawn(path.join(runfilesDir, '_main/client/dev_/dev'), clientArgs, {
-    stdio: 'inherit',
-    shell: true
-});
+    const client = spawn(bazelCmd, ['run', '//client:dev'], {
+        stdio: 'inherit',
+        cwd: workspaceRoot,
+        env: { ...process.env }
+    });
 
-// Handle process termination
-const cleanup = () => {
-    console.log('\\nShutting down...');
-    server.kill();
-    client.kill();
-    process.exit(0);
-};
+    // Handle process termination
+    const cleanup = () => {
+        console.log('\\n🛑 Shutting down...');
+        server.kill('SIGTERM');
+        client.kill('SIGTERM');
+        setTimeout(() => {
+            server.kill('SIGKILL');
+            client.kill('SIGKILL');
+            process.exit(0);
+        }, 2000);
+    };
 
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
 
-server.on('exit', (code) => {
-    console.log(`Server exited with code $${code}`);
-    client.kill();
-    process.exit(code || 0);
-});
+    server.on('exit', (code) => {
+        console.log(`Server exited with code $${code}`);
+        client.kill('SIGTERM');
+        setTimeout(() => process.exit(code || 0), 1000);
+    });
 
-client.on('exit', (code) => {
-    console.log(`Client exited with code $${code}`);
-    server.kill();
-    process.exit(code || 0);
-});
+    client.on('exit', (code) => {
+        console.log(`Client exited with code $${code}`);
+        server.kill('SIGTERM');
+        setTimeout(() => process.exit(code || 0), 1000);
+    });
+}, 1000);
 
 EOF
 """,
 )
 
 # Combined development mode - runs both server and client
+# This target spawns bazel run commands for both server and client
 # Note: Bazel automatically handles npm dependencies through the pnpm-lock.yaml file.
 # The //:node_modules target ensures all dependencies are installed and available.
 # No need to run 'pnpm install' manually - Bazel manages this automatically.
 js_binary(
     name = "dev",
     data = [
-        "//server:server_ts",
-        "//client:dev",
         "//:node_modules",  # This ensures all npm dependencies are available
-        "//:package_json",  # Include package.json for reference
-        "//:tsconfig",      # Include TypeScript config
     ],
     entry_point = ":dev_script_gen",
 )
@@ -101,13 +115,7 @@ js_binary(
 js_binary(
     name = "dev_no_browser",
     data = [
-        "//server:server_ts",
-        "//client:dev",
         "//:node_modules",
-        "//:package_json",
-        "//:tsconfig",
-                "//proto:index",
-
     ],
     entry_point = ":dev_script_gen",
     env = {

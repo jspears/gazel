@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
   import { FileCode, Search, File, FolderOpen, Target, ChevronRight, Play, TestTube, ExternalLink, X } from 'lucide-svelte';
-  import { api } from '$lib/api/client';
-  import type { BuildFile, BazelTarget } from '$lib/types';
-  import CopyButton from '$components/CopyButton.svelte';
-  import TargetDetails from '$components/TargetDetails.svelte';
+  import { api } from '../client.js';
+  import type { BuildFile, BazelTarget } from '../lib/types/index.js';
+  import CopyButton from '../components/CopyButton.svelte';
+  import TargetDetails from '../components/TargetDetails.svelte';
   import hljs from 'highlight.js/lib/core';
   import python from 'highlight.js/lib/languages/python';
   import bash from 'highlight.js/lib/languages/bash';
@@ -77,7 +77,7 @@
     try {
       loading = true;
       selectedFile = path;
-      const result = await api.getBuildFile(path);
+      const result = await api.getBuildFile({path});
       fileContent = result.content;
       fileTargets = result.targets;
       activeTab = 'files';

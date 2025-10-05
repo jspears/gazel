@@ -6,7 +6,7 @@
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { createServer } from "node:http";
 import { GazelServiceImpl } from "./server.js";
-import { GazelService } from "proto/index.js";
+import { GazelService } from "../proto/index.js";
 import config from "./config.js";
 import { printStartupBanner, printShutdownMessage } from "./utils/console-styles.js";
 
@@ -16,6 +16,7 @@ const serviceImpl = new GazelServiceImpl();
 // Create the Node.js HTTP server with the Connect adapter
 const server = createServer(
   connectNodeAdapter({
+    requestPathPrefix: "/api",
     routes: (router) => {
       router.service(GazelService, serviceImpl);
     },

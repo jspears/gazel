@@ -4,8 +4,8 @@
   import DependencyGraph from '../components/DependencyGraph.svelte';
   import EnhancedDependencyGraph from '../components/EnhancedDependencyGraph.svelte';
   import ElkDependencyGraph from '../components/ElkDependencyGraph.svelte';
-  import { api } from '$lib/api/client';
-  import { updateParam } from '$lib/navigation';
+  import { api } from '../client.js';
+  import { updateParam } from '../lib/navigation.js';
 
   export let initialTarget: string | null = null;
 

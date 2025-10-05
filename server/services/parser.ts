@@ -267,6 +267,92 @@ class ParserService {
   }
 
   /**
+   * Parse streamed_jsonproto output (one JSON object per line)
+   */
+  parseStreamedJsonProto(output: string): ParsedTarget[] {
+    const lines = output.split('\n').filter(line => line.trim());
+    const targets: ParsedTarget[] = [];
+
+    for (const line of lines) {
+      try {
+        const obj = JSON.parse(line);
+
+        // Handle different types of objects in the output
+        if (obj.type === 'RULE' || obj.rule) {
+          const rule = obj.rule || obj;
+          const name = rule.name || '';
+          const ruleClass = rule.ruleClass || rule.class || '';
+
+          // Extract package and target name from the name field
+          let pkg = '';
+          let targetName = '';
+          if (name) {
+            const match = name.match(/^(\/\/[^:]*):(.+)$/);
+            if (match) {
+              pkg = match[1];
+              targetName = match[2];
+            }
+          }
+
+          // Extract tags, deps, and srcs from attributes
+          const attributes = rule.attribute || [];
+          let tags: string[] = [];
+          let deps: string[] = [];
+          let srcs: string[] = [];
+
+          for (const attr of attributes) {
+            if (attr.name === 'tags' && attr.stringListValue) {
+              tags = attr.stringListValue;
+            } else if (attr.name === 'deps' && attr.stringListValue) {
+              deps = attr.stringListValue;
+            } else if (attr.name === 'srcs' && attr.stringListValue) {
+              srcs = attr.stringListValue;
+            }
+          }
+
+          targets.push({
+            ruleType: ruleClass,
+            package: pkg,
+            target: targetName,
+            full: name,
+            name: targetName,
+            location: rule.location,
+            attributes: rule.attribute || {},
+            tags: tags,
+            deps: deps,
+            srcs: srcs
+          });
+        } else if (obj.type === 'SOURCE_FILE' || obj.sourceFile) {
+          const sourceFile = obj.sourceFile || obj;
+          const name = sourceFile.name || '';
+
+          targets.push({
+            ruleType: 'source file',
+            full: name,
+            name: name,
+            location: sourceFile.location
+          });
+        } else if (obj.type === 'GENERATED_FILE' || obj.generatedFile) {
+          const genFile = obj.generatedFile || obj;
+          const name = genFile.name || '';
+
+          targets.push({
+            ruleType: 'generated file',
+            full: name,
+            name: name,
+            location: genFile.location,
+            generatingRule: genFile.generatingRule
+          });
+        }
+      } catch (e) {
+        console.warn(`Failed to parse JSON line: ${line}`, e);
+      }
+    }
+
+    return targets;
+  }
+
+  /**
    * Parse label_kind output (target with rule type)
    */
   parseLabelKindOutput(output: string): ParsedTarget[] {

@@ -36,6 +36,23 @@ message BazelInfo {
   string committed_heap_size = 12;
 }
 
+message BazelAttribute {
+  string name = 1;
+  string type = 2;
+  optional string string_value = 3;
+  repeated string string_list_value = 4;
+  optional int64 int_value = 5;
+  optional bool boolean_value = 6;
+  repeated StringDictEntry string_dict_value = 7;
+  bool explicitly_specified = 8;
+  bool nodep = 9;
+}
+
+message StringDictEntry {
+  string key = 1;
+  string value = 2;
+}
+
 message BazelTarget {
   string label = 1;
   string kind = 2;
@@ -44,9 +61,10 @@ message BazelTarget {
   repeated string tags = 5;
   repeated string deps = 6;
   repeated string srcs = 7;
-  map<string, string> attributes = 8;
+  repeated BazelAttribute attributes = 8;
   string visibility = 9;
   bool testonly = 10;
+  string location = 11;
 }
 
 message BuildFile {
@@ -65,6 +83,8 @@ message QueryTemplate {
   string template = 4;
   repeated string parameters = 5;
   string category = 6;
+  string query_type = 7; // "query", "aquery", or "cquery"
+  string output_format = 8; // Recommended output format for this template
 }
 
 message SavedQuery {
@@ -254,6 +274,7 @@ message SearchTargetsResponse {
 message ExecuteQueryRequest {
   string query = 1;
   string output_format = 2;
+  string query_type = 3; // "query", "aquery", or "cquery"
 }
 message ExecuteQueryResponse {
   string query = 1;
@@ -332,6 +353,105 @@ message ModuleStatistics {
   int32 indirect_dependencies = 4;
 }
 
+message GetModuleInfoRequest {
+  string module_name = 1;
+}
+message GetModuleInfoResponse {
+  Module module = 1;
+}
+
+message GetQueryTemplatesRequest {}
+message GetQueryTemplatesResponse {
+  repeated QueryTemplate templates = 1;
+}
+
+message GetSavedQueriesRequest {}
+message GetSavedQueriesResponse {
+  repeated SavedQuery queries = 1;
+}
+
+message SaveQueryRequest {
+  string name = 1;
+  string query = 2;
+  string description = 3;
+}
+message SaveQueryResponse {
+  SavedQuery query = 1;
+}
+
+message DeleteQueryRequest {
+  string id = 1;
+}
+message DeleteQueryResponse {
+  bool success = 1;
+}
+
+message StreamRunRequest {
+  string target = 1;
+  repeated string options = 2;
+}
+message StreamRunResponse {
+  oneof event {
+    string output = 1;
+    string error = 2;
+    RunProgress progress = 3;
+    RunComplete complete = 4;
+  }
+}
+
+message RunProgress {
+  string current_action = 1;
+}
+
+message RunComplete {
+  bool success = 1;
+  int32 exit_code = 2;
+  int64 duration_ms = 3;
+}
+
+// File Service Messages
+message GetBuildFileRequest {
+  string path = 1;
+}
+message GetBuildFileResponse {
+  string path = 1;
+  string content = 2;
+  repeated BuildFileTarget targets = 3;
+  int32 lines = 4;
+}
+
+message BuildFileTarget {
+  string rule_type = 1;
+  string name = 2;
+  int32 line = 3;
+}
+
+message GetTargetsByFileRequest {
+  string file = 1;
+}
+message GetTargetsByFileResponse {
+  string file = 1;
+  int32 total = 2;
+  repeated BazelTarget targets = 3;
+}
+
+message SearchInFilesRequest {
+  string query = 1;
+  bool case_sensitive = 2;
+}
+message SearchInFilesResponse {
+  string query = 1;
+  bool case_sensitive = 2;
+  int32 total = 3;
+  repeated SearchResult results = 4;
+}
+
+message SearchResult {
+  string file = 1;
+  int32 line = 2;
+  string content = 3;
+}
+
 // ============================================================================
 // Services
 // ============================================================================
@@ -344,7 +464,7 @@ service GazelService {
   rpc SwitchWorkspace(SwitchWorkspaceRequest) returns (SwitchWorkspaceResponse);
   rpc GetWorkspaceFiles(GetWorkspaceFilesRequest) returns (GetWorkspaceFilesResponse);
   rpc GetBazelInfo(GetBazelInfoRequest) returns (GetBazelInfoResponse);
-  
+
   // Target operations
   rpc ListTargets(ListTargetsRequest) returns (ListTargetsResponse);
   rpc GetTarget(GetTargetRequest) returns (GetTargetResponse);
@@ -352,15 +472,26 @@ service GazelService {
   rpc GetTargetOutputs(GetTargetOutputsRequest) returns (GetTargetOutputsResponse);
   rpc GetReverseDependencies(GetReverseDependenciesRequest) returns (GetReverseDependenciesResponse);
   rpc SearchTargets(SearchTargetsRequest) returns (SearchTargetsResponse);
-  
+
   // Query operations
   rpc ExecuteQuery(ExecuteQueryRequest) returns (ExecuteQueryResponse);
   rpc StreamQuery(StreamQueryRequest) returns (stream StreamQueryResponse);
-  
+  rpc GetQueryTemplates(GetQueryTemplatesRequest) returns (GetQueryTemplatesResponse);
+  rpc GetSavedQueries(GetSavedQueriesRequest) returns (GetSavedQueriesResponse);
+  rpc SaveQuery(SaveQueryRequest) returns (SaveQueryResponse);
+  rpc DeleteQuery(DeleteQueryRequest) returns (DeleteQueryResponse);
+
   // Build operations
   rpc BuildTarget(BuildTargetRequest) returns (BuildTargetResponse);
   rpc StreamBuild(StreamBuildRequest) returns (stream StreamBuildResponse);
-  
+  rpc StreamRun(StreamRunRequest) returns (stream StreamRunResponse);
+
   // Module operations
   rpc GetModuleGraph(GetModuleGraphRequest) returns (GetModuleGraphResponse);
+  rpc GetModuleInfo(GetModuleInfoRequest) returns (GetModuleInfoResponse);
+
+  // File operations
+  rpc GetBuildFile(GetBuildFileRequest) returns (GetBuildFileResponse);
+  rpc GetTargetsByFile(GetTargetsByFileRequest) returns (GetTargetsByFileResponse);
+  rpc SearchInFiles(SearchInFilesRequest) returns (SearchInFilesResponse);
 }

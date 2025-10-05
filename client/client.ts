@@ -1,1 +1,1 @@
-export * from './client.impl';
+export * from './client.impl.js';

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Folder, Search, Check, AlertCircle, FolderOpen, Home, ChevronUp, Clock, X, Trash2 } from 'lucide-svelte';
-  import { api } from '$lib/api/client';
-  import { storage, type WorkspaceHistoryEntry } from '$lib/storage';
+  import { api } from '../client.js';
+  import { storage, type WorkspaceHistoryEntry } from '../lib/storage.js';
 
   export let onWorkspaceSelected: (workspace: string) => void;
   export let currentWorkspace: string | null = null;

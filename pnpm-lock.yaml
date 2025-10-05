@@ -212,6 +212,9 @@ importers:
       '@connectrpc/connect':
         specifier: ^2.1.0
         version: 2.1.0(@bufbuild/protobuf@2.9.0)
+      lucide-svelte:
+        specifier: ^0.544.0
+        version: 0.544.0(svelte@5.39.8)
       vite-tsconfig-paths:
         specifier: ^5.1.4
         version: 5.1.4(typescript@5.4.5)(vite@5.4.20(@types/node@22.18.8))
@@ -219,6 +222,9 @@ importers:
       '@bufbuild/protoc-gen-es':
         specifier: ^2.9.0
         version: 2.9.0(@bufbuild/protobuf@2.9.0)
+      vite:
+        specifier: ^5.4.20
+        version: 5.4.20(@types/node@22.18.8)
 
   electron:
     dependencies:
@@ -7797,7 +7803,6 @@ snapshots:
     optionalDependencies:
       '@types/node': 22.18.8
       fsevents: 2.3.3
-    optional: true
 
   vitefu@1.1.1(vite@5.4.20(@types/node@20.19.19)):
     optionalDependencies:

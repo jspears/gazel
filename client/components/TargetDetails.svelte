@@ -1,9 +1,10 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { Target, ChevronRight, FileCode, ExternalLink, Play, GitBranch, Terminal, TestTube } from 'lucide-svelte';
-  import type { BazelTarget } from '$lib/types';
+  import type { BazelTarget } from '../lib/types/index.js';
   import CopyButton from './CopyButton.svelte';
-  import { api } from '$lib/api/client';
+  import AttributesDisplay from './AttributesDisplay.svelte';
+  import { api } from '../client.js';
 
   const dispatch = createEventDispatcher();
 
@@ -250,34 +251,14 @@
     {/if}
 
     <div class="border-l-4 border-purple-500 pl-4">
-      <h4 class="text-sm font-medium text-purple-600 mb-1">Attributes</h4>
       {#if loadingTarget}
         <div class="text-sm text-muted-foreground">Loading attributes...</div>
-      {:else if fullTarget?.attributes && Object.keys(fullTarget.attributes).length > 0}
-        <div class="space-y-1 max-h-40 overflow-y-auto bg-muted/30 p-2 rounded">
-          {#each Object.entries(fullTarget.attributes) as [key, value]}
-            <div class="text-sm">
-              <span class="font-mono text-muted-foreground">{key}:</span>
-              <span class="font-mono ml-2">
-                {#if Array.isArray(value)}
-                  {#if value.length === 0}
-                    []
-                  {:else if value.length <= 3}
-                    [{value.join(', ')}]
-                  {:else}
-                    [{value.slice(0, 3).join(', ')}, ... +{value.length - 3} more]
-                  {/if}
-                {:else if typeof value === 'object'}
-                  {JSON.stringify(value)}
-                {:else if typeof value === 'boolean'}
-                  <span class={value ? 'text-green-600' : 'text-red-600'}>{value}</span>
-                {:else}
-                  {value}
-                {/if}
-              </span>
-            </div>
-          {/each}
-        </div>
+      {:else if fullTarget?.attributes && fullTarget.attributes.length > 0}
+        <AttributesDisplay
+          attributes={fullTarget.attributes}
+          collapsible={false}
+          initiallyExpanded={true}
+        />
       {:else}
         <div class="text-sm text-muted-foreground">No attributes found</div>
       {/if}

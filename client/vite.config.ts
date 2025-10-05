@@ -1,26 +1,14 @@
 import { defineConfig } from 'vite';
-
+import viteTSConfigPaths from 'vite-tsconfig-paths';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import path from 'node:path';
-
 
 export default defineConfig({
   plugins: [
+    viteTSConfigPaths(),
     svelte({
-      
+
     })
   ],
-
-  resolve: {
-    alias: {
-      '$lib': path.resolve('./lib'),
-      '$components': path.resolve('./components'),
-      '$stores': path.resolve('./lib/stores'),
-      '$utils': path.resolve('./lib/utils'),
-      '$types': path.resolve('./lib/types'),
-      'client': process.env.VITE_ELECTRON ? path.resolve('./client.ipc.ts') : path.resolve('./client.web.ts'),
-    }
-  },
   server: {
     port: 5173,
     proxy: {
@@ -34,6 +22,7 @@ export default defineConfig({
       }
     }
   },
+
   build: {
     outDir: 'dist',
     sourcemap: true,

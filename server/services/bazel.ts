@@ -88,24 +88,24 @@ class BazelService {
   /**
    * Execute a Bazel query
    */
-  async query(query: string, outputFormat: string = 'xml'): Promise<CommandResult> {
-    const cacheKey = `${query}:${outputFormat}`;
-    
+  async query(query: string, outputFormat: string = 'xml', queryType: string = 'query'): Promise<CommandResult> {
+    const cacheKey = `${queryType}:${query}:${outputFormat}`;
+
     // Check cache
     if (this.queryCache.has(cacheKey)) {
       const cached = this.queryCache.get(cacheKey)!;
       if (Date.now() - cached.timestamp < config.cache.ttl) {
-        console.log(`Using cached result for query: ${query}`);
+        console.log(`Using cached result for ${queryType}: ${query}`);
         return cached.data;
       }
     }
-    
+
     const args = [
       `--output=${outputFormat}`,
       query  // Don't quote here - execute will handle it
     ];
 
-    const result = await this.execute('query', args);
+    const result = await this.execute(queryType, args);
     
     // Cache the result
     if (this.queryCache.size >= config.cache.maxSize) {
@@ -231,7 +231,7 @@ class BazelService {
       ? `deps(${target})`
       : `deps(${target}, ${depth})`;
 
-    return this.query(query, 'label');
+    return this.query(query, 'streamed_jsonproto');
   }
 
   /**
@@ -239,7 +239,7 @@ class BazelService {
    */
   async getReverseDependencies(target: string): Promise<CommandResult> {
     // Don't add quotes - let Bazel handle the target as-is
-    return this.query(`rdeps(//..., ${target})`, 'label');
+    return this.query(`rdeps(//..., ${target})`, 'streamed_jsonproto');
   }
 
   /**

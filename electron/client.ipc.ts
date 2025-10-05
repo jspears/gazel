@@ -1,7 +1,7 @@
-import { GazelService } from "proto/gazel_pb";
-import { createClient, type Transport, type UnaryResponse, type StreamResponse } from "@connectrpc/connect";
-import { setClient } from './client.impl';
-export * from './client.impl';
+import { createClient, type Transport } from "@connectrpc/connect";
+import { GazelService } from "proto/gazel_pb.js";
+import { setClient } from '../client/client.impl.js';
+export * from '../client/client.impl.js';
 const createGazelServiceClient = (transport:Transport)=> {
   return createClient(GazelService, transport);
 }

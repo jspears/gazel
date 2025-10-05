@@ -14,7 +14,7 @@ The async generator pattern provides a more elegant and flexible way to handle s
 ### Basic Usage
 
 ```typescript
-import { api } from '$lib/api/client';
+import { api } from '$client/client';
 
 // Using async generator with for-await-of
 async function runBazelTarget(target: string) {

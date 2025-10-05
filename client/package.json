@@ -3,10 +3,12 @@
         "@bufbuild/buf": "^1.57.2",
         "@bufbuild/protobuf": "^2.9.0",
         "@connectrpc/connect": "^2.1.0",
+        "lucide-svelte": "^0.544.0",
         "vite-tsconfig-paths": "^5.1.4"
     },
     "devDependencies": {
-        "@bufbuild/protoc-gen-es": "^2.9.0"
+        "@bufbuild/protoc-gen-es": "^2.9.0",
+        "vite": "^5.4.20"
     },
     "type": "module"
 }

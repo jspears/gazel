@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Target, GitBranch, Terminal, ChevronRight } from 'lucide-svelte';
-  import type { BazelTarget } from 'proto/gazel_pb';
+  import type { BazelTarget } from '../../proto/gazel_pb.js';
   import CopyButton from './CopyButton.svelte';
 
   interface Props {
@@ -100,6 +100,7 @@
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
     padding-right: 1rem;
+    padding-left: 1rem;
     border-bottom: 1px solid hsl(var(--border));
     cursor: pointer;
     transition: background-color 0.15s ease;

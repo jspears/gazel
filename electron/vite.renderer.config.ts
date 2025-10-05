@@ -29,14 +29,7 @@ export default defineConfig({
       'process.env.VITE_ELECTRON': '1'
   },
   resolve: {
-    alias: {
-      $lib: path.resolve(clientRoot, 'lib'),
-      $components: path.resolve(clientRoot, 'components'),
-      $stores: path.resolve(clientRoot, 'lib/stores'),
-      $utils: path.resolve(clientRoot, 'lib/utils'),
-      $types: path.resolve(clientRoot, 'lib/types'),
-      proto: protoAlias,
-    },
+    alias:[{ find: 'client.web.*', replacement: '../client/client.ipc.js' }]
   },
   css: {
     postcss: path.resolve(clientRoot, 'postcss.config.js'),

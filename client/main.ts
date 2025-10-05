@@ -1,4 +1,4 @@
-console.log('Mounting app', import.meta.env.VITE_ELECTRON ? 'in Electron' : 'in browser');
+import './client.web.js';
 import {mount} from 'svelte';
 import App from './App.svelte';
 import './app.css';

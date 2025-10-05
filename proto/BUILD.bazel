@@ -2,7 +2,7 @@ load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 load("@aspect_rules_ts//ts:defs.bzl", "ts_config")
-load("//tools:typescript.bzl", "ts_proto_library", "ts_proto_library_bundle")
+load("@aspect_rules_ts//ts:proto.bzl", "ts_proto_library")
 load("@aspect_rules_js//js:defs.bzl", "js_library")
 
 npm_link_all_packages(name = "node_modules")
@@ -34,6 +34,7 @@ proto_library(
 ts_proto_library(
     name = "gazel_ts_proto",
     proto = ":gazel_proto",
+    copy_files = False,
     node_modules = "//:node_modules",
     visibility = ["//visibility:public"],
 )
@@ -41,6 +42,7 @@ ts_proto_library(
 ts_proto_library(
     name = "logging_ts_proto",
     proto = ":logging_proto",
+    copy_files = False,
     node_modules = "//:node_modules",
     visibility = ["//visibility:public"],
 )
@@ -71,12 +73,12 @@ ts_project(
     visibility = ["//visibility:public"],
 )
 
-# js_library(
-#     name = "index_lib",
-#     srcs = [":index"],
-#     visibility = ["//visibility:public"],
-#     deps = [
-#         ":logging_ts_proto",
-#         ":gazel_ts_proto",
-#     ],
-# )
+js_library(
+    name = "index_lib",
+    srcs = [":index"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":logging_ts_proto",
+        ":gazel_ts_proto",
+    ],
+)

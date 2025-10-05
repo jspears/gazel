@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Play, Save, BookOpen, Trash2, Clock } from 'lucide-svelte';
-  import { api } from '$lib/api/client';
-  import type { QueryTemplate, SavedQuery, BazelTarget } from '$lib/types';
-  import { storage } from '$lib/storage';
+  import { api } from '../client.js';
+  import type { QueryTemplate, SavedQuery, BazelTarget } from '../lib/types/index.js';
+  import { storage } from '../lib/storage.js';
   
   let query = '';
+  let queryType = 'query'; // 'query', 'aquery', or 'cquery'
   let outputFormat = 'label_kind';
   let queryResult: { targets: BazelTarget[] } | null = null;
   let rawOutput = '';
@@ -17,6 +18,50 @@
   let queryName = '';
   let queryDescription = '';
   let recentQueries = storage.getRecentQueries();
+
+  // Output formats available for each query type
+  const outputFormats = {
+    query: [
+      { value: 'label', label: 'Label' },
+      { value: 'label_kind', label: 'Label with Kind' },
+      { value: 'xml', label: 'XML' },
+      { value: 'graph', label: 'Graph (DOT)' },
+      { value: 'proto', label: 'Protocol Buffer' },
+      { value: 'textproto', label: 'Text Protocol Buffer' },
+      { value: 'jsonproto', label: 'JSON Protocol Buffer' },
+    ],
+    cquery: [
+      { value: 'label', label: 'Label' },
+      { value: 'label_kind', label: 'Label with Kind' },
+      { value: 'transitions', label: 'Transitions (lite)' },
+      { value: 'proto', label: 'Protocol Buffer' },
+      { value: 'textproto', label: 'Text Protocol Buffer' },
+      { value: 'jsonproto', label: 'JSON Protocol Buffer' },
+      { value: 'graph', label: 'Graph (DOT)' },
+      { value: 'files', label: 'Output Files' },
+      { value: 'starlark', label: 'Starlark' },
+    ],
+    aquery: [
+      { value: 'text', label: 'Text (human-readable)' },
+      { value: 'summary', label: 'Summary' },
+      { value: 'proto', label: 'Protocol Buffer' },
+      { value: 'textproto', label: 'Text Protocol Buffer' },
+      { value: 'jsonproto', label: 'JSON Protocol Buffer' },
+      { value: 'commands', label: 'Commands' },
+    ],
+  };
+
+  // Get available formats for current query type
+  $: availableFormats = outputFormats[queryType as keyof typeof outputFormats] || outputFormats.query;
+
+  // Update output format when query type changes if current format is not available
+  $: {
+    const formatValues = availableFormats.map(f => f.value);
+    if (!formatValues.includes(outputFormat)) {
+      // Set to first available format for this query type
+      outputFormat = availableFormats[0]?.value || 'label_kind';
+    }
+  }
 
   onMount(() => {
     loadTemplates();
@@ -52,7 +97,7 @@
     try {
       loading = true;
       error = null;
-      const result = await api.executeQuery(query, outputFormat);
+      const result = await api.executeQuery({ query, outputFormat, queryType });
       queryResult = result.result;
       rawOutput = result.raw;
 
@@ -124,16 +169,28 @@
 
       <div class="flex gap-4">
         <div class="flex-1">
+          <label for="queryType" class="block text-sm font-medium mb-2">Query Type</label>
+          <select
+            id="queryType"
+            bind:value={queryType}
+            class="w-full px-3 py-2 border rounded-md bg-background"
+          >
+            <option value="query">query - Standard query</option>
+            <option value="cquery">cquery - Configured query</option>
+            <option value="aquery">aquery - Action graph query</option>
+          </select>
+        </div>
+
+        <div class="flex-1">
           <label for="format" class="block text-sm font-medium mb-2">Output Format</label>
           <select
             id="format"
             bind:value={outputFormat}
             class="w-full px-3 py-2 border rounded-md bg-background"
           >
-            <option value="label">Label</option>
-            <option value="label_kind">Label with Kind</option>
-            <option value="xml">XML</option>
-            <option value="graph">Graph (DOT)</option>
+            {#each availableFormats as format}
+              <option value={format.value}>{format.label}</option>
+            {/each}
           </select>
         </div>
 

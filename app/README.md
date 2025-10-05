@@ -1,20 +1,74 @@
-# Gazel Web Connect Service
+# Gazel Application
 
-This module provides a web client for the Gazel API using the Bazel-generated protobuf types.
+This module provides the main application targets for running Gazel in development and production modes.
 
-## Overview
+## Quick Start
 
-The `app/src` directory contains:
-- **Type definitions** from Bazel-generated protobuf files (`bazel-bin/proto`)
-- **HTTP client** for communicating with the Gazel server
-- **High-level API client** for easier usage in web applications
+### Development Mode
+
+Start both the server and client in development mode with hot-reloading:
+
+```bash
+bazel run //app:dev
+```
+
+This will:
+- Start the gRPC server on http://localhost:3002
+- Start the Vite dev server on http://localhost:5173
+- Automatically open your browser to the client
+- Enable hot-reloading for both server and client code
+
+### Production Mode
+
+Build and run the production version:
+
+```bash
+bazel run //app:main
+```
+
+This will:
+- Build the client for production
+- Start the server serving the built client files
+- Open your browser to http://localhost:3002
+
+## Available Targets
+
+### Development Targets
+
+- `//app:dev` - Run both server and client in development mode with browser auto-open
+- `//app:dev_no_browser` - Same as dev but without opening the browser (useful for Electron)
+- `//app:server_dev` - Run only the server in development mode
+
+### Production Targets
+
+- `//app:main` - Run the production server with built client files
+- `//app:prod_server` - Run only the production server
+- `//app:prod_build` - Build all production assets
+
+## Architecture
+
+The application consists of:
+- **Server** (`//server`) - gRPC server using Connect protocol
+- **Client** (`//client`) - Svelte-based web UI with Vite
+- **Proto** (`//proto`) - Protocol buffer definitions for API
+
+## Development Workflow
+
+1. **Start development mode:**
+   ```bash
+   bazel run //app:dev
+   ```
+
+2. **Make changes to server or client code** - changes will be automatically detected and hot-reloaded
+
+3. **Stop the servers** - Press Ctrl+C to gracefully shut down both servers
 
 ## Installation
 
+No manual installation needed! Bazel automatically manages all dependencies through the pnpm-lock.yaml file. Just run:
+
 ```bash
-cd app
-pnpm install
-pnpm run build
+bazel run //app:dev
 ```
 
 ## Usage

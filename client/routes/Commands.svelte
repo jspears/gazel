@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { Play, TestTube, Trash2, Clock, CheckCircle, XCircle, Terminal } from 'lucide-svelte';
-  import { api } from '$lib/api/client';
-  import type { CommandHistory } from '$lib/types';
+  import { api } from '../client.js';
+  import type { CommandHistory } from '../lib/types/index.js';
 
   export let initialTarget: string | null = null;
 

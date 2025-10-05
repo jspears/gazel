@@ -20,11 +20,7 @@ ts_config(
 ts_project(
     name = "server_ts",
     tsconfig = ":tsconfig",
-    allow_js=True,
-    declaration_map = True,
-    declaration = True,
-    source_map = True,
-
+    data = ["package.json"],
     deps = [
         "//proto:index",
         "//:node_modules",
@@ -45,6 +41,7 @@ js_library(
         "//proto:index",
         "//:node_modules/@bufbuild/protobuf",
         "//:node_modules/@connectrpc/connect",
+        ":node_modules",
     ],
 )
 
@@ -52,7 +49,11 @@ js_library(
 js_binary(
     name = "run",
     data = [
-        ":server_ts",
+        ":server_lib",
+        "//proto:index",
+        "//:node_modules",
+        ":node_modules",
     ],
     entry_point = "main.js",
+    chdir = package_name(),
 )

@@ -12,7 +12,7 @@
     BackgroundVariant
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { parseXmlString } from '$lib/utils/xmlParser';
+  import { parseXmlString } from '../lib/utils/xmlParser.js';
   
   export let xmlData: string = '';
   export let targetFilter: string = '';

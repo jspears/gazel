@@ -31,7 +31,7 @@ export interface TreeNodeData {
   }: Props = $props();
 
   function toggleExpand() {
-    node.isExpanded = !node.isExpanded;
+     node.isExpanded = isExpanded = !isExpanded;
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -72,28 +72,15 @@ export interface TreeNodeData {
   let isLeaf = $derived(!hasChildren && node.targets.length > 0);
   let children = $state(Array.from(node.children.values()));
   let targetCount = $derived(countAllTargets(node));
+  let isExpanded = $state(node.isExpanded);
 </script>
-
-{#if isLeaf}
-  <!-- Leaf node with targets -->
-  {#each node.targets as target}
-    <TargetItem
-      {target}
-      selected={selectedTarget === target}
-      level={node.level}
-      onSelectTarget={handleSelectTarget}
-      onNavigateToGraph={handleNavigateToGraph}
-      onNavigateToCommands={handleNavigateToCommands}
-    />
-  {/each}
-{:else if hasChildren}
-  <!-- Directory node -->
+ <!-- Directory node -->
   <button
     onclick={toggleExpand}
     onkeydown={handleKeydown}
     class="folder-node"
-    aria-expanded={node.isExpanded}
-    aria-label="{node.isExpanded ? 'Collapse' : 'Expand'} folder {node.name}"
+    aria-expanded={isExpanded}
+    aria-label="{isExpanded ? 'Collapse' : 'Expand'} folder {node.name}"
   >
     <div class="folder-content">
       <div class="folder-icon-wrapper">
@@ -115,10 +102,10 @@ export interface TreeNodeData {
     </div>
   </button>
 
-  {#if node.isExpanded}
+  {#if isExpanded}
     <div class="folder-children" transition:slide={{ duration: 200 }}>
       <!-- Recursively render children -->
-      {#each children, index}
+       {#each children, index}
         <TreeNode
           bind:node={children[index]}
           {selectedTarget}
@@ -126,9 +113,17 @@ export interface TreeNodeData {
           {onNavigateToGraph}
           {onNavigateToCommands}
         />
-
       {/each}
-
+      {#each node.targets as target}
+    <TargetItem
+      {target}
+      selected={selectedTarget === target}
+      level={node.level}
+      onSelectTarget={handleSelectTarget}
+      onNavigateToGraph={handleNavigateToGraph}
+      onNavigateToCommands={handleNavigateToCommands}
+    />
+  {/each}
       <!-- Render targets at this level if any -->
       <!-- {#each node.targets as target}
         <TargetItem
@@ -142,7 +137,16 @@ export interface TreeNodeData {
       {/each} -->
     </div>
   {/if}
-{/if}
+  <!--{#each node.targets as target}
+    <TargetItem
+      {target}
+      selected={selectedTarget === target}
+      level={node.level}
+      onSelectTarget={handleSelectTarget}
+      onNavigateToGraph={handleNavigateToGraph}
+      onNavigateToCommands={handleNavigateToCommands}
+    />
+  {/each}-->
 
 <style>
   .folder-node {
@@ -185,26 +189,6 @@ export interface TreeNodeData {
     height: 1rem;
   }
 
-  .chevron-icon {
-    width: 1rem;
-    height: 1rem;
-    color: hsl(var(--muted-foreground));
-    flex-shrink: 0;
-    transition: transform 0.2s ease;
-  }
-
-  .folder-icon {
-    width: 1rem;
-    height: 1rem;
-    color: hsl(var(--primary));
-    flex-shrink: 0;
-    transition: color 0.15s ease;
-  }
-
-  .folder-icon.open {
-    color: hsl(var(--primary));
-  }
-
   .folder-name {
     font-weight: 500;
     font-size: 0.875rem;
@@ -219,5 +203,6 @@ export interface TreeNodeData {
 
   .folder-children {
     overflow: hidden;
+    padding-left: 1rem;
   }
 </style>

@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from 'svelte';
   import { Folder, FileCode, Package, ExternalLink, Target, Clock, ChevronDown, ChevronRight, RefreshCw, Info } from 'lucide-svelte';
-  import { api } from '$lib/api/client';
+  import { api } from '../client.js';
 //  import type { WorkspaceInfo, BuildFile } from '$lib/types';
-  import { storage } from '$lib/storage';
+  import { storage } from '../lib/storage.js';
   import type { BuildFile, WorkspaceInfo, BazelInfo } from 'proto/gazel_pb.js';
 
   const dispatch = createEventDispatcher();

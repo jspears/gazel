@@ -61,7 +61,7 @@
     return root;
   }
 
-  let treeRoot = $derived(buildTree(targets));
+  let treeRoot = $state(buildTree(targets));
   console.log(treeRoot);
 </script>
 

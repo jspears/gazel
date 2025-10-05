@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { api } from '$lib/api/client';
+  import { api } from '../client.js';
   import { Package, GitBranch, Tag, AlertCircle, ChevronRight, ChevronDown, ExternalLink, Layers, Code } from 'lucide-svelte';
   import ElkModuleGraph from '../components/ElkModuleGraph.svelte';
 

@@ -28,6 +28,7 @@ import {
   type ListTargetsResponse,
   ListTargetsResponseSchema,
   BazelTargetSchema,
+  BazelAttributeSchema,
   TargetListSchema,
   type GetTargetRequest,
   type GetTargetResponse,
@@ -62,7 +63,39 @@ import {
   type GetModuleGraphResponse,
   GetModuleGraphResponseSchema,
   ModuleSchema,
-} from "proto/gazel_pb.js";
+  type GetModuleInfoRequest,
+  type GetModuleInfoResponse,
+  GetModuleInfoResponseSchema,
+  type GetQueryTemplatesRequest,
+  type GetQueryTemplatesResponse,
+  GetQueryTemplatesResponseSchema,
+  QueryTemplateSchema,
+  type GetSavedQueriesRequest,
+  type GetSavedQueriesResponse,
+  GetSavedQueriesResponseSchema,
+  SavedQuerySchema,
+  type SaveQueryRequest,
+  type SaveQueryResponse,
+  SaveQueryResponseSchema,
+  type DeleteQueryRequest,
+  type DeleteQueryResponse,
+  DeleteQueryResponseSchema,
+  type StreamRunRequest,
+  type StreamRunResponse,
+  StreamRunResponseSchema,
+  RunCompleteSchema,
+  type GetBuildFileRequest,
+  type GetBuildFileResponse,
+  GetBuildFileResponseSchema,
+  BuildFileTargetSchema,
+  type GetTargetsByFileRequest,
+  type GetTargetsByFileResponse,
+  GetTargetsByFileResponseSchema,
+  type SearchInFilesRequest,
+  type SearchInFilesResponse,
+  SearchInFilesResponseSchema,
+  SearchResultSchema,
+} from "../proto/gazel_pb.js";
 import bazelService from "./services/bazel.js";
 import parserService from "./services/parser.js";
 import config, { setWorkspace } from "./config.js";
@@ -71,6 +104,86 @@ import * as fsSync from "node:fs";
 import * as path from "path";
 
 export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
+  /**
+   * Helper function to convert attributes to BazelAttribute array
+   * Handles both array format (from streamed_jsonproto) and object format (from XML)
+   */
+  private convertAttributesToProto(attributes: any): any[] {
+    if (!attributes) {
+      return [];
+    }
+
+    const protoAttributes: any[] = [];
+
+    // Handle array format from streamed_jsonproto
+    if (Array.isArray(attributes)) {
+      for (const attr of attributes) {
+        const name = attr.name;
+        if (!name) continue;
+
+        const protoAttr: any = {
+          name: name,
+          type: attr.type || '',
+          explicitlySpecified: attr.explicitlySpecified || false,
+          nodep: attr.nodep || false,
+        };
+
+        // Add values based on what's present
+        if (attr.stringValue !== undefined && attr.stringValue !== null) {
+          protoAttr.stringValue = attr.stringValue;
+        }
+        if (attr.stringListValue !== undefined && attr.stringListValue !== null) {
+          protoAttr.stringListValue = attr.stringListValue;
+        }
+        if (attr.intValue !== undefined && attr.intValue !== null) {
+          protoAttr.intValue = attr.intValue;
+        }
+        if (attr.booleanValue !== undefined && attr.booleanValue !== null) {
+          protoAttr.booleanValue = attr.booleanValue;
+        }
+        if (attr.stringDictValue !== undefined && attr.stringDictValue !== null) {
+          protoAttr.stringDictValue = attr.stringDictValue;
+        }
+
+        protoAttributes.push(create(BazelAttributeSchema, protoAttr));
+      }
+    }
+    // Handle object format from XML or other sources - convert to proto format
+    else if (typeof attributes === 'object') {
+      for (const [key, value] of Object.entries(attributes)) {
+        const protoAttr: any = {
+          name: key,
+          type: 'UNKNOWN',
+          explicitlySpecified: true,
+          nodep: false,
+        };
+
+        if (value === null || value === undefined) {
+          protoAttr.stringValue = '';
+        } else if (typeof value === 'string') {
+          protoAttr.type = 'STRING';
+          protoAttr.stringValue = value;
+        } else if (typeof value === 'boolean') {
+          protoAttr.type = 'BOOLEAN';
+          protoAttr.booleanValue = value;
+        } else if (typeof value === 'number') {
+          protoAttr.type = 'INTEGER';
+          protoAttr.intValue = value;
+        } else if (Array.isArray(value)) {
+          protoAttr.type = 'STRING_LIST';
+          protoAttr.stringListValue = value.map(String);
+        } else if (typeof value === 'object') {
+          protoAttr.type = 'STRING_DICT';
+          protoAttr.stringValue = JSON.stringify(value);
+        }
+
+        protoAttributes.push(create(BazelAttributeSchema, protoAttr));
+      }
+    }
+
+    return protoAttributes;
+  }
+
   /**
    * Get workspace information
    */
@@ -467,7 +580,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
     try {
       // Ensure we have valid defaults for pattern and format
       const pattern = request.pattern || "//...";
-      const format = request.format || "label_kind";
+      const format = request.format || "streamed_jsonproto";
 
       const result = await bazelService.query(pattern, format);
 
@@ -475,6 +588,8 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       if (format === "xml") {
         const parsed = await parserService.parseXmlOutput(result.stdout);
         targets = parsed.targets;
+      } else if (format === "streamed_jsonproto") {
+        targets = parserService.parseStreamedJsonProto(result.stdout);
       } else if (format === "label_kind") {
         targets = parserService.parseLabelKindOutput(result.stdout);
       } else {
@@ -482,18 +597,39 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       }
 
       // Convert to proto format
-      const protoTargets = targets.map((target) =>
-        create(BazelTargetSchema, {
-          label: target.label || "",
-          kind: target.kind || "",
-          package: target.package || "",
-          name: target.name || "",
+      const protoTargets = targets.map((target) => {
+        const label = target.full || target.label || "";
+        const kind = target.ruleType || target.kind || "";
+
+        // Extract package and name
+        let pkg = target.package || "";
+        let name = target.name || target.target || "";
+
+        // If package starts with //, remove it
+        if (pkg.startsWith("//")) {
+          pkg = pkg.substring(2);
+        }
+
+        // If we still don't have package/name, try parsing from label
+        if (!pkg || !name) {
+          const match = label.match(/^\/\/([^:]*):(.+)$/);
+          if (match) {
+            pkg = match[1];
+            name = match[2];
+          }
+        }
+
+        return create(BazelTargetSchema, {
+          label: label,
+          kind: kind,
+          package: pkg,
+          name: name,
           tags: target.tags || [],
           deps: target.deps || [],
           srcs: target.srcs || [],
-          attributes: target.attributes || {},
-        })
-      );
+          attributes: target.attributes,
+        });
+      });
 
       // Group targets by package
       const byPackage: Record<string, any> = {};
@@ -528,23 +664,44 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       // Ensure target starts with //
       const fullTarget = target.startsWith("//") ? target : `//${target}`;
 
-      const result = await bazelService.query(fullTarget, "xml");
-      const parsed = await parserService.parseXmlOutput(result.stdout);
+      const result = await bazelService.query(fullTarget, "streamed_jsonproto");
+      const targets = parserService.parseStreamedJsonProto(result.stdout);
 
-      if (parsed.targets.length === 0) {
+      if (targets.length === 0) {
         throw new Error(`Target ${fullTarget} not found`);
       }
 
-      const targetData = parsed.targets[0] as any;
+      const targetData = targets[0];
+      const label = targetData.full || targetData.label || fullTarget;
+      const kind = targetData.ruleType || targetData.kind || "";
+
+      // Extract package and name
+      let pkg = targetData.package || "";
+      let name = targetData.name || targetData.target || "";
+
+      // If package starts with //, remove it
+      if (pkg.startsWith("//")) {
+        pkg = pkg.substring(2);
+      }
+
+      // If we still don't have package/name, try parsing from label
+      if (!pkg || !name) {
+        const match = label.match(/^\/\/([^:]*):(.+)$/);
+        if (match) {
+          pkg = match[1];
+          name = match[2];
+        }
+      }
+
       const protoTarget = create(BazelTargetSchema, {
-        label: targetData.label || fullTarget,
-        kind: targetData.kind || "",
-        package: targetData.package || "",
-        name: targetData.name || "",
+        label: label,
+        kind: kind,
+        package: pkg,
+        name: name,
         tags: targetData.tags || [],
         deps: targetData.deps || [],
         srcs: targetData.srcs || [],
-        attributes: targetData.attributes || {},
+        attributes: targetData.attributes ?? []
       });
 
       return create(GetTargetResponseSchema, {
@@ -571,24 +728,47 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       const fullTarget = target.startsWith("//") ? target : `//${target}`;
 
       const result = await bazelService.getTargetDependencies(fullTarget, depth);
-      const dependencies = parserService.parseLabelOutput(result.stdout);
+      const dependencies = parserService.parseStreamedJsonProto(result.stdout);
 
       // Convert dependencies to BazelTarget format
-      const protoDeps = dependencies.map((dep: any) =>
-        create(BazelTargetSchema, {
-          label: typeof dep === 'string' ? dep : (dep.label || ""),
-          kind: dep.kind || "",
-          package: dep.package || "",
-          name: dep.name || "",
+      const protoDeps = dependencies.map((dep: any) => {
+        const label = dep.full || "";
+        const kind = dep.ruleType || "";
+
+        // Extract package and name from the parsed data or from label
+        let pkg = dep.package || "";
+        let name = dep.name || dep.target || "";
+
+        // If package starts with //, remove it for the package field
+        if (pkg.startsWith("//")) {
+          pkg = pkg.substring(2);
+        }
+
+        // If we still don't have package/name, try parsing from label
+        if (!pkg || !name) {
+          const match = label.match(/^\/\/([^:]*):(.+)$/);
+          if (match) {
+            pkg = match[1];
+            name = match[2];
+          }
+        }
+
+        return create(BazelTargetSchema, {
+          label: label,
+          kind: kind,
+          package: pkg,
+          name: name,
           tags: [],
           deps: [],
           srcs: [],
-          attributes: {},
-        })
-      );
+          attributes: dep.attributes ?? [],
+        });
+      });
 
       return create(GetTargetDependenciesResponseSchema, {
         target: fullTarget,
+        depth: depth,
+        total: protoDeps.length,
         dependencies: protoDeps,
       });
     } catch (error: any) {
@@ -666,21 +846,42 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       const fullTarget = target.startsWith("//") ? target : `//${target}`;
 
       const result = await bazelService.getReverseDependencies(fullTarget);
-      const dependencies = parserService.parseLabelOutput(result.stdout);
+      const dependencies = parserService.parseStreamedJsonProto(result.stdout);
 
       // Convert to BazelTarget format
-      const protoDeps = dependencies.map((dep: any) =>
-        create(BazelTargetSchema, {
-          label: typeof dep === 'string' ? dep : (dep.label || ""),
-          kind: dep.kind || "",
-          package: dep.package || "",
-          name: dep.name || "",
+      const protoDeps = dependencies.map((dep: any) => {
+        const label = dep.full || "";
+        const kind = dep.ruleType || "";
+
+        // Extract package and name from the parsed data or from label
+        let pkg = dep.package || "";
+        let name = dep.name || dep.target || "";
+
+        // If package starts with //, remove it for the package field
+        if (pkg.startsWith("//")) {
+          pkg = pkg.substring(2);
+        }
+
+        // If we still don't have package/name, try parsing from label
+        if (!pkg || !name) {
+          const match = label.match(/^\/\/([^:]*):(.+)$/);
+          if (match) {
+            pkg = match[1];
+            name = match[2];
+          }
+        }
+
+        return create(BazelTargetSchema, {
+          label: label,
+          kind: kind,
+          package: pkg,
+          name: name,
           tags: [],
           deps: [],
           srcs: [],
-          attributes: {},
-        })
-      );
+          attributes: dep.attributes ?? [],
+        });
+      });
 
       return create(GetReverseDependenciesResponseSchema, {
         target: fullTarget,
@@ -717,17 +918,8 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       const targets = parserService.parseLabelKindOutput(result.stdout);
 
       // Convert to proto format
-      const protoTargets = targets.map((target: any) =>
-        create(BazelTargetSchema, {
-          label: target.label || "",
-          kind: target.kind || "",
-          package: target.package || "",
-          name: target.name || "",
-          tags: [],
-          deps: [],
-          srcs: [],
-          attributes: {},
-        })
+      const protoTargets = targets.map((target) =>
+        create(BazelTargetSchema,target)
       );
 
       return create(SearchTargetsResponseSchema, {
@@ -747,13 +939,13 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
     request: ExecuteQueryRequest
   ): Promise<ExecuteQueryResponse> {
     try {
-      const { query, outputFormat = "label_kind" } = request;
+      const { query, outputFormat = "label_kind", queryType = "query" } = request;
 
       if (!query) {
         throw new Error("Query is required");
       }
 
-      const result = await bazelService.query(query, outputFormat);
+      const result = await bazelService.query(query, outputFormat, queryType);
 
       let parsedResult: any;
       if (outputFormat === "xml") {
@@ -784,7 +976,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
           tags: target.tags || [],
           deps: target.deps || [],
           srcs: target.srcs || [],
-          attributes: target.attributes || {},
+          attributes: target.attributes ?? [],
         })
       );
 
@@ -973,6 +1165,461 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
         root: "",
         modules: [],
       });
+    }
+  }
+
+  /**
+   * Get detailed module information
+   */
+  async getModuleInfo(
+    request: GetModuleInfoRequest
+  ): Promise<GetModuleInfoResponse> {
+    try {
+      const { moduleName } = request;
+
+      // Get the full module graph first
+      const graphResult = await bazelService.execute(["mod", "graph", "--output", "json"]);
+      const moduleGraph = JSON.parse(graphResult.stdout);
+
+      // Find the specific module
+      const module = Object.entries(moduleGraph.modules || {}).find(
+        ([key, mod]: [string, any]) => mod.name === moduleName || key === moduleName
+      );
+
+      if (!module) {
+        throw new Error(`Module ${moduleName} not found`);
+      }
+
+      const [key, mod] = module as [string, any];
+      const protoModule = create(ModuleSchema, {
+        key,
+        name: mod.name || "",
+        version: mod.version || "",
+      });
+
+      return create(GetModuleInfoResponseSchema, {
+        module: protoModule,
+      });
+    } catch (error: any) {
+      throw new Error(`Failed to get module info: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get query templates
+   */
+  async getQueryTemplates(
+    _request: GetQueryTemplatesRequest
+  ): Promise<GetQueryTemplatesResponse> {
+    // Return predefined query templates
+    const templates = [
+      // Standard query templates
+      {
+        id: "all-targets",
+        name: "All Targets",
+        description: "List all targets in the workspace",
+        template: "//...",
+        parameters: [],
+        category: "basic",
+        queryType: "query",
+        outputFormat: "label_kind",
+      },
+      {
+        id: "deps",
+        name: "Dependencies",
+        description: "Find all dependencies of a target (e.g., //foo:bar)",
+        template: "deps({target})",
+        parameters: ["target"],
+        category: "dependencies",
+        queryType: "query",
+        outputFormat: "label_kind",
+      },
+      {
+        id: "rdeps",
+        name: "Reverse Dependencies",
+        description: "Find what depends on a target (e.g., //foo:bar)",
+        template: "rdeps(//..., {target})",
+        parameters: ["target"],
+        category: "dependencies",
+        queryType: "query",
+        outputFormat: "label_kind",
+      },
+      {
+        id: "kind-filter",
+        name: "Filter by Rule Type",
+        description: "Find targets of a specific rule type (e.g., cc_library, ts_project)",
+        template: "kind({kind}, //...)",
+        parameters: ["kind"],
+        category: "filter",
+        queryType: "query",
+        outputFormat: "label",
+      },
+      {
+        id: "attr-filter",
+        name: "Filter by Attribute",
+        description: "Find targets with specific attribute values (e.g., srcs, '.*\\.ts$', //...)",
+        template: "attr({attribute}, {pattern}, {scope})",
+        parameters: ["attribute", "pattern", "scope"],
+        category: "filter",
+        queryType: "query",
+        outputFormat: "label_kind",
+      },
+      // cquery templates
+      {
+        id: "cquery-deps",
+        name: "Configured Dependencies",
+        description: "Find dependencies with configuration info (e.g., //foo:bar)",
+        template: "deps({target})",
+        parameters: ["target"],
+        category: "configured",
+        queryType: "cquery",
+        outputFormat: "label_kind",
+      },
+      {
+        id: "cquery-somepath",
+        name: "Path Between Targets",
+        description: "Find a path from one target to another (e.g., //foo:a, //foo:b)",
+        template: "somepath({from}, {to})",
+        parameters: ["from", "to"],
+        category: "configured",
+        queryType: "cquery",
+        outputFormat: "label_kind",
+      },
+      {
+        id: "cquery-config",
+        name: "Specific Configuration",
+        description: "Query a target in a specific configuration (e.g., //foo:bar, target)",
+        template: "config({target}, {config})",
+        parameters: ["target", "config"],
+        category: "configured",
+        queryType: "cquery",
+        outputFormat: "label_kind",
+      },
+      // aquery templates
+      {
+        id: "aquery-actions",
+        name: "Actions for Target",
+        description: "Show all actions generated for a target (e.g., //foo:bar)",
+        template: "{target}",
+        parameters: ["target"],
+        category: "actions",
+        queryType: "aquery",
+        outputFormat: "text",
+      },
+      {
+        id: "aquery-inputs",
+        name: "Filter by Input Files",
+        description: "Find actions with specific input files (e.g., '.*\\.cpp', deps(//foo:bar))",
+        template: "inputs({pattern}, deps({target}))",
+        parameters: ["pattern", "target"],
+        category: "actions",
+        queryType: "aquery",
+        outputFormat: "text",
+      },
+      {
+        id: "aquery-mnemonic",
+        name: "Filter by Action Type",
+        description: "Find actions by mnemonic/type (e.g., 'Cpp.*', //foo:bar)",
+        template: "mnemonic({mnemonic}, {target})",
+        parameters: ["mnemonic", "target"],
+        category: "actions",
+        queryType: "aquery",
+        outputFormat: "text",
+      },
+    ];
+
+    const protoTemplates = templates.map((t) =>
+      create(QueryTemplateSchema, {
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        template: t.template,
+        parameters: t.parameters,
+        category: t.category,
+      })
+    );
+
+    return create(GetQueryTemplatesResponseSchema, {
+      templates: protoTemplates,
+    });
+  }
+
+  /**
+   * Get saved queries (stub implementation - would need database)
+   */
+  async getSavedQueries(
+    _request: GetSavedQueriesRequest
+  ): Promise<GetSavedQueriesResponse> {
+    // This would typically load from a database
+    // For now, return empty array
+    return create(GetSavedQueriesResponseSchema, {
+      queries: [],
+    });
+  }
+
+  /**
+   * Save a query (stub implementation - would need database)
+   */
+  async saveQuery(
+    request: SaveQueryRequest
+  ): Promise<SaveQueryResponse> {
+    const { name, query, description } = request;
+
+    // This would typically save to a database
+    // For now, just return the query back
+    const savedQuery = create(SavedQuerySchema, {
+      id: Date.now().toString(),
+      name,
+      query,
+      description,
+      createdAt: { seconds: BigInt(Math.floor(Date.now() / 1000)), nanos: 0 },
+      updatedAt: { seconds: BigInt(Math.floor(Date.now() / 1000)), nanos: 0 },
+    });
+
+    return create(SaveQueryResponseSchema, {
+      query: savedQuery,
+    });
+  }
+
+  /**
+   * Delete a query (stub implementation - would need database)
+   */
+  async deleteQuery(
+    _request: DeleteQueryRequest
+  ): Promise<DeleteQueryResponse> {
+    // This would typically delete from a database
+    // For now, just return success
+    return create(DeleteQueryResponseSchema, {
+      success: true,
+    });
+  }
+
+  /**
+   * Stream run events (server streaming)
+   */
+  async *streamRun(
+    request: StreamRunRequest
+  ): AsyncGenerator<StreamRunResponse> {
+    const { target, options = [] } = request;
+
+    if (!target) {
+      throw new Error("Target is required");
+    }
+
+    // Start the run - send initial output
+    yield create(StreamRunResponseSchema, {
+      event: {
+        case: "output",
+        value: `Starting run of ${target}`,
+      },
+    });
+
+    try {
+      // Execute the run command
+      const result = await bazelService.execute(["run", target, ...options]);
+
+      // Yield output lines as progress events
+      const lines = result.stdout.split("\n");
+      for (const line of lines) {
+        if (line.trim()) {
+          yield create(StreamRunResponseSchema, {
+            event: {
+              case: "output",
+              value: line,
+            },
+          });
+        }
+      }
+
+      // Send completion
+      yield create(StreamRunResponseSchema, {
+        event: {
+          case: "complete",
+          value: create(RunCompleteSchema, {
+            success: true,
+            exitCode: 0,
+          }),
+        },
+      });
+    } catch (error: any) {
+      // Send error
+      yield create(StreamRunResponseSchema, {
+        event: {
+          case: "error",
+          value: error.message,
+        },
+      });
+    }
+  }
+
+  /**
+   * Get build file content and targets
+   */
+  async getBuildFile(
+    request: GetBuildFileRequest
+  ): Promise<GetBuildFileResponse> {
+    try {
+      const { path: filePath } = request;
+
+      if (!filePath) {
+        throw new Error("File path is required");
+      }
+
+      const fullPath = path.join(config.bazelWorkspace, filePath);
+
+      // Read the file content
+      const content = await fs.readFile(fullPath, "utf-8");
+      const lines = content.split("\n");
+
+      // Parse targets from the BUILD file
+      const targets: Array<{ ruleType: string; name: string; line: number }> = [];
+
+      // Simple regex-based parsing to find target definitions
+      const targetRegex = /^(\w+)\s*\(\s*name\s*=\s*["']([^"']+)["']/;
+
+      lines.forEach((line, index) => {
+        const match = line.match(targetRegex);
+        if (match) {
+          targets.push({
+            ruleType: match[1],
+            name: match[2],
+            line: index + 1,
+          });
+        }
+      });
+
+      // Convert to proto format
+      const protoTargets = targets.map((t) =>
+        create(BuildFileTargetSchema, {
+          ruleType: t.ruleType,
+          name: t.name,
+          line: t.line,
+        })
+      );
+
+      return create(GetBuildFileResponseSchema, {
+        path: filePath,
+        content,
+        targets: protoTargets,
+        lines: lines.length,
+      });
+    } catch (error: any) {
+      throw new Error(`Failed to get build file: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get targets that use a specific file
+   */
+  async getTargetsByFile(
+    request: GetTargetsByFileRequest
+  ): Promise<GetTargetsByFileResponse> {
+    try {
+      const { file } = request;
+
+      if (!file) {
+        throw new Error("File name is required");
+      }
+
+      // Query for targets that have this file in their srcs
+      const query = `attr(srcs, ${file}, //...)`;
+
+      try {
+        const result = await bazelService.query(query, "label_kind");
+        const targets = parserService.parseLabelKindOutput(result.stdout);
+
+        // Convert to proto format
+        const protoTargets = targets.map((target) =>
+          create(BazelTargetSchema,target)
+        );
+
+        return create(GetTargetsByFileResponseSchema, {
+          file,
+          total: protoTargets.length,
+          targets: protoTargets,
+        });
+      } catch (queryError) {
+        // If query fails, return empty results
+        return create(GetTargetsByFileResponseSchema, {
+          file,
+          total: 0,
+          targets: [],
+        });
+      }
+    } catch (error: any) {
+      throw new Error(`Failed to get targets by file: ${error.message}`);
+    }
+  }
+
+  /**
+   * Search in files
+   */
+  async searchInFiles(
+    request: SearchInFilesRequest
+  ): Promise<SearchInFilesResponse> {
+    try {
+      const { query, caseSensitive = false } = request;
+
+      if (!query) {
+        throw new Error("Search query is required");
+      }
+
+      // Use grep to search in BUILD files
+      const grepArgs = [
+        "-n", // Show line numbers
+        "-H", // Show file names
+        caseSensitive ? "" : "-i", // Case insensitive
+        query,
+        "--include=BUILD*",
+        "--include=*.bzl",
+        "-r", // Recursive
+        config.bazelWorkspace,
+      ].filter(Boolean);
+
+      try {
+        const result = await bazelService.execute(["run", "@bazel_tools//tools/bash:bash", "--", "-c", `grep ${grepArgs.join(" ")}`]);
+
+        // Parse grep output (format: file:line:content)
+        const results: Array<{ file: string; line: number; content: string }> = [];
+        const lines = result.stdout.split("\n").filter((line) => line.trim());
+
+        for (const line of lines) {
+          const match = line.match(/^([^:]+):(\d+):(.+)$/);
+          if (match) {
+            results.push({
+              file: match[1].replace(config.bazelWorkspace + "/", ""),
+              line: parseInt(match[2], 10),
+              content: match[3],
+            });
+          }
+        }
+
+        // Convert to proto format
+        const protoResults = results.map((r) =>
+          create(SearchResultSchema, {
+            file: r.file,
+            line: r.line,
+            content: r.content,
+          })
+        );
+
+        return create(SearchInFilesResponseSchema, {
+          query,
+          caseSensitive,
+          total: protoResults.length,
+          results: protoResults,
+        });
+      } catch (grepError) {
+        // If grep fails (no matches or error), return empty results
+        return create(SearchInFilesResponseSchema, {
+          query,
+          caseSensitive,
+          total: 0,
+          results: [],
+        });
+      }
+    } catch (error: any) {
+      throw new Error(`Failed to search in files: ${error.message}`);
     }
   }
 }

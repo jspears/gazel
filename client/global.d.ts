@@ -1,5 +1,5 @@
 import { type Client } from "@connectrpc/connect";
-import { type GazelService } from "proto/gazel_pb";
+import { type GazelService } from "../proto/gazel_pb.js";
 import { type IpcRenderer } from "electron";
 
 

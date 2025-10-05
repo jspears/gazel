@@ -1,8 +1,10 @@
-load("@aspect_rules_js//js:defs.bzl", "js_library", "js_binary")
+load("@aspect_rules_js//js:defs.bzl", "js_library")
 load("@npm//:vite/package_json.bzl", vite_bin = "bin")
+load("@npm//:defs.bzl", "npm_link_all_packages")
 
 package(default_visibility = ["//visibility:public"])
 
+npm_link_all_packages(name = "node_modules")
 
 # Client source files and config
 js_library(
@@ -18,19 +20,21 @@ js_library(
     deps = [
         "//proto:index",
         "//:node_modules",
+        ":node_modules",
     ],
 )
 
 # Vite dev server using vite binary
 vite_bin.vite_binary(
     name = "dev",
-    args = ["--host", "0.0.0.0"],
+    args = ["--host", "0.0.0.0", "--open"],
     chdir = package_name(),
     data = [
         ":client_src",
         "//:tsconfig",
         "//:package_json",
         "//:node_modules",
+        ":node_modules",
     ],
 )
 
@@ -42,6 +46,7 @@ vite_bin.vite(
         "//:tsconfig",
         "//:package_json",
         "//:node_modules",
+        ":node_modules",
     ],
     args = ["build"],
     chdir = package_name(),
@@ -56,6 +61,7 @@ vite_bin.vite(
         "//:tsconfig",
         "//:package_json",
         "//:node_modules",
+        ":node_modules",
     ],
     env = {
         "VITE_ELECTRON": "1",

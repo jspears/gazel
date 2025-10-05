@@ -22,9 +22,9 @@
   import DependencyGraph from './routes/DependencyGraph.svelte';
   import Modules from './routes/Modules.svelte';
   import WorkspacePicker from './components/WorkspacePicker.svelte';
-  import { api } from '$lib/api/client';
-  import { storage } from '$lib/storage';
-  import { initNavigation, navigateToTab, updateParam, type AppState, copyUrlToClipboard } from '$lib/navigation';
+  import { api } from './client.js';
+  import { storage } from './lib/storage.js';
+  import { initNavigation, navigateToTab, updateParam, type AppState, copyUrlToClipboard } from './lib/navigation.js';
 
   let activeTab = 'workspace';
   let fileToOpen: string | null = null;

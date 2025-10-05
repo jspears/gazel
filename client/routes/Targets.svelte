@@ -1,14 +1,15 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink, Play, X, Clock, ChevronDown, GitBranch, Terminal, List, Network } from 'lucide-svelte';
-  import { api } from '$lib/api/client';
-  import type { BazelTarget } from '$lib/types';
+  import { api } from '../client.js';
+  import type { BazelTarget, StreamRunResponse } from 'proto/gazel_pb.js';
   import { createEventDispatcher } from 'svelte';
-  import { storage } from '$lib/storage';
-  import CopyButton from '$components/CopyButton.svelte';
-  import TypeSelector from '$components/TypeSelector.svelte';
-  import TargetTreeView from '$components/TargetTreeView.svelte';
-  import { updateParam } from '$lib/navigation';
+  import { storage } from '../lib/storage.js';
+  import CopyButton from '../components/CopyButton.svelte';
+  import TypeSelector from '../components/TypeSelector.svelte';
+  import TargetTreeView from '../components/TargetTreeView.svelte';
+  import AttributesDisplay from '../components/AttributesDisplay.svelte';
+  import { updateParam } from '../lib/navigation.js';
 
   const dispatch = createEventDispatcher();
 
@@ -24,7 +25,7 @@
   let selectedTarget: BazelTarget | null = null;
   let targetDependencies: BazelTarget[] = [];
   let targetReverseDependencies: BazelTarget[] = [];
-  let targetOutputs: Array<{path: string; filename: string; type: string}> = [];
+  let targetOutputs: Array<string> = [];
   let loadingOutputs = false;
   let loadingReverseDeps = false;
   let usingFallbackSearch = false;
@@ -34,7 +35,7 @@
   let runOutput: string[] = [];
   let runCommand = '';
   let runStatus: 'idle' | 'running' | 'success' | 'error' = 'idle';
-  let runEventSource: EventSource | null = null;
+  let runEventSource: AsyncIterable<StreamRunResponse> | null = null;
   let outputContainer: HTMLDivElement;
 
   // Show hidden targets state
@@ -53,8 +54,11 @@
   let navigationHistory: BazelTarget[] = [];
 
   // View mode state
-  let viewMode: 'list' | 'tree' = 'list';
+  let viewMode: 'list' | 'tree' = 'tree';
 
+  const toFull = (target: BazelTarget) => {
+    return `${target.package}:${target.name}`;
+  };
   onMount(async () => {
     await loadTargets();
 
@@ -64,9 +68,7 @@
     // If there's an initial target, find and select it
     if (initialTarget) {
       const target = targets.find(t =>
-        t.full === initialTarget ||
         t.name === initialTarget ||
-        (t.full && t.full.includes(initialTarget)) ||
         (t.name && t.name.includes(initialTarget))
       );
 
@@ -74,7 +76,7 @@
         selectTarget(target);
         // Optionally scroll to the target in the list
         setTimeout(() => {
-          const targetElement = document.querySelector(`[data-target="${target.full || target.name}"]`);
+          const targetElement = document.querySelector(`[data-target="${target.package}:${target.name}"]`);
           if (targetElement) {
             targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
@@ -139,8 +141,9 @@
       loading = true;
       error = null;
       displayLimit = 100; // Reset display limit when loading new targets
-      const result = await api.listTargets();
+      const result = await api.listTargets({});
       targets = result.targets;
+      console.log({targets});
       filteredTargets = targets;
       byPackage = result.byPackage;
     } catch (err: any) {
@@ -200,7 +203,7 @@
       loading = true;
       error = null;
       usingFallbackSearch = false;
-      const result = await api.searchTargets(searchQuery, selectedType);
+      const result = await api.searchTargets({query: searchQuery, type: selectedType});
       filteredTargets = result.targets;
     } catch (err: any) {
       // If the Bazel query fails, fall back to string search
@@ -262,29 +265,30 @@
 
     // Apply type filter if selected
     if (selectedType) {
-      filteredTargets = filteredTargets.filter(t => t.type === selectedType);
+      filteredTargets = filteredTargets.filter(t => t.kind === selectedType);
     }
   }
 
   async function selectTarget(target: BazelTarget, addToHistory = true) {
+    console.log({target});
     selectedTarget = target;
     targetOutputs = [];
     targetReverseDependencies = [];
 
     // Update URL with selected target
-    const targetName = target.full || target.name || '';
+    const targetName =  target.name || '';
     updateParam('target', targetName);
 
     // Save to recent targets
-    if (target.full || target.name) {
-      storage.addRecentTarget(target.full || target.name || '', target.ruleType || target.type);
+    if ( target.name) {
+      storage.addRecentTarget(target.name);
     }
 
     // Add to navigation history if not navigating back
     if (addToHistory && selectedTarget) {
       // Remove any items after the current position if we're not at the end
       const currentIndex = navigationHistory.findIndex(t =>
-        (t.full || t.name) === (selectedTarget?.full || selectedTarget?.name)
+        t.name === selectedTarget?.name
       );
       if (currentIndex !== -1) {
         navigationHistory = navigationHistory.slice(0, currentIndex);
@@ -293,20 +297,23 @@
       }
     }
 
-    if (target.full) {
+    if (target.name) {
       // Load full target details with attributes
       try {
-        const fullTargetResult = await api.getTarget(target.full);
+        const fullTargetResult = await api.getTarget({target: toFull(target)});
         if (fullTargetResult) {
-          selectedTarget = fullTargetResult;
+          selectedTarget = fullTargetResult.target;
         }
       } catch (err) {
         console.error('Failed to load target details:', err);
       }
       // Load direct dependencies
       try {
-        const deps = await api.getTargetDependencies(target.full, 1);
+        const full = toFull(target);
+        const deps = await api.getTargetDependencies({target:full, depth: 1});
+        console.log({deps, full});
         targetDependencies = deps.dependencies;
+
       } catch (err) {
         console.error('Failed to load dependencies:', err);
         targetDependencies = [];
@@ -315,7 +322,7 @@
       // Load reverse dependencies (what depends on this target)
       loadingReverseDeps = true;
       try {
-        const rdeps = await api.getReverseDependencies(target.full);
+        const rdeps = await api.getReverseDependencies({target: target.name});
         targetReverseDependencies = rdeps.dependencies || [];
       } catch (err) {
         console.error('Failed to load reverse dependencies:', err);
@@ -327,7 +334,7 @@
       // Load outputs for the selected target
       loadingOutputs = true;
       try {
-        const outputResult = await api.getTargetOutputs(target.full);
+        const outputResult = await api.getTargetOutputs({target: target.name});
         targetOutputs = outputResult.outputs || [];
       } catch (err) {
         console.error('Failed to load outputs:', err);
@@ -348,7 +355,7 @@
   async function navigateToTarget(target: BazelTarget) {
     // If the target doesn't have full details, try to find it in the current list
     const fullTarget = targets.find(t =>
-      (t.full === target.full) || (t.name === target.name)
+      (t.name === target.name) && (t.package === target.package)
     );
 
     if (fullTarget) {
@@ -383,15 +390,15 @@
       if (!type) {
         filteredTargets = targets;
       } else {
-        filteredTargets = targets.filter(t => t.ruleType === type);
+        filteredTargets = targets.filter(t => t.kind === type);
       }
     }
   }
 
   function navigateToBuildFile(target: BazelTarget) {
-    if (target.location) {
+    if (target.package) {
       // Extract the BUILD file path from the location (format: //package:target:line:column)
-      const match = target.location.match(/^([^:]+)/);
+      const match = target.package.match(/^([^:]+)/);
       if (match) {
         const buildPath = match[1].replace('//', '') + '/BUILD';
         // Dispatch event to parent to switch to Files tab with this file
@@ -401,7 +408,7 @@
   }
 
   function navigateToGraph(target: BazelTarget) {
-    const targetName = target.full || target.name;
+    const targetName = target.name;
     if (targetName) {
       // Dispatch event to parent to switch to Graph tab with this target
       dispatch('navigate-to-graph', { target: targetName });
@@ -409,7 +416,7 @@
   }
 
   function navigateToCommands(target: BazelTarget) {
-    const targetName = target.full || target.name;
+    const targetName = target.name;
     if (targetName) {
       // Dispatch event to parent to switch to Commands tab with this target
       dispatch('navigate-to-commands', { target: targetName });
@@ -417,8 +424,8 @@
   }
 
   function getBuildFilePath(target: BazelTarget): string | null {
-    if (target.location) {
-      const match = target.location.match(/^([^:]+)/);
+    if (target.package) {
+      const match = target.package.match(/^([^:]+)/);
       if (match) {
         return match[1].replace('//', '') + '/BUILD';
       }
@@ -454,7 +461,7 @@
   }
 
   function isExecutableTarget(target: BazelTarget): boolean {
-    if (!target.ruleType) return false;
+    if (!target.kind) return false;
 
     const executableTypes = [
       'cc_binary',
@@ -475,66 +482,58 @@
 
   function isHiddenTarget(target: BazelTarget): boolean {
     // Check if the target name starts with a dot
-    const name = target.name || target.full || '';
+    const name = target.name || '';
     const lastPart = name.split(':').pop() || '';
     return lastPart.startsWith('.');
   }
 
-  function runTarget(target: BazelTarget) {
-    if (!target.full && !target.name) return;
+  async function runTarget(target: BazelTarget) {
+    if (!target.name) return;
 
-    const targetName = target.full || target.name;
+    const targetName = target.name;
     runCommand = `bazel run ${targetName}`;
     runOutput = [];
     runStatus = 'running';
     showRunModal = true;
 
     // Use EventSource for streaming
-    runEventSource = api.streamRun(targetName, [], (data) => {
-      if (data.type === 'stdout' || data.type === 'stderr') {
-        runOutput = [...runOutput, data.data];
+    for await (const message of  api.streamRun({target: targetName})){
+      const data = message.event;
+      if (data.case === 'output') {
+        runOutput = [...runOutput, data.value];
         // Auto-scroll to bottom
         if (outputContainer) {
           setTimeout(() => {
             outputContainer.scrollTop = outputContainer.scrollHeight;
           }, 0);
         }
-      } else if (data.type === 'info') {
-        runOutput = [...runOutput, `ℹ️ ${data.data}\n`];
+      } else if (data.case === 'progress') {
+        runOutput = [...runOutput, `ℹ️ ${data.value.currentAction}\n`];
         // Auto-scroll for info messages too
         if (outputContainer) {
           setTimeout(() => {
             outputContainer.scrollTop = outputContainer.scrollHeight;
           }, 0);
         }
-      } else if (data.type === 'exit') {
-        if (data.code === 0) {
+      } else if (data.case === 'complete') {
+        if (data.value.exitCode === 0) {
           runStatus = 'success';
           runOutput = [...runOutput, '\n✅ Command completed successfully'];
-        } else if (data.code === null) {
+        } else if (data.value.exitCode === null) {
           // Process was killed or terminated abnormally
           runStatus = 'error';
           runOutput = [...runOutput, '\n⚠️ Command was terminated'];
         } else {
           runStatus = 'error';
-          runOutput = [...runOutput, `\n❌ Command failed with exit code ${data.code}`];
+          runOutput = [...runOutput, `\n❌ Command failed with exit code ${data.value.exitCode}`];
         }
-        // Close the EventSource when process exits
-        if (runEventSource) {
-          runEventSource.close();
-          runEventSource = null;
-        }
-      } else if (data.type === 'error') {
+       
+      } else if (data.case === 'error') {
         // Handle stream errors
         runStatus = 'error';
-        runOutput = [...runOutput, `\n❌ Error: ${data.data}`];
-        // Close the EventSource on error
-        if (runEventSource) {
-          runEventSource.close();
-          runEventSource = null;
-        }
+        runOutput = [...runOutput, `\n❌ Error: ${data.value}`];
       }
-    });
+    }
   }
 
 
@@ -545,8 +544,6 @@
       if (runStatus === 'running') {
         runOutput = [...runOutput, '\n⚠️ Stopping command...'];
       }
-      runEventSource.close();
-      runEventSource = null;
     }
     showRunModal = false;
     runStatus = 'idle';
@@ -555,8 +552,10 @@
   }
 
 
-  $: uniqueTypes = [...new Set(targets.map(t => t.ruleType).filter(Boolean))];
-
+  $: uniqueTypes = [...new Set(targets.map(t => t.kind).filter(Boolean))];
+$:{
+  console.log({uniqueTypes});
+}
   // Filter targets based on hidden state
   $: visibleTargets = showHiddenTargets
     ? filteredTargets
@@ -706,17 +705,17 @@
                 tabindex={0}
                 on:click={() => selectTarget(target)}
                 on:keydown={(event) => handleTargetActivation(event, target)}
-                data-target={target.full || target.name}
+                data-target={toFull(target)}
                 class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 flex items-center justify-between group"
                 class:bg-muted={selectedTarget === target}
               >
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <Target class="w-4 h-4 text-muted-foreground" />
-                    <span class="font-mono text-sm truncate">{target.full || target.name}</span>
+                    <span class="font-mono text-sm truncate">{target.name}</span>
                   </div>
-                  {#if target.ruleType}
-                    <span class="text-xs text-muted-foreground">{target.ruleType}</span>
+                  {#if target.kind}
+                    <span class="text-xs text-muted-foreground">{target.kind}</span>
                   {/if}
                 </div>
                 <div class="flex items-center gap-1">
@@ -734,7 +733,7 @@
                   >
                     <Terminal class="w-4 h-4 text-muted-foreground hover:text-primary" />
                   </button>
-                  <CopyButton text={target.full || target.name} size="sm" className="opacity-0 group-hover:opacity-100" />
+                  <CopyButton text={toFull(target)} size="sm" className="opacity-0 group-hover:opacity-100" />
                   <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
                 </div>
               </div>
@@ -759,9 +758,9 @@
             targets={visibleTargets}
             {selectedTarget}
             {displayLimit}
-            onselecttarget={(e) => selectTarget(e.detail.target)}
-            onnavigateToGraph={(e) => navigateToGraph(e.detail.target)}
-            onnavigateToCommands={(e) => navigateToCommands(e.detail.target)}
+            onSelectTarget={(e) => selectTarget(e.detail.target)}
+            onNavigateToGraph={(e) => navigateToGraph(e.detail.target)}
+            onNavigateToCommands={(e) => navigateToCommands(e.detail.target)}
           />
         {/if}
       </div>
@@ -769,33 +768,6 @@
       <div class="bg-card rounded-lg border">
         <div class="p-4 border-b">
           <h3 class="font-semibold">Target Details</h3>
-          {#if navigationHistory.length > 0}
-            <div class="mt-2 flex items-center gap-1 flex-wrap">
-              <span class="text-xs text-muted-foreground">Navigation:</span>
-              {#each navigationHistory as navTarget, index}
-                <button
-                  on:click={() => navigateToBreadcrumb(index)}
-                  class="text-xs px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1"
-                  class:bg-primary={index === navigationHistory.length - 1}
-                  class:text-primary-foreground={index === navigationHistory.length - 1}
-                >
-                  {navTarget.name || navTarget.full}
-                </button>
-                {#if index < navigationHistory.length - 1}
-                  <ChevronRight class="w-3 h-3 text-muted-foreground" />
-                {/if}
-              {/each}
-              {#if navigationHistory.length > 1}
-                <button
-                  on:click={clearNavigationHistory}
-                  class="text-xs text-muted-foreground hover:text-foreground ml-2"
-                  title="Clear navigation history"
-                >
-                  Clear
-                </button>
-              {/if}
-            </div>
-          {/if}
         </div>
         <div class="p-4">
           {#if selectedTarget}
@@ -803,17 +775,17 @@
               <div>
                 <h4 class="text-sm font-medium text-muted-foreground mb-1">Name</h4>
                 <div class="flex items-center gap-2">
-                  <p class="font-mono text-sm">{selectedTarget.name || selectedTarget.full}</p>
-                  <CopyButton text={selectedTarget.name || selectedTarget.full || ''} size="sm" />
+                  <p class="font-mono text-sm">{selectedTarget.name}</p>
+                  <CopyButton text={toFull(selectedTarget)} size="sm" />
                 </div>
               </div>
 
-              {#if selectedTarget.ruleType}
+              {#if selectedTarget.kind}
                 <div>
                   <h4 class="text-sm font-medium text-muted-foreground mb-1">Type</h4>
-                  <p class="font-mono text-sm">{selectedTarget.ruleType}</p>
+                  <p class="font-mono text-sm">{selectedTarget.kind}</p>
                   <p class="text-xs text-muted-foreground mt-1">
-                    Expected: {getExpectedOutputs(selectedTarget.ruleType)}
+                    Expected: {getExpectedOutputs(selectedTarget.kind)}
                   </p>
                 </div>
               {/if}
@@ -833,10 +805,7 @@
                       {#each targetOutputs as output}
                         <div class="flex items-center gap-2 text-sm">
                           <span class="font-mono text-xs px-1 py-0.5 bg-primary/10 text-primary rounded">
-                            .{output.type}
-                          </span>
-                          <span class="font-mono text-sm truncate" title={output.path}>
-                            {output.filename}
+                            {output}
                           </span>
                         </div>
                       {/each}
@@ -879,20 +848,12 @@
                 </div>
               {/if}
 
-              {#if selectedTarget.attributes && Object.keys(selectedTarget.attributes).length > 0}
-                <div>
-                  <h4 class="text-sm font-medium text-muted-foreground mb-1">Attributes</h4>
-                  <div class="space-y-1">
-                    {#each Object.entries(selectedTarget.attributes) as [key, value]}
-                      <div class="text-sm">
-                        <span class="font-mono text-muted-foreground">{key}:</span>
-                        <span class="font-mono ml-2">
-                          {typeof value === 'object' ? JSON.stringify(value) : value}
-                        </span>
-                      </div>
-                    {/each}
-                  </div>
-                </div>
+              {#if selectedTarget.attributes && selectedTarget.attributes.length > 0}
+                <AttributesDisplay
+                  attributes={selectedTarget.attributes}
+                  collapsible={true}
+                  initiallyExpanded={true}
+                />
               {/if}
 
               {#if targetDependencies.length > 0}
@@ -907,7 +868,7 @@
                         class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
                       >
                         <ChevronRight class="w-3 h-3" />
-                        {dep.full || dep.name}
+                        {dep.label}
                       </button>
                     {/each}
                   </div>
@@ -929,7 +890,7 @@
                           class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
                         >
                           <ChevronRight class="w-3 h-3" />
-                          {rdep.full || rdep.name}
+                          {rdep.label}
                         </button>
                       {/each}
                     </div>
