@@ -17,6 +17,16 @@ const config: ForgeConfig = {
     executableName: 'gazel',
     icon: './assets/icon',
     asar: true,
+    // macOS code signing configuration
+    // Enable code signing for macOS builds
+    osxSign: {},
+    // macOS notarization configuration using App Store Connect API key
+    // Requires environment variables to be set (see .env.example)
+    osxNotarize: process.env.APPLE_API_KEY && process.env.APPLE_API_KEY_ID && process.env.APPLE_API_ISSUER ? {
+      appleApiKey: process.env.APPLE_API_KEY,
+      appleApiKeyId: process.env.APPLE_API_KEY_ID,
+      appleApiIssuer: process.env.APPLE_API_ISSUER,
+    } : undefined,
   },
   rebuildConfig: {},
   makers: [

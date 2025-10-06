@@ -2,15 +2,32 @@
 
 This directory contains the application icons for the Gazel Electron app.
 
-## Required Icon Files
+## Icon Files
 
-- **icon.png** - Linux icon (512x512 pixels recommended)
-- **icon.icns** - macOS icon (created from 1024x1024 source)
-- **icon.ico** - Windows icon (created from multiple sizes: 16x16, 32x32, 48x48, 256x256)
+✅ All icon files have been generated and are ready to use:
 
-## Creating Icons
+- **icon.png** (1.9 MB) - Linux icon and source image (1024x1024 pixels)
+- **icon.icns** (2.7 MB) - macOS icon bundle with all required sizes
+- **icon.ico** (162 KB) - Windows icon with multiple sizes
 
-You can use the following tools to create icons from a source PNG image:
+## Regenerating Icons
+
+If you need to update the icons (e.g., after changing the source image), use the automated script:
+
+```bash
+# From the project root
+./scripts/generate-icons.sh
+```
+
+This script will:
+1. Copy the source icon from `electron/images/icon.png`
+2. Generate all required sizes for macOS (16x16 to 1024x1024, including @2x variants)
+3. Create the `.icns` bundle using macOS's built-in `iconutil`
+4. Create the `.ico` file for Windows (if ImageMagick is installed)
+
+## Manual Icon Creation
+
+If you prefer to create icons manually, here are the commands:
 
 ### macOS (.icns)
 ```bash
@@ -27,12 +44,13 @@ sips -z 512 512   icon.png --out icon.iconset/icon_256x256@2x.png
 sips -z 512 512   icon.png --out icon.iconset/icon_512x512.png
 sips -z 1024 1024 icon.png --out icon.iconset/icon_512x512@2x.png
 iconutil -c icns icon.iconset
+rm -rf icon.iconset
 ```
 
 ### Windows (.ico)
 ```bash
-# Using ImageMagick
-convert icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
+# Using ImageMagick (install with: brew install imagemagick)
+magick icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
 ```
 
 ### Linux (.png)

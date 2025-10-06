@@ -217,6 +217,8 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false, // Required for some Electron APIs
+      // Allow loading local resources (required for packaged apps)
+      webSecurity: false, // Disable web security to allow file:// protocol access
     },
     icon: iconPath,
     title: 'Gazel - Bazel Explorer',
@@ -244,6 +246,20 @@ async function createWindow() {
       validatedURL,
       isMainFrame,
     });
+  });
+
+  // Log all console messages from renderer
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    const levelMap = ['log', 'warn', 'error'];
+    logToFile(`Renderer console [${levelMap[level] || level}]`, {
+      message,
+      source: `${sourceId}:${line}`,
+    });
+  });
+
+  // Log renderer process crashes
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    logToFile('Renderer process gone', details);
   });
 
   // Determine if we're in development or production
@@ -305,6 +321,8 @@ async function createWindow() {
     mainWindow.loadFile(rendererPath).catch(error => {
       logToFile('Failed to load renderer file', error);
     });
+    // Open DevTools in production to see any errors
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
   // Handle window closed

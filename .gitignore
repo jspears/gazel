@@ -45,3 +45,6 @@ bazel-out
 bazel-bin
 bazel-*
 
+# Electron
+out
+electron/.vite/

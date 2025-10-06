@@ -17,6 +17,7 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
+    "generate-icons": "./scripts/generate-icons.sh",
     "build:server": "tsc -p tsconfig.server.json",
     "build:client": "vite build",
     "build:finalize": "cp package.prod.json dist/package.json && cp .env.example dist/.env.example && cp README.prod.md dist/README.md && echo 'Production build ready in dist/'",
