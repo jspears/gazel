@@ -10,8 +10,8 @@ cp .env.codesigning.example .env
 
 # Edit .env with your actual values (already pre-filled in the example)
 # The file should contain:
-APPLE_API_KEY=/Users/justinspears/Downloads/AuthKey_X8AQXQ8VJR.p8
-APPLE_API_KEY_ID=X8AQXQ8VJR
+APPLE_API_KEY=/Users/<username>/Downloads/AuthKey_XXXXXXXXX.p8
+APPLE_API_KEY_ID=XXXXXXXXX
 APPLE_API_ISSUER=69a6de7f-91fb-47e3-e053-5b8c7c11a4d1
 ```
 
@@ -87,7 +87,7 @@ Expected: `accepted` with `source=Notarized Developer ID`
 
 ✅ **Security**: The `.env` file is already in `.gitignore` and will not be committed
 
-✅ **API Key Location**: The API key file should remain at `/Users/justinspears/Downloads/AuthKey_X8AQXQ8VJR.p8`
+✅ **API Key Location**: The API key file should remain at `/Users/<username>/Downloads/AuthKey_XXXXXXXXX.p8`
 
 ✅ **Optional**: Code signing only runs when environment variables are set. Development builds work without them.
 
@@ -101,7 +101,7 @@ Expected: `accepted` with `source=Notarized Developer ID`
 
 **Problem**: "API key file not found"
 - **Solution**: Verify the path in `APPLE_API_KEY` is correct
-- **Check**: `ls -la /Users/justinspears/Downloads/AuthKey_X8AQXQ8VJR.p8`
+- **Check**: `ls -la /Users/<username>/Downloads/AuthKey_XXXXXXXXX.p8`
 
 **Problem**: Environment variables not loaded
 - **Solution**: Run `source .env` before building

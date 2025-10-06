@@ -125,17 +125,17 @@
     <source-file location="/gazel/example-bazel-workspace/lib/string_utils.h:1:1" name="//lib:string_utils.h">
         <visibility-label name="//visibility:private"/>
     </source-file>
-    <rule class="cc_library" location="/private/var/tmp/_bazel_justinspears/bbe283f69cdad0806da2a6d43d79a282/external/rules_cc+/BUILD:20:11" name="@rules_cc//:link_extra_lib">
+    <rule class="cc_library" location="/private/var/tmp/_bazel_username/bbe283f69cdad0806da2a6d43d79a282/external/rules_cc+/BUILD:20:11" name="@rules_cc//:link_extra_lib">
         <string name="name" value="link_extra_lib"/>
         <string name="generator_name" value="link_extra_lib"/>
         <string name="generator_function" value="cc_library"/>
-        <string name="generator_location" value="/private/var/tmp/_bazel_justinspears/bbe283f69cdad0806da2a6d43d79a282/external/rules_cc+/BUILD:20:11"/>
+        <string name="generator_location" value="/private/var/tmp/_bazel_username/bbe283f69cdad0806da2a6d43d79a282/external/rules_cc+/BUILD:20:11"/>
         <list name="deps">
             <label value="@rules_cc//:link_extra_libs"/>
         </list>
         <rule-input name="@rules_cc//:link_extra_libs"/>
     </rule>
-    <rule class="label_flag" location="/private/var/tmp/_bazel_justinspears/bbe283f69cdad0806da2a6d43d79a282/external/rules_cc+/BUILD:13:11" name="@rules_cc//:link_extra_libs">
+    <rule class="label_flag" location="/private/var/tmp/_bazel_username/bbe283f69cdad0806da2a6d43d79a282/external/rules_cc+/BUILD:13:11" name="@rules_cc//:link_extra_libs">
         <string name="name" value="link_extra_libs"/>
         <label name="build_setting_default" value="@rules_cc//:empty_lib"/>
     </rule>

@@ -142,7 +142,7 @@ pnpm make
 
 ### Code Signing Fails
 - Verify environment variables are set: `echo $APPLE_API_KEY`
-- Check API key file exists: `ls -la /Users/justinspears/Downloads/AuthKey_X8AQXQ8VJR.p8`
+- Check API key file exists: `ls -la /Users/<username>/Downloads/AuthKey_XXXXXXXXX.p8`
 - Ensure Developer ID certificate is installed: `security find-identity -p codesigning -v`
 
 ### App Won't Open on Other Macs

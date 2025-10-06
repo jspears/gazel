@@ -45,18 +45,18 @@ The `.env` file should contain:
 
 ```bash
 # Path to your App Store Connect API key file
-APPLE_API_KEY=/Users/justinspears/Downloads/AuthKey_X8AQXQ8VJR.p8
+APPLE_API_KEY=/Users/<username>/Downloads/AuthKey_XXXXX.p8
 
 # API Key ID (10-character alphanumeric string from the filename)
-APPLE_API_KEY_ID=X8AQXQ8VJR
+APPLE_API_KEY_ID=XXXXX
 
 # API Issuer ID (UUID from App Store Connect)
-APPLE_API_ISSUER=69a6de7f-91fb-47e3-e053-5b8c7c11a4d1
+APPLE_API_ISSUER=6XXXXX
 ```
 
 **Important Security Notes:**
 - The `.env` file is already in `.gitignore` and will not be committed
-- The API key file (`AuthKey_X8AQXQ8VJR.p8`) should remain in its current location
+- The API key file (`AuthKey_XXXXX.p8`) should remain in its current location
 - Never commit the API key file or credentials to version control
 
 ### 3. Verify Configuration
@@ -200,7 +200,7 @@ If notarization fails:
 If you get "API key file not found":
 
 1. Verify the file exists at the path specified in `APPLE_API_KEY`
-2. Check file permissions: `ls -la /Users/justinspears/Downloads/AuthKey_X8AQXQ8VJR.p8`
+2. Check file permissions: `ls -la /Users/<username>/Downloads/AuthKey_XXXXXXXXX.p8`
 3. Ensure the path is absolute, not relative
 
 ## CI/CD Considerations
