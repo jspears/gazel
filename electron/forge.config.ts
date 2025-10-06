@@ -6,6 +6,7 @@ import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import fs from 'fs-extra';
 
 const __filename = fileURLToPath(import.meta.url);
 const electronDir = path.dirname(__filename);
@@ -16,7 +17,10 @@ const config: ForgeConfig = {
     name: 'Gazel',
     executableName: 'gazel',
     icon: './assets/icon',
-    asar: true,
+    // Temporarily disable asar to debug renderer loading issue
+    // The Electron Forge Vite plugin has known issues with asar packaging
+    // See: https://github.com/electron/forge/issues/3423
+    asar: false,
     // macOS code signing configuration
     // Enable code signing for macOS builds
     osxSign: {},
@@ -29,6 +33,22 @@ const config: ForgeConfig = {
     } : undefined,
   },
   rebuildConfig: {},
+  hooks: {
+    packageAfterCopy: async (_config, buildPath) => {
+      // Workaround for Electron Forge Vite plugin not copying renderer files
+      // See: https://github.com/electron/forge/issues/3423
+      const rendererSource = path.resolve(electronDir, '.vite/renderer');
+      const rendererDest = path.join(buildPath, '.vite/renderer');
+
+      if (fs.existsSync(rendererSource)) {
+        console.log(`Copying renderer files from ${rendererSource} to ${rendererDest}`);
+        await fs.copy(rendererSource, rendererDest);
+        console.log('✓ Renderer files copied successfully');
+      } else {
+        console.warn(`⚠ Renderer source directory not found: ${rendererSource}`);
+      }
+    },
+  },
   makers: [
     new MakerSquirrel({
       name: 'Gazel',
@@ -67,6 +87,8 @@ const config: ForgeConfig = {
         {
           name: 'main_window',
           config: path.resolve(electronDir, 'vite.renderer.config.ts'),
+          // Explicitly specify the HTML entry point
+          // This ensures the renderer files are properly packaged
         },
       ],
     }),

@@ -262,67 +262,53 @@ async function createWindow() {
     logToFile('Renderer process gone', details);
   });
 
-  // Determine if we're in development or production
-  // Electron Forge sets MAIN_WINDOW_VITE_DEV_SERVER_URL in development
-  // If not set, try to detect dev server by checking common ports
-  let devServerUrl = process.env.MAIN_WINDOW_VITE_DEV_SERVER_URL;
+  // Use Electron Forge's Vite plugin global variables
+  // These are automatically defined by the Vite plugin
+  // @ts-ignore - These globals are defined by Electron Forge Vite plugin
+  const MAIN_WINDOW_VITE_DEV_SERVER_URL = typeof globalThis.MAIN_WINDOW_VITE_DEV_SERVER_URL !== 'undefined'
+    ? globalThis.MAIN_WINDOW_VITE_DEV_SERVER_URL
+    : undefined;
+  // @ts-ignore
+  const MAIN_WINDOW_VITE_NAME = typeof globalThis.MAIN_WINDOW_VITE_NAME !== 'undefined'
+    ? globalThis.MAIN_WINDOW_VITE_NAME
+    : 'main_window';
 
-  // If environment variable is not set, try to detect dev server
-  if (!devServerUrl) {
-    const portsToTry = [5173, 5174, 5175, 5176];
-    for (const port of portsToTry) {
-      const testUrl = `http://localhost:${port}`;
-      try {
-        const http = await import('http');
-        const isAvailable = await new Promise<boolean>((resolve) => {
-          const req = http.request(testUrl, { method: 'HEAD', timeout: 500 }, (res) => {
-            resolve(res.statusCode === 200);
-          });
-          req.on('error', () => resolve(false));
-          req.on('timeout', () => {
-            req.destroy();
-            resolve(false);
-          });
-          req.end();
-        });
-        if (isAvailable) {
-          devServerUrl = testUrl;
-          break;
-        }
-      } catch (error) {
-        // Continue to next port
-      }
-    }
-  }
-
-  const isDev = !!devServerUrl;
-
-  logToFile('Environment resolved', {
-    NODE_ENV: process.env.NODE_ENV,
-    devServerUrl,
-    isDev,
+  logToFile('Vite plugin globals', {
+    MAIN_WINDOW_VITE_DEV_SERVER_URL,
+    MAIN_WINDOW_VITE_NAME,
   });
 
-  if (isDev && devServerUrl) {
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     // In development, load from Vite dev server
-    logToFile('Loading renderer from dev server', { url: devServerUrl });
-    mainWindow.loadURL(devServerUrl).catch(error => {
+    logToFile('Loading renderer from dev server', { url: MAIN_WINDOW_VITE_DEV_SERVER_URL });
+    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL).catch(error => {
       logToFile('Failed to load dev server URL', error);
     });
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    // In production, load from built files
-    const rendererPath = path.join(__dirname, '../renderer/main_window/index.html');
+    // In production, load from built files using Electron Forge's expected path
+    const rendererPath = path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`);
     const rendererExists = fs.existsSync(rendererPath);
-    logToFile('Loading renderer from file', { rendererPath, rendererExists });
+    logToFile('Loading renderer from file', {
+      rendererPath,
+      rendererExists,
+      __dirname,
+      MAIN_WINDOW_VITE_NAME,
+    });
     if (!rendererExists) {
       logToFile('Renderer entry file missing', { rendererPath });
+      // List what files are actually there
+      const rendererDir = path.join(__dirname, '../renderer');
+      if (fs.existsSync(rendererDir)) {
+        const files = fs.readdirSync(rendererDir);
+        logToFile('Files in renderer directory', { files });
+      } else {
+        logToFile('Renderer directory does not exist', { rendererDir });
+      }
     }
     mainWindow.loadFile(rendererPath).catch(error => {
       logToFile('Failed to load renderer file', error);
     });
-    // Open DevTools in production to see any errors
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
   // Handle window closed

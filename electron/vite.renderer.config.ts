@@ -14,10 +14,6 @@ console.log('[vite.renderer.config] electronDir:', electronDir);
 console.log('[vite.renderer.config] index.html path:', path.resolve(electronDir, 'index.html'));
 console.log('[vite.renderer.config] index.html exists:', existsSync(path.resolve(electronDir, 'index.html')));
 
-const protoGeneratedDir = path.resolve(workspaceRoot, 'bazel-bin/proto');
-const protoSourceDir = path.resolve(workspaceRoot, 'proto');
-const protoAlias = existsSync(protoGeneratedDir) ? protoGeneratedDir : protoSourceDir;
-
 // https://vitejs.dev/config
 export default defineConfig({
   base: './',
@@ -37,20 +33,15 @@ export default defineConfig({
   define:{
       'process.env.VITE_ELECTRON': '1'
   },
-  resolve: {
-    alias:[{ find: 'client.web.*', replacement: '../client/client.ipc.js' }]
-  },
+  
   css: {
     postcss: path.resolve(clientRoot, 'postcss.config.js'),
   },
 
   plugins: [
     viteTSConfigPaths(),
-//    patchSvelteLoad(),
     svelte({
-      // preprocess: sveltePreprocess({
-      //   typescript: true,
-      // }),
+   
     }),
   ],
 });

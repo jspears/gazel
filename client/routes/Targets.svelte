@@ -449,20 +449,6 @@
   function isExecutableTarget(target: BazelTarget): boolean {
     if (!target.kind) return false;
 
-    const executableTypes = [
-      'cc_binary',
-      'cc_test',
-      'py_binary',
-      'py_test',
-      'java_binary',
-      'java_test',
-      'go_binary',
-      'go_test',
-      'rust_binary',
-      'sh_binary',
-      'sh_test'
-    ];
-
     return /(_test|_binary)$/.test(target.kind);
   }
 
