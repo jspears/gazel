@@ -487,6 +487,17 @@ message CommandHistoryItem {
   int32 duration_ms = 9;
 }
 
+// Configuration messages
+message UpdateBazelExecutableRequest {
+  string executable = 1; // Path to bazel/bazelisk executable (empty for auto-detect)
+}
+
+message UpdateBazelExecutableResponse {
+  bool success = 1;
+  string message = 2;
+  string detected_path = 3; // The actual path being used after resolution
+}
+
 // ============================================================================
 // Services
 // ============================================================================
@@ -533,4 +544,7 @@ service GazelService {
 
   // Command history operations
   rpc GetCommandHistory(GetCommandHistoryRequest) returns (GetCommandHistoryResponse);
+
+  // Configuration operations
+  rpc UpdateBazelExecutable(UpdateBazelExecutableRequest) returns (UpdateBazelExecutableResponse);
 }

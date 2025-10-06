@@ -107,10 +107,13 @@ import {
   type GetCommandHistoryResponse,
   GetCommandHistoryResponseSchema,
   CommandHistoryItemSchema,
+  type UpdateBazelExecutableRequest,
+  type UpdateBazelExecutableResponse,
+  UpdateBazelExecutableResponseSchema,
 } from "proto/gazel_pb.js";
 import bazelService from "./services/bazel.js";
 import parserService from "./services/parser.js";
-import config, { setWorkspace } from "./config.js";
+import config, { setWorkspace, setBazelExecutable } from "./config.js";
 import * as fs from "fs/promises";
 import * as fsSync from "node:fs";
 import * as path from "path";
@@ -1913,5 +1916,49 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
     return create(GetCommandHistoryResponseSchema, {
       history: [],
     });
+  }
+
+  /**
+   * Update Bazel executable path
+   */
+  async updateBazelExecutable(
+    request: UpdateBazelExecutableRequest
+  ): Promise<UpdateBazelExecutableResponse> {
+    try {
+      const executable = request.executable || '';
+
+      // Update the config
+      const detectedPath = setBazelExecutable(executable);
+
+      // Update the bazelService to use the new executable
+      bazelService.setBazelExecutable(detectedPath);
+
+      // Verify the executable works by running 'bazel version'
+      try {
+        const result = await bazelService.execute(['version']);
+        console.log(`[updateBazelExecutable] Successfully verified Bazel executable: ${detectedPath}`);
+        console.log(`[updateBazelExecutable] Bazel version output: ${result.stdout.substring(0, 100)}`);
+
+        return create(UpdateBazelExecutableResponseSchema, {
+          success: true,
+          message: 'Bazel executable updated and verified successfully',
+          detectedPath: detectedPath,
+        });
+      } catch (verifyError: any) {
+        console.error(`[updateBazelExecutable] Failed to verify Bazel executable: ${verifyError.message}`);
+        return create(UpdateBazelExecutableResponseSchema, {
+          success: false,
+          message: `Bazel executable set to "${detectedPath}" but verification failed: ${verifyError.message}`,
+          detectedPath: detectedPath,
+        });
+      }
+    } catch (error: any) {
+      console.error(`[updateBazelExecutable] Error: ${error.message}`);
+      return create(UpdateBazelExecutableResponseSchema, {
+        success: false,
+        message: `Failed to update Bazel executable: ${error.message}`,
+        detectedPath: '',
+      });
+    }
   }
 }

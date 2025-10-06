@@ -4,12 +4,26 @@ import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
+import { notarize } from '@electron/notarize';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'fs-extra';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file for code signing
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const electronDir = path.dirname(__filename);
+
+// Debug: Log notarization configuration
+const hasNotarizationEnv = !!(process.env.APPLE_API_KEY && process.env.APPLE_API_KEY_ID && process.env.APPLE_API_ISSUER);
+console.log('[forge.config] Notarization will be:', hasNotarizationEnv ? 'ENABLED' : 'DISABLED');
+if (hasNotarizationEnv) {
+  console.log('[forge.config] API Key ID:', process.env.APPLE_API_KEY_ID);
+  console.log('[forge.config] API Issuer:', process.env.APPLE_API_ISSUER);
+  console.log('[forge.config] API Key file:', process.env.APPLE_API_KEY);
+}
 
 
 const config: ForgeConfig = {
@@ -17,19 +31,20 @@ const config: ForgeConfig = {
     name: 'Gazel',
     executableName: 'gazel',
     icon: './assets/icon',
-    // Temporarily disable asar to debug renderer loading issue
-    // The Electron Forge Vite plugin has known issues with asar packaging
-    // See: https://github.com/electron/forge/issues/3423
-    asar: false,
+    // Enable asar for production builds
+    // The renderer packaging issue has been fixed with the packageAfterCopy hook
+    asar: true,
     // macOS code signing configuration
     // Enable code signing for macOS builds
     osxSign: {},
     // macOS notarization configuration using App Store Connect API key
     // Requires environment variables to be set (see .env.example)
-    osxNotarize: process.env.APPLE_API_KEY && process.env.APPLE_API_KEY_ID && process.env.APPLE_API_ISSUER ? {
-      appleApiKey: process.env.APPLE_API_KEY,
-      appleApiKeyId: process.env.APPLE_API_KEY_ID,
-      appleApiIssuer: process.env.APPLE_API_ISSUER,
+    // Note: Notarization requires the app to be signed first
+    osxNotarize: hasNotarizationEnv ? {
+      tool: 'notarytool',
+      appleApiKey: process.env.APPLE_API_KEY!,
+      appleApiKeyId: process.env.APPLE_API_KEY_ID!,
+      appleApiIssuer: process.env.APPLE_API_ISSUER!,
     } : undefined,
   },
   rebuildConfig: {},
@@ -46,6 +61,44 @@ const config: ForgeConfig = {
         console.log('✓ Renderer files copied successfully');
       } else {
         console.warn(`⚠ Renderer source directory not found: ${rendererSource}`);
+      }
+    },
+    postPackage: async (_config, options) => {
+      console.log('[forge.config] postPackage hook - checking if notarization is needed');
+
+      // Only notarize on macOS
+      if (options.platform !== 'darwin') {
+        console.log('[forge.config] Skipping notarization - not macOS');
+        return;
+      }
+
+      // Only notarize if credentials are available
+      if (!hasNotarizationEnv) {
+        console.log('[forge.config] Skipping notarization - credentials not found');
+        return;
+      }
+
+      // outputPaths[0] is the directory containing the .app bundle
+      // We need to find the .app bundle inside it
+      const outputDir = options.outputPaths[0];
+      const appName = `${_config.packagerConfig.name}.app`;
+      const appPath = path.join(outputDir, appName);
+
+      console.log(`[forge.config] Notarizing ${appPath}...`);
+      console.log('[forge.config] This may take 2-10 minutes...');
+
+      try {
+        await notarize({
+          tool: 'notarytool',
+          appPath,
+          appleApiKey: process.env.APPLE_API_KEY!,
+          appleApiKeyId: process.env.APPLE_API_KEY_ID!,
+          appleApiIssuer: process.env.APPLE_API_ISSUER!,
+        });
+        console.log('[forge.config] ✓ Notarization successful!');
+      } catch (error) {
+        console.error('[forge.config] ✗ Notarization failed:', error);
+        throw error;
       }
     },
   },

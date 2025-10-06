@@ -37,13 +37,15 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
   } from 'lucide-svelte';
   import './default.min.css';
   import WorkspacePicker from './components/WorkspacePicker.svelte';
+  import SettingsModal from './components/Settings.svelte';
   import { api } from './client.js';
   import { storage } from './lib/storage.js';
-  import { navigation, initNavigation, navigateToTab, updateParam, type AppState, copyUrlToClipboard } from './lib/navigation.js';
+  import { navigation as nav, initNavigation, navigateToTab, updateParam, type AppState, copyUrlToClipboard } from './lib/navigation.js';
 
-  let activeTab: keyof typeof Routes = $derived($navigation.tab || 'workspace');
+  let activeTab: keyof typeof Routes = $derived(nav.tab || 'workspace');
   let TabComponent = $derived(Routes[activeTab] || Routes.workspace);
   let showWorkspacePicker = $state(false);
+  let showSettings = $state(false);
   let currentWorkspace: string | null = $state('');
   let currentWorkspaceName: string | null = $state('');
   let checkingWorkspace = $state(false);
@@ -100,12 +102,48 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
 
 
   onMount(async () => {
+    // Send Bazel executable configuration to server on startup
+    await initializeBazelExecutable();
+
     await checkWorkspace();
 
     // Initialize navigation and restore state from URL
      initNavigation(handleStateChange);
-    
+
   });
+
+  async function initializeBazelExecutable() {
+    try {
+      const storedExecutable = storage.getPreference('bazelExecutable');
+      console.log('[App] Initializing Bazel executable:', storedExecutable || '(auto-detect)');
+
+      const result = await api.updateBazelExecutable({
+        executable: storedExecutable || ''
+      });
+
+      if (result.success) {
+        console.log('[App] Bazel executable initialized:', result.detectedPath);
+
+        // If we didn't have a stored value, save the detected one
+        if (!storedExecutable && result.detectedPath) {
+          storage.setPreference('bazelExecutable', result.detectedPath);
+        }
+      } else {
+        console.warn('[App] Bazel executable verification failed:', result.message);
+
+        // Show settings modal if Bazel is not found
+        if (result.message.includes('command not found') || result.message.includes('not found')) {
+          console.error('[App] Bazel executable not found. Please configure it in Settings.');
+          // Delay showing settings to let the UI render first
+          setTimeout(() => {
+            showSettings = true;
+          }, 1000);
+        }
+      }
+    } catch (error) {
+      console.error('[App] Failed to initialize Bazel executable:', error);
+    }
+  }
 
   // Handle state changes from browser navigation (back/forward)
   function handleStateChange(state: Record<string,string>) {
@@ -246,7 +284,7 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
 
   // Props to pass to route components
   let routeProps = $derived({
-    ...$navigation,
+    ...$nav,
     onNavigateToFile: handleNavigateToFile,
     onNavigateToTargets: handleNavigateToTargets,
     onOpenWorkspacePicker: handleOpenWorkspacePicker,
@@ -292,7 +330,11 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
             {/if}
           </div>
           <div class="flex items-center gap-4">
-            <button class="p-2 hover:bg-muted rounded-md">
+            <button
+              class="p-2 hover:bg-muted rounded-md transition-colors"
+              onclick={() => showSettings = true}
+              aria-label="Open settings"
+            >
               <Settings class="w-5 h-5" />
             </button>
           </div>
@@ -378,4 +420,7 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
   </div>
 {/if}
 
-
+<!-- Settings Modal -->
+{#if showSettings}
+  <SettingsModal onClose={() => showSettings = false} />
+{/if}

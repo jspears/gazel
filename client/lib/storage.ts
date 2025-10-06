@@ -22,6 +22,7 @@ interface StorageConfig {
     theme?: 'light' | 'dark' | 'system';
     defaultTab?: string;
     lastWorkspace?: string;
+    bazelExecutable?: string;
   };
   // Workspace history
   workspaceHistory: WorkspaceHistoryEntry[];

@@ -369,6 +369,15 @@ class BazelService {
     this.workspace = newWorkspace;
     this.clearCache();
   }
+
+  /**
+   * Update the Bazel executable path dynamically
+   */
+  setBazelExecutable(newExecutable: string): void {
+    this.executable = newExecutable;
+    this.clearCache();
+    console.log(`[BazelService] Bazel executable updated to: ${newExecutable}`);
+  }
 }
 
 export default new BazelService();

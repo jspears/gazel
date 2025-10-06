@@ -51,6 +51,7 @@ js_binary(
     data = [
         ":server_lib",
         "//proto:index",
+        "//proto:gazel_ts_proto",
         "//:node_modules",
         ":node_modules",
     ],
