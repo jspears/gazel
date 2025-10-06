@@ -32,16 +32,16 @@ FILES = [
 # Export proto files for reference
 protos = glob(["protos/**/*.proto"])
 # Define the proto library
-proto_library(
-    name = "bzl_proto",
-    srcs = ["@protobuf//src/google/protobuf:descriptor_proto"],
-    visibility = ["//visibility:public"],
-    deps = [
-       "@com_google_protobuf//:any_proto",
-       "@com_google_protobuf//:timestamp_proto",
+# proto_library(
+#     name = "bzl_proto",
+#     srcs = ["@protobuf//src/google/protobuf:descriptor_proto"],
+#     visibility = ["//visibility:public"],
+#     deps = [
+#        "@com_google_protobuf//:any_proto",
+#        "@com_google_protobuf//:timestamp_proto",
         
-    ],
-)
+#     ],
+# )
 
 [proto_library(
     name = s + "_proto",

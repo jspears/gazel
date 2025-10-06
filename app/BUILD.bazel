@@ -13,7 +13,7 @@ js_binary(
         "//client:dev",
     ],
     
-    entry_point = "//server:index.js",
+    entry_point = "//server:server_ts",
 )
 
 # Create a Node.js script for running both dev servers
@@ -140,7 +140,7 @@ js_binary(
         ":prod_build",
         "//:node_modules",
     ],
-    entry_point = "//server:index.js",
+    entry_point = "//server:server_ts",
     env = {
         "NODE_ENV": "production",
         "PORT": "3002",

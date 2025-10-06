@@ -1,3 +1,25 @@
+<script lang="ts" module>
+  import Workspace from './routes/Workspace.svelte';
+  import Targets from './routes/Targets.svelte';
+  import Files from './routes/Files.svelte';
+  import Query from './routes/Query.svelte';
+  import Commands from './routes/Commands.svelte';
+  import DependencyGraph from './routes/DependencyGraph.svelte';
+  import Modules from './routes/Modules.svelte';
+
+const Routes = {
+  workspace: Workspace,
+  targets: Targets,
+  files: Files,
+  modules: Modules,
+  query: Query,
+  commands: Commands,
+  graph: DependencyGraph,
+} as const;
+const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
+
+</script>
+
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
@@ -14,28 +36,19 @@
     FolderOpen
   } from 'lucide-svelte';
   import './default.min.css';
-  import Workspace from './routes/Workspace.svelte';
-  import Targets from './routes/Targets.svelte';
-  import Files from './routes/Files.svelte';
-  import Query from './routes/Query.svelte';
-  import Commands from './routes/Commands.svelte';
-  import DependencyGraph from './routes/DependencyGraph.svelte';
-  import Modules from './routes/Modules.svelte';
   import WorkspacePicker from './components/WorkspacePicker.svelte';
   import { api } from './client.js';
   import { storage } from './lib/storage.js';
-  import { initNavigation, navigateToTab, updateParam, type AppState, copyUrlToClipboard } from './lib/navigation.js';
+  import { navigation, initNavigation, navigateToTab, updateParam, type AppState, copyUrlToClipboard } from './lib/navigation.js';
 
-  let activeTab = 'workspace';
-  let fileToOpen: string | null = null;
-  let targetToOpen: string | null = null;
-  let graphTarget: string | null = null;
-  let commandTarget: string | null = null;
-  let showWorkspacePicker = false;
-  let currentWorkspace: string | null = null;
-  let currentWorkspaceName: string | null = null;
-  let checkingWorkspace = true;
-  let showCopied = false;
+  let activeTab: keyof typeof Routes = $derived($navigation.tab || 'workspace');
+  let TabComponent = $derived(Routes[activeTab] || Routes.workspace);
+  let showWorkspacePicker = $state(false);
+  let currentWorkspace: string | null = $state('');
+  let currentWorkspaceName: string | null = $state('');
+  let checkingWorkspace = $state(false);
+  let showCopied = $state(false);
+
 
   async function shareUrl() {
     const success = await copyUrlToClipboard();
@@ -54,7 +67,7 @@
 
     if (isLocalDev) {
       // When running from Bazel, prioritize the known workspace path
-      const knownBazelWorkspace = '/Users/justinspears/Documents/augment-projects/gazel';
+      const knownBazelWorkspace = '';
 
       // Try the known Bazel workspace first
       try {
@@ -71,7 +84,7 @@
       const storedWorkspace = storage.getPreference('lastWorkspace');
       if (storedWorkspace && storedWorkspace !== knownBazelWorkspace) {
         try {
-          const result = await api.switchWorkspace(storedWorkspace);
+          const result = await api.switchWorkspace({workspace:storedWorkspace});
           if (result.success) {
             console.log('Auto-set stored workspace:', storedWorkspace);
             return storedWorkspace;
@@ -85,40 +98,20 @@
     return null;
   }
 
+
   onMount(async () => {
     await checkWorkspace();
 
     // Initialize navigation and restore state from URL
-    const initialState = initNavigation(handleStateChange);
-    if (initialState.tab) {
-      activeTab = initialState.tab;
-    }
-    if (initialState.target) {
-      targetToOpen = initialState.target;
-    }
-    if (initialState.graphTarget) {
-      graphTarget = initialState.graphTarget;
-    }
-    if (initialState.file) {
-      fileToOpen = initialState.file;
-    }
+     initNavigation(handleStateChange);
+    
   });
 
   // Handle state changes from browser navigation (back/forward)
-  function handleStateChange(state: AppState) {
-    if (state.tab) {
-      activeTab = state.tab;
-    }
-    if (state.target) {
-      targetToOpen = state.target;
-    }
-    if (state.graphTarget) {
-      graphTarget = state.graphTarget;
-    }
-    if (state.file) {
-      fileToOpen = state.file;
-    }
+  function handleStateChange(state: Record<string,string>) {
+    activeTab =  RouteKeys.includes(state.tab) ? state.tab  as keyof typeof Routes: 'workspace';
   }
+    
 
   async function checkWorkspace() {
     console.log('[App] checkWorkspace called');
@@ -147,13 +140,13 @@
 
       // Check current server configuration
       console.log('[App] Checking current workspace...');
-      const result = await api.getCurrentWorkspace();
-      console.log('[App] Current workspace result:', result);
+      const workspace = storedWorkspace || (await api.getCurrentWorkspace({})).workspace;
+      console.log('[App] Current workspace result:', workspace);
 
       // If server has no workspace but we have one stored, try to switch to it
-      if (!result.configured && storedWorkspace) {
+      if (workspace) {
         try {
-          const switchResult = await api.switchWorkspace(storedWorkspace);
+          const switchResult = await api.switchWorkspace({workspace});
           if (switchResult.success) {
             currentWorkspace = storedWorkspace;
             showWorkspacePicker = false;
@@ -177,32 +170,32 @@
         }
       }
 
-      if (!result.configured || !result.workspace || !result.valid) {
+      if (!workspace) {
         // No workspace configured or invalid, show picker
         showWorkspacePicker = true;
       } else {
-        currentWorkspace = result.workspace;
+        currentWorkspace = workspace;
         showWorkspacePicker = false;
         // Store the current workspace if not already stored
-        if (result.workspace !== storedWorkspace) {
-          storage.setPreference('lastWorkspace', result.workspace);
+        if (workspace !== storedWorkspace) {
+          storage.setPreference('lastWorkspace', workspace);
         }
 
         // Get workspace name from history if available
         const workspaceHistory = storage.getWorkspaceHistory();
-        const historyEntry = workspaceHistory.find(w => w.path === result.workspace);
+        const historyEntry = workspaceHistory.find(w => w.path === workspace);
         let workspaceName = historyEntry?.name;
 
         // If not in history, extract from path
         if (!workspaceName) {
-          const parts = result.workspace.split('/').filter(p => p);
+          const parts = workspace.split('/').filter(p => p);
           workspaceName = parts[parts.length - 1];
         }
 
         currentWorkspaceName = workspaceName || 'Unknown';
 
         // Set the current workspace for workspace-specific data
-        storage.setCurrentWorkspace(result.workspace, workspaceName);
+        storage.setCurrentWorkspace(workspace, workspaceName);
       }
     } catch (err) {
       console.error('[App] Failed to check workspace:', err);
@@ -217,39 +210,9 @@
     }
   }
 
-  function handleNavigateToFile(event: CustomEvent<{path: string}>) {
-    fileToOpen = event.detail.path;
-    activeTab = 'files';
-    navigateToTab('files', { file: event.detail.path });
-  }
 
-  function handleNavigateToTargets(event: CustomEvent<{target: string}>) {
-    targetToOpen = event.detail.target;
-    activeTab = 'targets';
-    navigateToTab('targets', { target: event.detail.target });
-    // Reset after a short delay to allow the component to use it
-    setTimeout(() => {
-      targetToOpen = null;
-    }, 100);
-  }
 
-  function handleNavigateToGraph(event: CustomEvent<{target: string}>) {
-    graphTarget = event.detail.target;
-    activeTab = 'graph';
-    navigateToTab('graph', { graphTarget: event.detail.target });
-  }
-
-  function handleNavigateToCommands(event: CustomEvent<{target: string}>) {
-    commandTarget = event.detail.target;
-    activeTab = 'commands';
-    navigateToTab('commands', { commandTarget: event.detail.target });
-    // Reset after a short delay to allow the component to use it
-    setTimeout(() => {
-      commandTarget = null;
-    }, 100);
-  }
-
-  function switchTab(tab: string) {
+  function switchTab(tab: keyof typeof Routes) {
     activeTab = tab;
     navigateToTab(tab);
   }
@@ -271,6 +234,23 @@
     // Don't reload - the reactive components will update automatically
     // since currentWorkspace is a reactive variable
   }
+
+  // Navigation handlers for child components
+  function handleNavigateToFile(path: string) {
+    navigateToTab('files', { file: path });
+  }
+
+  function handleNavigateToTargets(target: string) {
+    navigateToTab('targets', { target });
+  }
+
+  // Props to pass to route components
+  let routeProps = $derived({
+    ...$navigation,
+    onNavigateToFile: handleNavigateToFile,
+    onNavigateToTargets: handleNavigateToTargets,
+    onOpenWorkspacePicker: handleOpenWorkspacePicker,
+  });
 </script>
 
 {#if checkingWorkspace}
@@ -304,7 +284,7 @@
               <button
                 class="flex items-center gap-2 px-3 py-1 bg-muted hover:bg-muted/80 rounded-md transition-colors"
                 title={`${currentWorkspace}\n\nClick to change workspace`}
-                on:click={handleOpenWorkspacePicker}
+                onclick={handleOpenWorkspacePicker}
               >
                 <span class="text-sm text-muted-foreground">Workspace:</span>
                 <span class="text-sm font-medium">{currentWorkspaceName}</span>
@@ -325,49 +305,49 @@
         <div class="flex items-center gap-2 mb-6">
           <div class="grid w-full grid-cols-7 bg-muted p-1 rounded-md flex-1">
           <button
-            on:click={() => switchTab('workspace')}
+            onclick={() => switchTab('workspace')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'workspace' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <Home class="w-4 h-4" />
             Workspace
           </button>
           <button
-            on:click={() => switchTab('targets')}
+            onclick={() => switchTab('targets')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'targets' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <Target class="w-4 h-4" />
             Targets
           </button>
           <button
-            on:click={() => switchTab('files')}
+            onclick={() => switchTab('files')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'files' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <FileText class="w-4 h-4" />
             Files
           </button>
           <button
-            on:click={() => switchTab('modules')}
+            onclick={() => switchTab('modules')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'modules' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <Package class="w-4 h-4" />
             Modules
           </button>
           <button
-            on:click={() => switchTab('query')}
+            onclick={() => switchTab('query')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'query' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <Search class="w-4 h-4" />
             Query
           </button>
           <button
-            on:click={() => switchTab('graph')}
+            onclick={() => switchTab('graph')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'graph' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <GitBranch class="w-4 h-4" />
             Graph
           </button>
           <button
-            on:click={() => switchTab('commands')}
+            onclick={() => switchTab('commands')}
             class="flex items-center justify-center gap-2 px-3 py-2 rounded-sm text-sm font-medium transition-colors {activeTab === 'commands' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}"
           >
             <Terminal class="w-4 h-4" />
@@ -376,7 +356,7 @@
           </div>
 
           <button
-            on:click={shareUrl}
+            onclick={shareUrl}
             class="px-3 py-2 rounded-md text-sm font-medium transition-colors bg-muted hover:bg-muted/80 flex items-center gap-2"
             title="Copy shareable URL"
           >
@@ -391,36 +371,7 @@
         </div>
 
         <div class="mt-2">
-          {#if activeTab === 'workspace'}
-            <Workspace
-              on:navigate-to-file={handleNavigateToFile}
-              on:navigate-to-targets={handleNavigateToTargets}
-              on:open-workspace-picker={handleOpenWorkspacePicker}
-            />
-          {:else if activeTab === 'targets'}
-            <Targets
-              initialTarget={targetToOpen}
-              on:navigate-to-file={handleNavigateToFile}
-              on:navigate-to-graph={handleNavigateToGraph}
-              on:navigate-to-commands={handleNavigateToCommands}
-            />
-          {:else if activeTab === 'files'}
-            <Files
-              bind:fileToOpen
-              on:navigate-to-graph={handleNavigateToGraph}
-              on:navigate-to-commands={handleNavigateToCommands}
-              on:navigate-to-targets={handleNavigateToTargets}
-            />
-          {:else if activeTab === 'modules'}
-            <Modules />
-          {:else if activeTab === 'query'}
-            <Query />
-          {:else if activeTab === 'graph'}
-            <DependencyGraph bind:initialTarget={graphTarget} />
-          {:else if activeTab === 'commands'}
-            <Commands initialTarget={commandTarget} />
-
-          {/if}
+         <TabComponent {...routeProps} />
         </div>
       </div>
     </main>

@@ -1,10 +1,11 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { Target, ChevronRight, FileCode, ExternalLink, Play, GitBranch, Terminal, TestTube } from 'lucide-svelte';
-  import type { BazelTarget } from '../lib/types/index.js';
   import CopyButton from './CopyButton.svelte';
   import AttributesDisplay from './AttributesDisplay.svelte';
   import { api } from '../client.js';
+  import type { BazelTarget } from 'proto/gazel_pb.js';
+  import { toFull } from './target-util.js';
 
   const dispatch = createEventDispatcher();
 
@@ -16,15 +17,14 @@
   let fullTarget: BazelTarget | null = null;
   let targetDependencies: BazelTarget[] = [];
   let targetReverseDependencies: BazelTarget[] = [];
-  let targetOutputs: Array<{path: string; filename: string; type: string}> = [];
+  let targetOutputs: string[] = [];
   let loadingTarget = false;
   let loadingOutputs = false;
   let loadingReverseDeps = false;
   let loadingDeps = false;
 
-  $: if (target?.full || target?.label) {
-    loadTargetDetails(target.full || target.label || target.name);
-  }
+  $: loadTargetDetails(`${target.package}:${target.name}`);
+  
 
   async function loadTargetDetails(targetName: string) {
     // Reset state
@@ -36,10 +36,7 @@
     // Load full target details with attributes
     loadingTarget = true;
     try {
-      const targetResult = await api.getTarget(targetName);
-      if (targetResult) {
-        fullTarget = targetResult;
-      }
+      fullTarget = (await api.getTarget({target: targetName})).target;
     } catch (err) {
       console.error('Failed to load target details:', err);
       fullTarget = target;
@@ -50,7 +47,7 @@
     // Load direct dependencies
     loadingDeps = true;
     try {
-      const deps = await api.getTargetDependencies(targetName, 1);
+      const deps = await api.getTargetDependencies({target: toFull(target), depth:1});
       targetDependencies = deps.dependencies;
     } catch (err) {
       console.error('Failed to load dependencies:', err);
@@ -62,7 +59,7 @@
     // Load reverse dependencies (what depends on this target)
     loadingReverseDeps = true;
     try {
-      const rdeps = await api.getReverseDependencies(targetName);
+      const rdeps = await api.getReverseDependencies({target: toFull(target)});
       targetReverseDependencies = rdeps.dependencies || [];
     } catch (err) {
       console.error('Failed to load reverse dependencies:', err);
@@ -74,8 +71,7 @@
     // Load outputs for the selected target
     loadingOutputs = true;
     try {
-      const outputResult = await api.getTargetOutputs(targetName);
-      targetOutputs = outputResult.outputs || [];
+      targetOutputs = (await api.getTargetOutputs({target: toFull(target)})).outputs || [];
     } catch (err) {
       console.error('Failed to load outputs:', err);
       targetOutputs = [];
@@ -109,9 +105,8 @@
   }
 
   function isExecutableTarget(target: BazelTarget): boolean {
-    if (!target.ruleType && !target.type) return false;
 
-    const ruleType = target.ruleType || target.type || '';
+    const ruleType = target.kind
     const executableTypes = [
       'cc_binary',
       'cc_test',
@@ -130,38 +125,33 @@
   }
 
   function getBuildFilePath(target: BazelTarget): string | null {
-    if (target.location) {
-      const match = target.location.match(/^([^:]+)/);
+    if (target.package) {
+      const match = target.package.match(/^([^:]+)/);
       if (match) {
         return match[1].replace('//', '') + '/BUILD';
       }
     }
-    if (target.package) {
-      return target.package.replace('//', '') + '/BUILD';
-    }
-    return null;
+
+    return target.package+'/BUILD';
   }
 
   function navigateToBuildFile() {
-    if (target && target.location) {
-      const match = target.location.match(/^([^:]+)/);
-      if (match) {
-        const buildPath = match[1].replace('//', '') + '/BUILD';
-        dispatch('navigate-to-file', { path: buildPath });
-      }
-    }
+
+        dispatch('navigate-to-file', { path: toFull(target) });
+      
+    
   }
 
 
 
   function runTarget() {
     if (target) {
-      dispatch('run-target', { target: target.full || target.name });
+      dispatch('run-target', { target: toFull(target) });
     }
   }
 
   function navigateToTarget(dep: BazelTarget) {
-    dispatch('navigate-to-target', { target: dep });
+    dispatch('navigate-to-target', { target: toFull(dep) });
   }
 </script>
 
@@ -170,17 +160,17 @@
     <div>
       <h4 class="text-sm font-medium text-muted-foreground mb-1">Name</h4>
       <div class="flex items-center gap-2">
-        <p class="font-mono {compact ? 'text-sm' : ''}">{target.full}</p>
-        <CopyButton text={ target.full || ''} size="sm" />
+        <p class="font-mono {compact ? 'text-sm' : ''}">{toFull(target)}</p>
+        <CopyButton text={ '//'+toFull(target) } size="sm" />
       </div>
     </div>
     
-    {#if target.ruleType || target.type}
+    {#if target.kind}
       <div>
         <h4 class="text-sm font-medium text-muted-foreground mb-1">Type</h4>
-        <p class="font-mono {compact ? 'text-sm' : ''}">{target.ruleType || target.type}</p>
+        <p class="font-mono {compact ? 'text-sm' : ''}">{target.kind}</p>
         <p class="text-xs text-muted-foreground mt-1">
-          Expected: {getExpectedOutputs(target.ruleType || target.type || '')}
+          Expected: {getExpectedOutputs(target.kind || '')}
         </p>
       </div>
     {/if}
@@ -199,11 +189,8 @@
           <div class="space-y-1 max-h-32 overflow-y-auto bg-muted/30 p-2 rounded">
             {#each targetOutputs as output}
               <div class="flex items-center gap-2 text-sm">
-                <span class="font-mono text-xs px-1 py-0.5 bg-primary/10 text-primary rounded">
-                  .{output.type}
-                </span>
-                <span class="font-mono text-sm truncate" title={output.path}>
-                  {output.filename}
+                <span class="font-mono text-sm truncate" title={output}>
+                  {output}
                 </span>
               </div>
             {/each}

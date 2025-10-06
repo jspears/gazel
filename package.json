@@ -31,6 +31,7 @@
     "@connectrpc/connect": "^2.1.0",
     "@connectrpc/connect-node": "^2.1.0",
     "@connectrpc/connect-web": "^2.1.0",
+    "@hpcc-js/wasm": "^2.26.2",
     "@types/highlight.js": "^10.1.0",
     "@xyflow/svelte": "0.1.36",
     "chokidar": "^4.0.3",

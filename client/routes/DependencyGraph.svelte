@@ -7,17 +7,19 @@
   import { api } from '../client.js';
   import { updateParam } from '../lib/navigation.js';
 
-  export let initialTarget: string | null = null;
+  export let target: string | null = null;
 
-  let targetInput = '';
+  $: targetInput = target;
   let filterInput = '';
   let xmlData = '';
+  let targets: any[] = [];
   let loading = false;
   let error: string | null = null;
   let showRawXml = false;
   let queryType = 'deps'; // 'deps' or 'direct'
   let maxDepth = 0; // 0 means unlimited
-  let useStreaming = false; // Use streaming for very large queries
+  let useStreaming = true; // Use streaming with streamed_jsonproto for better performance
+  let useJsonProto = true; // Use streamed_jsonproto instead of XML
 
   // Example targets for quick access
   const exampleTargets = [
@@ -30,8 +32,7 @@
   ];
 
   // Watch for initialTarget changes
-  $: if (initialTarget) {
-    targetInput = initialTarget;
+  $: if (target){
     // Automatically generate the graph when a target is provided
     if (useStreaming) {
       fetchDependencyGraphStreaming();
@@ -48,6 +49,7 @@
 
     loading = true;
     error = null;
+    targets = [];
 
     try {
       // Build query based on options
@@ -63,21 +65,37 @@
         query = `deps(${targetInput})`;
       }
 
-      const result = await api.executeQuery(query, 'xml');
+      if (useJsonProto) {
+        // Use streamed_jsonproto for structured data
+        const result = await api.executeQuery({
+          query,
+          outputFormat: 'streamed_jsonproto'
+        });
 
-      if (result.raw) {
-        xmlData = result.raw;
+        if (result.result && result.result.length > 0) {
+          targets = result.result;
+          xmlData = convertTargetsToXml(targets);
+        } else {
+          error = 'No data received from query';
+        }
       } else {
-        error = 'No XML data received from query';
+        // Use XML format
+        const result = await api.executeQuery({ query, outputFormat: 'xml' });
+
+        if (result.raw) {
+          xmlData = result.raw;
+        } else {
+          error = 'No XML data received from query';
+        }
       }
     } catch (err: any) {
       error = err.message || 'Failed to fetch dependency graph';
       if (err.details) {
         error += `\n${err.details}`;
       }
-      // If buffer exceeded, suggest using depth limit
+      // If buffer exceeded, suggest using streaming
       if (error.includes('maxBuffer')) {
-        error += '\n\nTip: Try limiting the depth or using direct dependencies only to reduce the output size.';
+        error += '\n\nTip: Try enabling streaming mode for very large graphs.';
       }
     } finally {
       loading = false;
@@ -99,7 +117,7 @@
 
     try {
       const query = `deps(${targetInput})`;
-      const result = await api.executeQuery(query, 'graph');
+      const result = await api.executeQuery({query, queryType: 'query', outputFormat: 'graph'});
 
       if (result.raw) {
         const blob = new Blob([result.raw], { type: 'text/plain' });
@@ -124,6 +142,7 @@
     loading = true;
     error = null;
     xmlData = '';
+    targets = [];
 
     try {
       // Build query based on options
@@ -136,48 +155,87 @@
         query = `deps(${targetInput})`;
       }
 
-      // Use streaming API
-      const response = await api.streamQuery(query, false);
-      const reader = response.body?.getReader();
+      if (useJsonProto) {
+        // Use streamed_jsonproto format for structured data
+        const response = api.streamQuery({
+          query,
+          outputFormat: 'streamed_jsonproto'
+        });
 
-      if (!reader) {
-        throw new Error('Response body is not readable');
-      }
-
-      const decoder = new TextDecoder();
-      let chunks: string[] = [];
-
-      // Read the stream
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        chunks.push(chunk);
-
-        // Update UI periodically to show progress
-        if (chunks.length % 10 === 0) {
-          xmlData = chunks.join('');
+        for await (const message of response) {
+          if (message.data.case === 'target') {
+            // Collect targets as they stream in
+            targets.push(message.data.value);
+          } else if (message.data.case === 'error') {
+            error = message.data.value;
+            break;
+          }
         }
-      }
 
-      // Final update with complete data
-      xmlData = chunks.join('');
+        // Convert targets to XML format for the graph component
+        // (ElkDependencyGraph expects XML, we'll need to convert or update the component)
+        xmlData = convertTargetsToXml(targets);
 
-      if (!xmlData) {
-        error = 'No XML data received from query';
+        if (!xmlData && targets.length === 0) {
+          error = 'No data received from query';
+        }
+      } else {
+        // Use XML format
+        const response = api.streamQuery({
+          query,
+          outputFormat: 'xml'
+        });
+
+        for await (const message of response) {
+          if (message.data.case === 'rawLine') {
+            xmlData += message.data.value;
+          } else if (message.data.case === 'error') {
+            error = message.data.value;
+            break;
+          }
+        }
+
+        if (!xmlData) {
+          error = 'No XML data received from query';
+        }
       }
     } catch (err: any) {
       error = err.message || 'Failed to fetch dependency graph';
       if (err.details) {
         error += `\n${err.details}`;
       }
-      if (error.includes('maxBuffer')) {
-        error += '\n\nTip: Try enabling streaming mode for very large graphs.';
-      }
     } finally {
       loading = false;
     }
+  }
+
+  // Convert targets from streamed_jsonproto to XML format
+  function convertTargetsToXml(targets: any[]): string {
+    if (targets.length === 0) return '';
+
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<query version="2">\n';
+
+    for (const target of targets) {
+      xml += `  <rule class="${target.ruleClass || 'unknown'}" location="${target.location || ''}" name="${target.label || ''}">\n`;
+
+      // Add attributes if available
+      if (target.attributes && target.attributes.length > 0) {
+        for (const attr of target.attributes) {
+          if (attr.name === 'deps' && attr.stringListValue) {
+            xml += `    <list name="deps">\n`;
+            for (const dep of attr.stringListValue) {
+              xml += `      <label value="${dep}" />\n`;
+            }
+            xml += `    </list>\n`;
+          }
+        }
+      }
+
+      xml += `  </rule>\n`;
+    }
+
+    xml += '</query>';
+    return xml;
   }
 </script>
 
@@ -260,8 +318,26 @@
             </button>
           </div>
         </div>
+      </div>
 
-      
+      <!-- Advanced Options -->
+      <div class="flex items-center gap-4 pt-2 border-t">
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            bind:checked={useStreaming}
+            class="rounded"
+          />
+          <span>Use Streaming (for large graphs)</span>
+        </label>
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            bind:checked={useJsonProto}
+            class="rounded"
+          />
+          <span>Use JSON Proto (faster, structured data)</span>
+        </label>
       </div>
 
       <!-- Example Targets -->
@@ -298,6 +374,9 @@
           {#if targetInput}
             <span class="text-sm font-normal text-muted-foreground">
               for {targetInput}
+              {#if targets.length > 0}
+                ({targets.length} targets)
+              {/if}
             </span>
           {/if}
         </h3>

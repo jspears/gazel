@@ -63,9 +63,16 @@ import {
   type GetModuleGraphResponse,
   GetModuleGraphResponseSchema,
   ModuleSchema,
+  DependencySchema,
+  ExtensionUsageSchema,
+  LocationSchema,
+  ModuleStatisticsSchema,
   type GetModuleInfoRequest,
   type GetModuleInfoResponse,
   GetModuleInfoResponseSchema,
+  type GetModuleGraphDotRequest,
+  type GetModuleGraphDotResponse,
+  GetModuleGraphDotResponseSchema,
   type GetQueryTemplatesRequest,
   type GetQueryTemplatesResponse,
   GetQueryTemplatesResponseSchema,
@@ -95,6 +102,10 @@ import {
   type SearchInFilesResponse,
   SearchInFilesResponseSchema,
   SearchResultSchema,
+  type GetCommandHistoryRequest,
+  type GetCommandHistoryResponse,
+  GetCommandHistoryResponseSchema,
+  CommandHistoryItemSchema,
 } from "../proto/gazel_pb.js";
 import bazelService from "./services/bazel.js";
 import parserService from "./services/parser.js";
@@ -950,6 +961,19 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       let parsedResult: any;
       if (outputFormat === "xml") {
         parsedResult = await parserService.parseXmlOutput(result.stdout);
+      } else if (outputFormat === "streamed_jsonproto") {
+        // Parse streamed JSON proto format (one JSON object per line)
+        const lines = result.stdout.trim().split('\n').filter(line => line.trim());
+        const targets = lines.map(line => {
+          try {
+            return JSON.parse(line);
+          } catch (e) {
+            console.error('Failed to parse JSON line:', line);
+            return null;
+          }
+        }).filter(t => t !== null);
+
+        parsedResult = { targets };
       } else if (outputFormat === "label_kind") {
         parsedResult = {
           targets: parserService.parseLabelKindOutput(result.stdout),
@@ -1001,35 +1025,74 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   async *streamQuery(
     request: StreamQueryRequest
   ): AsyncGenerator<StreamQueryResponse> {
-    // For now, execute the query and yield results in chunks
-    const { query, outputFormat = "label_kind" } = request;
+    const { query, outputFormat = "label_kind", queryType = "query" } = request;
 
     if (!query) {
       throw new Error("Query is required");
     }
 
-    const result = await bazelService.query(query, outputFormat);
-    const lines = result.stdout.split("\n");
+    try {
+      const result = await bazelService.query(query, outputFormat, queryType);
 
-    // Yield results in chunks
-    const chunkSize = 10;
-    for (let i = 0; i < lines.length; i += chunkSize) {
-      const chunk = lines.slice(i, i + chunkSize).join("\n");
+      if (outputFormat === "streamed_jsonproto") {
+        // Parse and yield each JSON object as a target
+        const lines = result.stdout.trim().split("\n").filter(line => line.trim());
+
+        for (const line of lines) {
+          try {
+            const target = JSON.parse(line);
+            yield create(StreamQueryResponseSchema, {
+              data: {
+                case: "target",
+                value: create(BazelTargetSchema, {
+                  label: target.rule?.name || target.name || "",
+                  kind: target.rule?.ruleClass || target.type || "",
+                  package: target.rule?.location?.split(":")[0]?.replace("//", "") || "",
+                  name: target.rule?.name?.split(":").pop() || "",
+                  tags: [],
+                  deps: [],
+                  srcs: [],
+                  attributes: target.rule?.attribute || [],
+                }),
+              },
+            });
+          } catch (e) {
+            console.error("Failed to parse JSON line:", line, e);
+            // Continue with next line
+          }
+        }
+      } else {
+        // For other formats, yield raw lines in chunks
+        const lines = result.stdout.split("\n");
+        const chunkSize = 10;
+
+        for (let i = 0; i < lines.length; i += chunkSize) {
+          const chunk = lines.slice(i, i + chunkSize).join("\n");
+          yield create(StreamQueryResponseSchema, {
+            data: {
+              case: "rawLine",
+              value: chunk,
+            },
+          });
+        }
+      }
+
+      // Send completion signal
       yield create(StreamQueryResponseSchema, {
         data: {
           case: "rawLine",
-          value: chunk,
+          value: "",
+        },
+      });
+    } catch (error: any) {
+      // Send error
+      yield create(StreamQueryResponseSchema, {
+        data: {
+          case: "error",
+          value: error.message || "Query failed",
         },
       });
     }
-
-    // Send final line
-    yield create(StreamQueryResponseSchema, {
-      data: {
-        case: "rawLine",
-        value: "",
-      },
-    });
   }
 
   /**
@@ -1039,14 +1102,24 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
     request: BuildTargetRequest
   ): Promise<BuildTargetResponse> {
     try {
-      const { target, options = [] } = request;
+      const { target, options = [], command = "build" } = request;
 
       if (!target) {
         throw new Error("Target is required");
       }
 
       try {
-        const result = await bazelService.build(target, options);
+        let result;
+
+        // Execute the appropriate Bazel command
+        if (command === "test") {
+          result = await bazelService.execute(["test", target, ...options]);
+        } else if (command === "run") {
+          result = await bazelService.execute(["run", target, ...options]);
+        } else {
+          // Default to build
+          result = await bazelService.build(target, options);
+        }
 
         return create(BuildTargetResponseSchema, {
           success: true,
@@ -1058,10 +1131,11 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
           success: false,
           output: error.stdout || "",
           stderr: error.stderr || error.message,
+          error: error.message,
         });
       }
     } catch (error: any) {
-      throw new Error(`Build failed: ${error.message}`);
+      throw new Error(`${request.command || 'Build'} failed: ${error.message}`);
     }
   }
 
@@ -1131,40 +1205,179 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   ): Promise<GetModuleGraphResponse> {
     try {
       // Try to execute bazel mod graph command with JSON output
+      console.log("Executing: bazel mod graph --output=json");
       const result = await bazelService.execute(["mod", "graph", "--output", "json"]);
+      console.log("Bazel mod graph stdout length:", result.stdout.length);
+      console.log("Bazel mod graph stderr:", result.stderr);
 
-      // Parse the JSON output
-      let moduleGraph: any;
+      // Parse the JSON output - Bazel returns a tree structure, not a flat list
+      let rootModule: any;
       try {
-        moduleGraph = JSON.parse(result.stdout);
+        rootModule = JSON.parse(result.stdout);
+        console.log("Parsed module graph root:", rootModule.key, rootModule.name);
+        console.log("Direct dependencies:", rootModule.dependencies?.length || 0);
       } catch (parseError) {
+        console.error("Failed to parse module graph JSON:", parseError);
+        console.error("Raw stdout:", result.stdout.substring(0, 500));
         // Return empty graph if parsing fails
         return create(GetModuleGraphResponseSchema, {
           root: "",
           modules: [],
+          dependencies: [],
+          statistics: create(ModuleStatisticsSchema, {
+            totalModules: 0,
+            directDependencies: 0,
+            devDependencies: 0,
+            indirectDependencies: 0,
+          }),
         });
       }
 
+      // Flatten the tree structure into a list of modules
+      const moduleMap = new Map<string, any>();
+
+      function flattenModule(mod: any) {
+        if (!mod || !mod.key) return;
+
+        // Skip if already processed (handles unexpanded references)
+        if (moduleMap.has(mod.key)) return;
+
+        moduleMap.set(mod.key, mod);
+
+        // Recursively process dependencies
+        if (mod.dependencies && Array.isArray(mod.dependencies)) {
+          for (const dep of mod.dependencies) {
+            if (!dep.unexpanded) {
+              flattenModule(dep);
+            }
+          }
+        }
+      }
+
+      // Start flattening from root
+      flattenModule(rootModule);
+
+      console.log("Flattened module count:", moduleMap.size);
+
       // Convert to proto format
-      const protoModules = Object.entries(moduleGraph.modules || {}).map(
-        ([key, mod]: [string, any]) =>
-          create(ModuleSchema, {
-            key,
+      const protoModules = Array.from(moduleMap.values()).map(
+        (mod: any) => {
+          // Convert dependencies - only include direct dependencies, not unexpanded ones
+          const dependencies = (mod.dependencies || [])
+            .filter((dep: any) => !dep.unexpanded)
+            .map((dep: any) =>
+              create(DependencySchema, {
+                key: dep.key || "",
+                name: dep.name || "",
+                version: dep.version || "",
+                devDependency: dep.devDependency || false,
+                registry: dep.registry || "",
+              })
+            );
+
+          // Convert extension usages
+          const extensionUsages = (mod.extensionUsages || []).map((ext: any) =>
+            create(ExtensionUsageSchema, {
+              extensionBzlFile: ext.extensionBzlFile || "",
+              extensionName: ext.extensionName || "",
+              location: ext.location
+                ? create(LocationSchema, {
+                    file: ext.location.file || "",
+                    line: ext.location.line || 0,
+                    column: ext.location.column || 0,
+                  })
+                : undefined,
+              imports: ext.imports || {},
+              devDependency: ext.devDependency || false,
+              isolate: ext.isolate || false,
+            })
+          );
+
+          return create(ModuleSchema, {
+            key: mod.key || "",
             name: mod.name || "",
             version: mod.version || "",
-          })
+            location: mod.location
+              ? create(LocationSchema, {
+                  file: mod.location.file || "",
+                  line: mod.location.line || 0,
+                  column: mod.location.column || 0,
+                })
+              : undefined,
+            compatibilityLevel: mod.compatibilityLevel || 0,
+            repoName: mod.repoName || mod.name || "",
+            bazelCompatibility: mod.bazelCompatibility || [],
+            moduleRuleExportsAllRules: mod.moduleRuleExportsAllRules || false,
+            tags: mod.tags || [],
+            dependencies,
+            resolvedDependencies: [], // Will be populated if needed
+            extensionUsages,
+            dependencyCount: dependencies.length,
+            extensionCount: extensionUsages.length,
+          });
+        }
       );
 
-      return create(GetModuleGraphResponseSchema, {
-        root: moduleGraph.root || "",
+      // Calculate statistics
+      const rootKey = rootModule.key || "<root>";
+      const rootModuleDeps = protoModules.find(
+        (m) => m.key === rootKey
+      )?.dependencies || [];
+
+      const directDeps = rootModuleDeps.length;
+      const devDeps = rootModuleDeps.filter((d: any) => d.devDependency).length;
+      // Indirect dependencies = total modules - 1 (root) - direct dependencies
+      const indirectDeps = Math.max(0, protoModules.length - 1 - directDeps);
+
+      const response = create(GetModuleGraphResponseSchema, {
+        root: rootKey,
         modules: protoModules,
+        dependencies: [],
+        statistics: create(ModuleStatisticsSchema, {
+          totalModules: protoModules.length,
+          directDependencies: directDeps,
+          devDependencies: devDeps,
+          indirectDependencies: indirectDeps,
+        }),
       });
+
+      console.log("Returning module graph response with", protoModules.length, "modules");
+      return response;
     } catch (error: any) {
+      console.error("Error in getModuleGraph:", error);
+      console.error("Error stack:", error.stack);
       // Return empty graph on error
       return create(GetModuleGraphResponseSchema, {
         root: "",
         modules: [],
       });
+    }
+  }
+
+  /**
+   * Get module graph in DOT format
+   */
+  async getModuleGraphDot(
+    request: GetModuleGraphDotRequest
+  ): Promise<GetModuleGraphDotResponse> {
+    try {
+      console.log("Executing: bazel mod graph --output=graph");
+      const args = ["mod", "graph", "--output", "graph"];
+
+      // Add any additional options
+      if (request.options && request.options.length > 0) {
+        args.push(...request.options);
+      }
+
+      const result = await bazelService.execute(args);
+      console.log("DOT graph length:", result.stdout.length);
+
+      return create(GetModuleGraphDotResponseSchema, {
+        dot: result.stdout,
+      });
+    } catch (error: any) {
+      console.error("Error in getModuleGraphDot:", error);
+      throw new Error(`Failed to get module graph DOT: ${error.message}`);
     }
   }
 
@@ -1326,6 +1539,57 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
         queryType: "aquery",
         outputFormat: "text",
       },
+      // Example queries (prefilled, no parameters)
+      {
+        id: "example-all-ts",
+        name: "Example: All TypeScript Projects",
+        description: "Find all ts_project targets in the workspace",
+        template: "kind(ts_project, //...)",
+        parameters: [],
+        category: "examples",
+        queryType: "query",
+        outputFormat: "label",
+      },
+      {
+        id: "example-proto-targets",
+        name: "Example: All Proto Targets",
+        description: "Find all proto_library and ts_proto_library targets",
+        template: "kind('.*proto.*', //...)",
+        parameters: [],
+        category: "examples",
+        queryType: "query",
+        outputFormat: "label_kind",
+      },
+      {
+        id: "example-test-targets",
+        name: "Example: All Test Targets",
+        description: "Find all test targets (any rule ending with _test)",
+        template: "kind('.*_test$', //...)",
+        parameters: [],
+        category: "examples",
+        queryType: "query",
+        outputFormat: "label_kind",
+      },
+      {
+        id: "example-cquery-server",
+        name: "Example: Server Dependencies",
+        description: "Show configured dependencies of the server",
+        template: "deps(//server:run)",
+        parameters: [],
+        category: "examples",
+        queryType: "cquery",
+        outputFormat: "label_kind",
+      },
+      {
+        id: "example-aquery-proto",
+        name: "Example: Proto Build Actions",
+        description: "Show actions for building proto files",
+        template: "//proto:gazel_ts_proto",
+        parameters: [],
+        category: "examples",
+        queryType: "aquery",
+        outputFormat: "text",
+      },
     ];
 
     const protoTemplates = templates.map((t) =>
@@ -1336,6 +1600,8 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
         template: t.template,
         parameters: t.parameters,
         category: t.category,
+        queryType: t.queryType,
+        outputFormat: t.outputFormat,
       })
     );
 
@@ -1621,5 +1887,20 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
     } catch (error: any) {
       throw new Error(`Failed to search in files: ${error.message}`);
     }
+  }
+
+  /**
+   * Get command history
+   */
+  async getCommandHistory(
+    request: GetCommandHistoryRequest
+  ): Promise<GetCommandHistoryResponse> {
+    // For now, return empty history
+    // In a real implementation, this would read from a persistent store
+    const limit = request.limit || 50;
+
+    return create(GetCommandHistoryResponseSchema, {
+      history: [],
+    });
   }
 }

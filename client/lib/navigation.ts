@@ -1,3 +1,5 @@
+import {writable} from 'svelte/store';
+
 /**
  * Client-side navigation utilities using the browser's History API
  */
@@ -44,20 +46,12 @@ export function parseUrlParams(): AppState {
  */
 export function updateUrl(state: AppState, replace = false) {
   const params = new URLSearchParams();
+  Object.entries(state).forEach(([key, value]) => {
+    if (value != null ) params.append(key, value);
+  });
   
-  // Add non-empty parameters
-  if (state.tab) params.set('tab', state.tab);
-  if (state.target) params.set('target', state.target);
-  if (state.graphTarget) params.set('graphTarget', state.graphTarget);
-  if (state.file) params.set('file', state.file);
-  if (state.query) params.set('query', state.query);
-  if (state.queryType) params.set('queryType', state.queryType);
-  if (state.maxDepth) params.set('maxDepth', state.maxDepth);
-  if (state.searchQuery) params.set('searchQuery', state.searchQuery);
-  if (state.selectedType) params.set('selectedType', state.selectedType);
-  if (state.showHidden) params.set('showHidden', state.showHidden);
-  if (state.workspace) params.set('workspace', state.workspace);
-  
+  navigation.set(state);
+
   const url = params.toString() ? `?${params.toString()}` : window.location.pathname;
   
   if (replace) {
@@ -92,43 +86,43 @@ export function navigateToTab(tab: string, additionalState: Partial<AppState> = 
     ...additionalState
   };
   
-  // Clear tab-specific parameters when switching tabs
-  switch (tab) {
-    case 'targets':
-      delete newState.graphTarget;
-      delete newState.file;
-      delete newState.query;
-      break;
-    case 'graph':
-      delete newState.target;
-      delete newState.file;
-      delete newState.query;
-      delete newState.searchQuery;
-      delete newState.selectedType;
-      break;
-    case 'files':
-      delete newState.target;
-      delete newState.graphTarget;
-      delete newState.query;
-      break;
-    case 'query':
-      delete newState.target;
-      delete newState.graphTarget;
-      delete newState.file;
-      break;
-    case 'workspace':
-      delete newState.target;
-      delete newState.graphTarget;
-      delete newState.file;
-      delete newState.query;
-      break;
-    case 'commands':
-      delete newState.target;
-      delete newState.graphTarget;
-      delete newState.file;
-      delete newState.query;
-      break;
-  }
+  // // Clear tab-specific parameters when switching tabs
+  // switch (tab) {
+  //   case 'targets':
+  //     delete newState.graphTarget;
+  //     delete newState.file;
+  //     delete newState.query;
+  //     break;
+  //   case 'graph':
+  //     delete newState.target;
+  //     delete newState.file;
+  //     delete newState.query;
+  //     delete newState.searchQuery;
+  //     delete newState.selectedType;
+  //     break;
+  //   case 'files':
+  //     delete newState.target;
+  //     delete newState.graphTarget;
+  //     delete newState.query;
+  //     break;
+  //   case 'query':
+  //     delete newState.target;
+  //     delete newState.graphTarget;
+  //     delete newState.file;
+  //     break;
+  //   case 'workspace':
+  //     delete newState.target;
+  //     delete newState.graphTarget;
+  //     delete newState.file;
+  //     delete newState.query;
+  //     break;
+  //   case 'commands':
+  //     delete newState.target;
+  //     delete newState.graphTarget;
+  //     delete newState.file;
+  //     delete newState.query;
+  //     break;
+  // }
   
   updateUrl(newState);
 }
@@ -152,11 +146,15 @@ export function updateParam(key: keyof AppState, value: string | undefined) {
 /**
  * Initialize navigation and set up event listeners
  */
-export function initNavigation(onStateChange: (state: AppState) => void) {
+export function initNavigation(onStateChange: (state: AppState, location: string) => void) {
   // Handle browser back/forward buttons
   window.addEventListener('popstate', (event) => {
-    const state = event.state as AppState || parseUrlParams();
-    onStateChange(state);
+    const state = Object.assign({},event.state as AppState, parseUrlParams());
+    navigation.set(state);
+    navigation.subscribe((state) => {
+      onStateChange(state, document.location.pathname);
+    });
+    onStateChange(state, document.location.pathname);
   });
   
   // Handle initial load
@@ -188,3 +186,4 @@ export async function copyUrlToClipboard(): Promise<boolean> {
     return false;
   }
 }
+export const navigation = writable(getCurrentState());

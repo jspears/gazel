@@ -2,13 +2,13 @@
   import { onMount, createEventDispatcher } from 'svelte';
   import { FileCode, Search, File, FolderOpen, Target, ChevronRight, Play, TestTube, ExternalLink, X } from 'lucide-svelte';
   import { api } from '../client.js';
-  import type { BuildFile, BazelTarget } from '../lib/types/index.js';
   import CopyButton from '../components/CopyButton.svelte';
   import TargetDetails from '../components/TargetDetails.svelte';
   import hljs from 'highlight.js/lib/core';
   import python from 'highlight.js/lib/languages/python';
   import bash from 'highlight.js/lib/languages/bash';
   import 'highlight.js/styles/atom-one-dark.css';
+  import type { BazelTarget, BuildFile, GetWorkspaceFilesResponse } from 'proto/gazel_pb.js';
 
   // Register languages for syntax highlighting
   hljs.registerLanguage('python', python);
@@ -20,7 +20,7 @@
 
   const dispatch = createEventDispatcher();
 
-  let buildFiles: BuildFile[] = [];
+  let buildFiles: GetWorkspaceFilesResponse['files'] = [];
   let selectedFile: string | null = null;
   let fileContent = '';
   let highlightedContent = '';
@@ -64,7 +64,7 @@
   async function loadBuildFiles() {
     try {
       loading = true;
-      const result = (await api.getWorkspaceFiles());
+      const result = (await api.getWorkspaceFiles({}));
       buildFiles = result.files;
     } catch (err: any) {
       error = err.message;
@@ -115,7 +115,7 @@
       const fileName = filePath.split('/').pop();
       if (!fileName) return;
 
-      const result = await api.getTargetsByFile(fileName);
+      const result = await api.getTargetsByFile({file: fileName});
       fileActions = result.targets;
     } catch (err) {
       console.error('Failed to load file actions:', err);
@@ -203,14 +203,14 @@
       const fullTargetPath = packagePath ? `//${packagePath}:${target.name}` : `//:${target.name}`;
 
       try {
-        const targetData = await api.getTarget(fullTargetPath);
-        selectedTarget = targetData;
+        const targetData = await api.getTarget({target: fullTargetPath});
+        selectedTarget = targetData.target;
       } catch (err) {
         console.error('Failed to load target details:', err);
         // Try without the full path
         try {
-          const targetData = await api.getTarget(target.name);
-          selectedTarget = targetData;
+          const targetData = await api.getTarget({target: target.name});
+          selectedTarget = targetData.target;
         } catch (err2) {
           console.error('Failed to load target with name only:', err2);
           selectedTarget = null;
@@ -237,11 +237,14 @@
       buildFileTargets = [];
 
       // Execute a bazel query to get all targets in this BUILD file
-      const result = await api.executeQuery(queryPath, 'label_kind');
+      const result = await api.executeQuery({
+        query: queryPath,
+        outputFormat: 'label_kind',
+        
+        queryType: 'query'
+      });
 
-      if (result.result && result.result.targets) {
-        buildFileTargets = result.result.targets;
-      }
+        buildFileTargets = result?.result?.targets ?? []
     } catch (err) {
       console.error('Failed to load BUILD file targets:', err);
       buildFileTargets = [];
@@ -267,7 +270,7 @@
     }
   }
 
-  function runTargetByName(targetName: string) {
+async function runTargetByName(targetName: string) {
     if (!targetName) return;
 
     runCommand = `bazel run ${targetName}`;
@@ -276,51 +279,44 @@
     showRunModal = true;
 
     // Use EventSource for streaming
-    runEventSource = api.streamRun(targetName, [], (data) => {
-      if (data.type === 'stdout' || data.type === 'stderr') {
-        runOutput = [...runOutput, data.data];
+    for await (const {event:data} of api.streamRun({target: targetName})){
+      if (data.case === 'progress'){
+        runOutput = [...runOutput, data.value.currentAction];
         // Auto-scroll to bottom
         if (outputContainer) {
           setTimeout(() => {
             outputContainer.scrollTop = outputContainer.scrollHeight;
           }, 0);
         }
-      } else if (data.type === 'info') {
-        runOutput = [...runOutput, `ℹ️ ${data.data}\n`];
-        // Auto-scroll for info messages too
-        if (outputContainer) {
-          setTimeout(() => {
-            outputContainer.scrollTop = outputContainer.scrollHeight;
-          }, 0);
-        }
-      } else if (data.type === 'exit') {
-        if (data.code === 0) {
+    
+      } else if (data.case === 'complete') {
+        if (data.value.exitCode === 0) {
           runStatus = 'success';
-          runOutput = [...runOutput, '\n✅ Command completed successfully'];
-        } else if (data.code === null) {
+          runOutput = [...runOutput, `\n✅ Command completed successfully in (${data.value.durationMs}ms)`];
+        } else if (data.value.exitCode === null) {
           // Process was killed or terminated abnormally
           runStatus = 'error';
           runOutput = [...runOutput, '\n⚠️ Command was terminated'];
         } else {
           runStatus = 'error';
-          runOutput = [...runOutput, `\n❌ Command failed with exit code ${data.code}`];
+          runOutput = [...runOutput, `\n❌ Command failed with exit code ${data.value.exitCode}`];
         }
         // Close the EventSource when process exits
         if (runEventSource) {
           runEventSource.close();
           runEventSource = null;
         }
-      } else if (data.type === 'error') {
+      } else if (data.case === 'error') {
         // Handle stream errors
         runStatus = 'error';
-        runOutput = [...runOutput, `\n❌ Error: ${data.data}`];
+        runOutput = [...runOutput, `\n❌ Error: ${data.value}`];
         // Close the EventSource on error
         if (runEventSource) {
           runEventSource.close();
           runEventSource = null;
         }
       }
-    });
+    }
   }
 
   function closeRunModal() {
@@ -460,8 +456,8 @@
         </div>
 
         {#if selectedFile && activeTab === 'files'}
-          {@const fileName = selectedFile.split('/').pop()}
-          {@const isBuildFile = fileName && (fileName.startsWith('BUILD') || fileName.includes('BUILD'))}
+          {@const file = selectedFile.split('/').pop()}
+          {@const isBuildFile = file && (file.startsWith('BUILD') || fileName.includes('BUILD'))}
           {#if isBuildFile}
             <div class="flex gap-2">
               <button
@@ -521,10 +517,10 @@
                 <div class="p-3 border rounded-md hover:bg-muted/50 transition-colors">
                   <div class="flex items-center justify-between">
                     <div>
-                      <div class="font-mono text-sm font-medium">{action.name || action.full}</div>
-                      {#if action.ruleType || action.type}
+                      <div class="font-mono text-sm font-medium">{action.label}</div>
+                      {#if action.kind }
                         <div class="text-xs text-muted-foreground mt-1">
-                          Type: {action.ruleType || action.type}
+                          Type: {action.kind }
                         </div>
                       {/if}
                       {#if action.package}
@@ -558,7 +554,7 @@
                   </div>
                 </div>
                 <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <CopyButton text={target.name} />
+                 111 <CopyButton text={target.name} />
                   {#if target.ruleType && (target.ruleType.includes('binary') || target.ruleType.includes('test'))}
                     <button
                       on:click={() => runTargetByName(target.name)}

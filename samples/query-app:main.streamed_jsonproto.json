@@ -3,7 +3,7 @@
   "rule": {
     "name": "//app:main",
     "ruleClass": "js_binary",
-    "location": "/Users/justinspears/Documents/augment-projects/gazel/app/BUILD.bazel:205:10",
+    "location": "/gazel/app/BUILD.bazel:205:10",
     "attribute": [
       {
         "name": "$config_dependencies",

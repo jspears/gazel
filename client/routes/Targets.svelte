@@ -9,7 +9,9 @@
   import TypeSelector from '../components/TypeSelector.svelte';
   import TargetTreeView from '../components/TargetTreeView.svelte';
   import AttributesDisplay from '../components/AttributesDisplay.svelte';
-  import { updateParam } from '../lib/navigation.js';
+  import { navigateToTab, updateParam } from '../lib/navigation.js';
+  import TargetActions from '../components/TargetActions.svelte';
+  import { toFull } from '../components/target-util.js';
 
   const dispatch = createEventDispatcher();
 
@@ -56,9 +58,7 @@
   // View mode state
   let viewMode: 'list' | 'tree' = 'tree';
 
-  const toFull = (target: BazelTarget) => {
-    return `${target.package}:${target.name}`;
-  };
+ 
   onMount(async () => {
     await loadTargets();
 
@@ -309,9 +309,7 @@
       }
       // Load direct dependencies
       try {
-        const full = toFull(target);
-        const deps = await api.getTargetDependencies({target:full, depth: 1});
-        console.log({deps, full});
+        const deps = await api.getTargetDependencies({target:toFull(target), depth: 1});
         targetDependencies = deps.dependencies;
 
       } catch (err) {
@@ -366,15 +364,6 @@
     }
   }
 
-  function navigateToBreadcrumb(index: number) {
-    const target = navigationHistory[index];
-    navigationHistory = navigationHistory.slice(0, index + 1);
-    selectTarget(target, false);
-  }
-
-  function clearNavigationHistory() {
-    navigationHistory = [];
-  }
 
   function filterByType(type: string) {
     selectedType = type;
@@ -401,8 +390,7 @@
       const match = target.package.match(/^([^:]+)/);
       if (match) {
         const buildPath = match[1].replace('//', '') + '/BUILD';
-        // Dispatch event to parent to switch to Files tab with this file
-        dispatch('navigate-to-file', { path: buildPath });
+        navigateToTab('files', { file: buildPath });
       }
     }
   }
@@ -411,16 +399,13 @@
     const targetName = target.name;
     if (targetName) {
       // Dispatch event to parent to switch to Graph tab with this target
-      dispatch('navigate-to-graph', { target: targetName });
+       navigateToTab('graph', { file: toFull(target) });
+
     }
   }
 
   function navigateToCommands(target: BazelTarget) {
-    const targetName = target.name;
-    if (targetName) {
-      // Dispatch event to parent to switch to Commands tab with this target
-      dispatch('navigate-to-commands', { target: targetName });
-    }
+     navigateToTab('commands', { target: toFull(target) });
   }
 
   function getBuildFilePath(target: BazelTarget): string | null {
@@ -477,7 +462,7 @@
       'sh_test'
     ];
 
-    return executableTypes.includes(target.ruleType);
+    return /(_test|_binary)$/.test(target.kind);
   }
 
   function isHiddenTarget(target: BazelTarget): boolean {
@@ -577,15 +562,15 @@ $:{
         <input
           type="text"
           bind:value={searchQuery}
-          on:input={() => searchTargets()}
-          on:focus={() => showSearchHistory = searchHistory.length > 0}
+          oninput={() => searchTargets()}
+          onfocus={() => showSearchHistory = searchHistory.length > 0}
           placeholder="Search targets (Bazel query or text)..."
           class="w-full pl-10 pr-10 py-2 border rounded-md bg-background"
           title="Enter a Bazel query expression or plain text to search. Falls back to text search if query syntax is invalid."
         />
         {#if searchHistory.length > 0}
           <button
-            on:click={() => showSearchHistory = !showSearchHistory}
+            onclick={() => showSearchHistory = !showSearchHistory}
             class="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-muted rounded"
             title="Search history"
           >
@@ -598,7 +583,7 @@ $:{
             <div class="p-2 border-b flex items-center justify-between">
               <span class="text-xs text-muted-foreground font-medium">Recent Searches</span>
               <button
-                on:click={clearSearchHistory}
+                onclick={clearSearchHistory}
                 class="text-xs text-muted-foreground hover:text-foreground"
               >
                 Clear
@@ -606,7 +591,7 @@ $:{
             </div>
             {#each searchHistory as query}
               <button
-                on:click={() => selectSearchFromHistory(query)}
+                onclick={() => selectSearchFromHistory(query)}
                 class="w-full text-left px-3 py-2 hover:bg-muted flex items-center gap-2 group"
               >
                 <Clock class="w-3 h-3 text-muted-foreground" />
@@ -620,10 +605,10 @@ $:{
     <TypeSelector
       bind:value={selectedType}
       types={uniqueTypes}
-      on:change={() => filterByType(selectedType)}
+      onchange={() => filterByType(selectedType)}
     />
     <button
-      on:click={loadTargets}
+      onclick={loadTargets}
       class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
     >
       Refresh
@@ -677,7 +662,7 @@ $:{
             {/if}
             <div class="flex items-center gap-1 border rounded-md p-1">
               <button
-                on:click={() => viewMode = 'list'}
+                onclick={() => viewMode = 'list'}
                 class="p-1 rounded transition-colors"
                 class:bg-muted={viewMode === 'list'}
                 class:text-primary={viewMode === 'list'}
@@ -686,7 +671,7 @@ $:{
                 <List class="w-4 h-4" />
               </button>
               <button
-                on:click={() => viewMode = 'tree'}
+                onclick={() => viewMode = 'tree'}
                 class="p-1 rounded transition-colors"
                 class:bg-muted={viewMode === 'tree'}
                 class:text-primary={viewMode === 'tree'}
@@ -703,8 +688,8 @@ $:{
               <div
                 role="button"
                 tabindex={0}
-                on:click={() => selectTarget(target)}
-                on:keydown={(event) => handleTargetActivation(event, target)}
+                onclick={() => selectTarget(target)}
+                onkeydown={(event) => handleTargetActivation(event, target)}
                 data-target={toFull(target)}
                 class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 flex items-center justify-between group"
                 class:bg-muted={selectedTarget === target}
@@ -718,24 +703,9 @@ $:{
                     <span class="text-xs text-muted-foreground">{target.kind}</span>
                   {/if}
                 </div>
-                <div class="flex items-center gap-1">
-                  <button
-                    on:click|stopPropagation={() => navigateToGraph(target)}
-                    class="p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="View in dependency graph"
-                  >
-                    <GitBranch class="w-4 h-4 text-muted-foreground hover:text-primary" />
-                  </button>
-                  <button
-                    on:click|stopPropagation={() => navigateToCommands(target)}
-                    class="p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Open in Commands tab"
-                  >
-                    <Terminal class="w-4 h-4 text-muted-foreground hover:text-primary" />
-                  </button>
-                  <CopyButton text={toFull(target)} size="sm" className="opacity-0 group-hover:opacity-100" />
-                  <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                </div>
+               <TargetActions {target}>
+                    <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
+               </TargetActions>
               </div>
             {/each}
             {#if visibleTargets.length > displayLimit}
@@ -777,6 +747,18 @@ $:{
                 <div class="flex items-center gap-2">
                   <p class="font-mono text-sm">{selectedTarget.name}</p>
                   <CopyButton text={toFull(selectedTarget)} size="sm" />
+                   {#if isExecutableTarget(selectedTarget)}
+                <div>
+                  <button
+                    onclick={() => selectedTarget && runTarget(selectedTarget)}
+                    class="p-1 hover:bg-muted rounded transition-colors"
+                    disabled={runStatus === 'running'}
+                  >
+                    <Play class="w-4 h-4 color-{runStatus === 'running' ? 'green' : 'primary'}" />
+                   
+                  </button>
+                </div>
+              {/if}
                 </div>
               </div>
 
@@ -823,7 +805,7 @@ $:{
                     <p class="font-mono text-sm">{selectedTarget.location}</p>
                     {#if getBuildFilePath(selectedTarget)}
                       <button
-                        on:click={() => selectedTarget && navigateToBuildFile(selectedTarget)}
+                        onclick={() => selectedTarget && navigateToBuildFile(selectedTarget)}
                         class="p-1 hover:bg-muted rounded flex items-center gap-1 text-xs text-primary"
                         title="View in BUILD file"
                       >
@@ -835,18 +817,7 @@ $:{
                 </div>
               {/if}
 
-              {#if isExecutableTarget(selectedTarget)}
-                <div>
-                  <button
-                    on:click={() => selectedTarget && runTarget(selectedTarget)}
-                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md flex items-center gap-2 transition-colors"
-                    disabled={runStatus === 'running'}
-                  >
-                    <Play class="w-4 h-4" />
-                    Run Target
-                  </button>
-                </div>
-              {/if}
+             
 
               {#if selectedTarget.attributes && selectedTarget.attributes.length > 0}
                 <AttributesDisplay
@@ -864,7 +835,7 @@ $:{
                   <div class="space-y-1 max-h-40 overflow-y-auto">
                     {#each targetDependencies as dep}
                       <button
-                        on:click={() => navigateToTarget(dep)}
+                        onclick={() => navigateToTarget(dep)}
                         class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
                       >
                         <ChevronRight class="w-3 h-3" />
@@ -886,7 +857,7 @@ $:{
                     <div class="space-y-1 max-h-40 overflow-y-auto">
                       {#each targetReverseDependencies as rdep}
                         <button
-                          on:click={() => navigateToTarget(rdep)}
+                          onclick={() => navigateToTarget(rdep)}
                           class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
                         >
                           <ChevronRight class="w-3 h-3" />
@@ -918,7 +889,7 @@ $:{
           <p class="text-sm text-muted-foreground font-mono mt-1">{runCommand}</p>
         </div>
         <button
-          on:click={closeRunModal}
+          onclick={closeRunModal}
           class="p-2 hover:bg-muted rounded-md transition-colors"
           title="Close"
         >
@@ -949,7 +920,7 @@ $:{
           {/if}
         </div>
         <button
-          on:click={closeRunModal}
+          onclick={closeRunModal}
           class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
         >
           Close

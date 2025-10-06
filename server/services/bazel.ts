@@ -1,5 +1,7 @@
-import { exec, spawn, ChildProcess } from 'child_process';
-import { promisify } from 'util';
+import { exec, spawn, ChildProcess } from 'node:child_process';
+import { promisify } from 'node:util';
+import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
 import config from '../config.js';
 import type { CommandResult, CachedQuery, WorkspaceInfo } from '../types/index.js';
 
@@ -21,6 +23,52 @@ class BazelService {
     this.workspace = config.bazelWorkspace;
     this.executable = config.bazelExecutable;
     this.queryCache = new Map();
+
+    // If workspace is empty and we're running from a Bazel output directory,
+    // try to find the actual workspace root
+    if (!this.workspace || this.workspace.trim() === '') {
+      this.workspace = this.findWorkspaceRoot();
+    }
+  }
+
+  /**
+   * Find the workspace root when running from a Bazel output directory
+   */
+  private findWorkspaceRoot(): string {
+    const cwd = process.cwd();
+
+    // Check if we're in a Bazel output directory
+    if (cwd.includes('bazel-out') || cwd.includes('execroot')) {
+      // Try to extract workspace from BUILD_WORKSPACE_DIRECTORY env var (set by bazel run)
+      const workspaceDir = process.env.BUILD_WORKSPACE_DIRECTORY;
+      if (workspaceDir) {
+        console.log(`[BazelService] Detected workspace from BUILD_WORKSPACE_DIRECTORY: ${workspaceDir}`);
+        return workspaceDir;
+      }
+
+      // Fallback: try to find WORKSPACE or MODULE.bazel file by walking up
+      let dir = cwd;
+      for (let i = 0; i < 10; i++) {
+        const parentDir = dirname(dir);
+        if (parentDir === dir) break; // Reached root
+        dir = parentDir;
+
+        try {
+          if (existsSync(join(dir, 'MODULE.bazel')) ||
+              existsSync(join(dir, 'WORKSPACE')) ||
+              existsSync(join(dir, 'WORKSPACE.bazel'))) {
+            console.log(`[BazelService] Found workspace root: ${dir}`);
+            return dir;
+          }
+        } catch (e) {
+          // Continue searching
+        }
+      }
+    }
+
+    // Default to current directory
+    console.log(`[BazelService] Using current directory as workspace: ${cwd}`);
+    return cwd;
   }
 
   /**
@@ -89,6 +137,11 @@ class BazelService {
    * Execute a Bazel query
    */
   async query(query: string, outputFormat: string = 'xml', queryType: string = 'query'): Promise<CommandResult> {
+    // Ensure queryType has a valid value
+    if (!queryType || queryType.trim() === '') {
+      queryType = 'query';
+    }
+
     const cacheKey = `${queryType}:${query}:${outputFormat}`;
 
     // Check cache
@@ -100,12 +153,16 @@ class BazelService {
       }
     }
 
-    const args = [
+    // Build the full command array: [queryType, --output=format, query]
+    const fullCommand = [
+      queryType,
       `--output=${outputFormat}`,
       query  // Don't quote here - execute will handle it
     ];
 
-    const result = await this.execute(queryType, args);
+    console.log(`[bazel.query] queryType="${queryType}", outputFormat="${outputFormat}", query="${query}"`);
+    console.log(`[bazel.query] Building command: ${JSON.stringify(fullCommand)}`);
+    const result = await this.execute(fullCommand);
     
     // Cache the result
     if (this.queryCache.size >= config.cache.maxSize) {

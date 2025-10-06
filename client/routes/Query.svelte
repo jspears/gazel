@@ -2,8 +2,10 @@
   import { onMount } from 'svelte';
   import { Play, Save, BookOpen, Trash2, Clock } from 'lucide-svelte';
   import { api } from '../client.js';
-  import type { QueryTemplate, SavedQuery, BazelTarget } from '../lib/types/index.js';
+  import type { QueryTemplate, SavedQuery, BazelTarget } from 'proto/gazel_pb.js';
   import { storage } from '../lib/storage.js';
+  import { toFull } from '../components/target-util.js';
+  import { Graphviz } from '@hpcc-js/wasm/graphviz';
   
   let query = '';
   let queryType = 'query'; // 'query', 'aquery', or 'cquery'
@@ -18,6 +20,8 @@
   let queryName = '';
   let queryDescription = '';
   let recentQueries = storage.getRecentQueries();
+  let graphSvg = '';
+  let graphContainer: HTMLDivElement;
 
   // Output formats available for each query type
   const outputFormats = {
@@ -63,6 +67,10 @@
     }
   }
 
+  // Separate templates into examples and regular templates
+  $: exampleTemplates = templates.filter(t => t.category === 'examples');
+  $: regularTemplates = templates.filter(t => t.category !== 'examples');
+
   onMount(() => {
     loadTemplates();
     loadSavedQueries();
@@ -71,7 +79,7 @@
 
   async function loadTemplates() {
     try {
-      templates = await api.getQueryTemplates();
+      templates = (await api.getQueryTemplates({})).templates;
     } catch (err: any) {
       // Don't log error if request was aborted due to page reload (workspace switching)
       if (!err.isAborted) {
@@ -82,12 +90,23 @@
 
   async function loadSavedQueries() {
     try {
-      savedQueries = await api.getSavedQueries();
+      savedQueries = (await api.getSavedQueries()).queries;
     } catch (err: any) {
       // Don't log error if request was aborted due to page reload (workspace switching)
       if (!err.isAborted) {
         console.error('Failed to load saved queries:', err);
       }
+    }
+  }
+
+  async function renderGraph(dotSource: string) {
+    try {
+      const graphviz = await Graphviz.load();
+      const svg = graphviz.dot(dotSource);
+      graphSvg = svg;
+    } catch (err) {
+      console.error('Failed to render graph:', err);
+      graphSvg = '';
     }
   }
 
@@ -97,9 +116,15 @@
     try {
       loading = true;
       error = null;
+      graphSvg = '';
       const result = await api.executeQuery({ query, outputFormat, queryType });
       queryResult = result.result;
       rawOutput = result.raw;
+
+      // If output format is graph, render it
+      if (outputFormat === 'graph' && rawOutput) {
+        await renderGraph(rawOutput);
+      }
 
       // Save to recent queries
       storage.addRecentQuery(query, outputFormat);
@@ -146,7 +171,25 @@
   }
 
   function useTemplate(template: QueryTemplate) {
-    query = template.query;
+    // Set the query type and output format from the template
+    if (template.queryType) {
+      queryType = template.queryType;
+    }
+    if (template.outputFormat) {
+      outputFormat = template.outputFormat;
+    }
+
+    // If template has parameters, show a simple substitution
+    if (template.parameters && template.parameters.length > 0) {
+      // Replace parameters with placeholder format
+      let queryText = template.template;
+      for (const param of template.parameters) {
+        queryText = queryText.replace(`{${param}}`, `<${param}>`);
+      }
+      query = queryText;
+    } else {
+      query = template.template;
+    }
   }
 
   function useSavedQuery(savedQuery: SavedQuery) {
@@ -218,21 +261,69 @@
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="space-y-4">
+      {#if exampleTemplates.length > 0}
+        <div class="bg-card rounded-lg border">
+          <div class="p-4 border-b">
+            <h3 class="font-semibold flex items-center gap-2">
+              <Play class="w-4 h-4" />
+              Example Queries
+            </h3>
+            <p class="text-xs text-muted-foreground mt-1">Ready-to-run examples</p>
+          </div>
+          <div class="max-h-[300px] overflow-y-auto">
+            {#each exampleTemplates as template}
+              <button
+                on:click={() => useTemplate(template)}
+                class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 transition-colors"
+              >
+                <div class="flex items-center gap-2 mb-1">
+                  <div class="font-medium text-sm">{template.name}</div>
+                  {#if template.queryType}
+                    <span
+                      class="text-xs px-1.5 py-0.5 rounded font-mono {template.queryType === 'query' ? 'bg-blue-500/10 text-blue-600' : template.queryType === 'cquery' ? 'bg-purple-500/10 text-purple-600' : 'bg-green-500/10 text-green-600'}"
+                    >
+                      {template.queryType}
+                    </span>
+                  {/if}
+                </div>
+                <div class="text-xs text-muted-foreground">{template.description}</div>
+                <div class="text-xs font-mono text-muted-foreground mt-1 bg-muted/30 px-2 py-1 rounded">
+                  {template.template}
+                </div>
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
       <div class="bg-card rounded-lg border">
         <div class="p-4 border-b">
           <h3 class="font-semibold flex items-center gap-2">
             <BookOpen class="w-4 h-4" />
             Query Templates
           </h3>
+          <p class="text-xs text-muted-foreground mt-1">Templates with parameters</p>
         </div>
-        <div class="max-h-[300px] overflow-y-auto">
-          {#each templates as template}
+        <div class="max-h-[400px] overflow-y-auto">
+          {#each regularTemplates as template}
             <button
               on:click={() => useTemplate(template)}
-              class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0"
+              class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 transition-colors"
             >
-              <div class="font-medium text-sm">{template.name}</div>
-              <div class="text-xs text-muted-foreground mt-1">{template.description}</div>
+              <div class="flex items-center gap-2 mb-1">
+                <div class="font-medium text-sm">{template.name}</div>
+                {#if template.category}
+                  <span
+                    class="text-xs px-1.5 py-0.5 rounded font-mono {template.category === 'query' ? 'bg-blue-500/10 text-blue-600' : template.queryType === 'cquery' ? 'bg-purple-500/10 text-purple-600' : 'bg-green-500/10 text-green-600'}"
+                  >
+                    {template.category}
+                  </span>
+                {/if}
+              </div>
+              <div class="text-xs text-muted-foreground">{template.description}</div>
+              <div class="text-xs font-mono text-muted-foreground mt-1 bg-muted/30 px-2 py-1 rounded">
+                {template.template}
+              </div>
             </button>
           {/each}
         </div>
@@ -331,14 +422,22 @@
             <div class="text-sm text-muted-foreground mb-2">
               Found {queryResult.targets.length} targets
             </div>
-            {#if outputFormat === 'xml' || outputFormat === 'graph'}
+            {#if outputFormat === 'graph'}
+              {#if graphSvg}
+                <div class="border rounded-lg p-4 bg-white overflow-auto" bind:this={graphContainer}>
+                  {@html graphSvg}
+                </div>
+              {:else}
+                <pre class="font-mono text-xs bg-muted p-4 rounded overflow-x-auto">{rawOutput}</pre>
+              {/if}
+            {:else if outputFormat === 'xml'}
               <pre class="font-mono text-xs bg-muted p-4 rounded overflow-x-auto">{rawOutput}</pre>
             {:else}
               {#each queryResult.targets as target}
                 <div class="font-mono text-sm py-1">
-                  {target.full || target.name}
-                  {#if target.ruleType}
-                    <span class="text-muted-foreground ml-2">({target.ruleType})</span>
+                  {target.label || target.name || toFull(target)}
+                  {#if target.kind}
+                    <span class="text-muted-foreground ml-2">({target.kind})</span>
                   {/if}
                 </div>
               {/each}

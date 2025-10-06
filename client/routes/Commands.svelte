@@ -4,9 +4,8 @@
   import { api } from '../client.js';
   import type { CommandHistory } from '../lib/types/index.js';
 
-  export let initialTarget: string | null = null;
+  export let target: string | null = null;
 
-  let target = '';
   let commandType: 'build' | 'test' | 'run' = 'build';
   let options = '';
   let output = '';
@@ -17,15 +16,12 @@
   let cancelStreamRun: (() => void) | null = null;
 
   onMount(() => {
-    if (initialTarget) {
-      target = initialTarget;
-    }
     loadHistory();
   });
 
   async function loadHistory() {
     try {
-      const result = await api.getCommandHistory();
+      const result = await api.getCommandHistory({limit: 50});
       history = result.history;
     } catch (err) {
       console.error('Failed to load history:', err);
@@ -39,37 +35,26 @@
       loading = true;
       error = null;
       output = '';
-      
+
       const optionsArray = options.trim() ? options.trim().split(' ') : [];
-      
-      if (commandType === 'build') {
-        const result = await api.buildTarget(target, optionsArray);
-        output = result.output + (result.stderr ? `\n\nErrors:\n${result.stderr}` : '');
-        if (!result.success) {
-          error = result.error || 'Build failed';
-          if (result.command) {
-            error += `\n\nFailed command: ${result.command}`;
-          }
-        }
-      } else {
-        const result = await api.testTarget(target, optionsArray);
-        output = result.output + (result.stderr ? `\n\nErrors:\n${result.stderr}` : '');
-        if (!result.success) {
-          error = result.error || 'Test failed';
-          if (result.command) {
-            error += `\n\nFailed command: ${result.command}`;
-          }
-        }
+
+      // Use buildTarget for build, test, and run commands
+      const result = await api.buildTarget({
+        target,
+        options: optionsArray,
+        command: commandType
+      });
+
+      output = result.output + (result.stderr ? `\n\nErrors:\n${result.stderr}` : '');
+      if (!result.success) {
+        error = result.error || `${commandType} failed`;
       }
-      
+
       await loadHistory();
     } catch (err: any) {
-      error = err.message;
-      if (err.command) {
-        error += `\n\nFailed command: ${err.command}`;
-      }
-      if (err.data?.details) {
-        error += `\n\nDetails: ${err.data.details}`;
+      error = err.message || `${commandType} failed`;
+      if (err.details) {
+        error += `\n\nDetails: ${err.details}`;
       }
     } finally {
       loading = false;

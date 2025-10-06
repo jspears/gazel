@@ -3,38 +3,40 @@
   import { api } from '../client.js';
   import { Package, GitBranch, Tag, AlertCircle, ChevronRight, ChevronDown, ExternalLink, Layers, Code } from 'lucide-svelte';
   import ElkModuleGraph from '../components/ElkModuleGraph.svelte';
+  import type {  GetModuleGraphResponse } from 'proto/gazel_pb.js';
+  import { Graphviz } from '@hpcc-js/wasm/graphviz';
 
   let loading = true;
   let error: string | null = null;
-  let moduleGraph: any = null;
-  let selectedModule: any = null;
+  let moduleGraph: GetModuleGraphResponse | null = null;
+  let selectedModule: GetModuleGraphResponse['modules'][0] | null = null;
   let expandedModules = new Set<string>();
-  let viewMode: 'list' | 'graph' = 'list';
+  let viewMode: 'list' | 'graph' | 'graphviz' = 'list';
   let searchQuery = '';
   let layoutDirection: 'DOWN' | 'RIGHT' = 'DOWN';
+  let dotGraph = '';
+  let graphSvg = '';
+  let loadingGraph = false;
 
   onMount(async () => {
     await loadModuleGraph();
   });
 
+
   async function loadModuleGraph() {
     try {
       loading = true;
       error = null;
-      moduleGraph = await api.getModuleGraph();
+      console.log('Calling api.getModuleGraph...');
+      moduleGraph = (await api.getModuleGraph({}));
       console.log('Module graph loaded:', moduleGraph);
+      console.log('Module count:', moduleGraph?.modules?.length);
+      console.log('Root:', moduleGraph?.root);
+      console.log('Statistics:', moduleGraph?.statistics);
 
-      // Ensure statistics exists
-      if (moduleGraph && !moduleGraph.statistics) {
-        moduleGraph.statistics = {
-          totalModules: moduleGraph.modules?.length || 0,
-          directDependencies: 0,
-          devDependencies: 0,
-          indirectDependencies: 0
-        };
-      }
     } catch (err: any) {
       console.error('Failed to load module graph:', err);
+      console.error('Error details:', err.message, err.stack);
       // Check if it's a bazel command error
       if (err.message?.includes('bazel') || err.message?.includes('command')) {
         error = 'Unable to load module graph. Make sure Bazel is installed and the workspace has a MODULE.bazel file with bzlmod enabled.';
@@ -42,97 +44,50 @@
         error = err.message || 'Failed to load module graph';
       }
 
-      // Provide sample data for demonstration
-      if (err.message?.includes('not found') || err.message?.includes('bazel')) {
-        moduleGraph = {
-          root: '<root>',
-          modules: [
-            {
-              key: '<root>',
-              name: 'example_workspace',
-              version: '1.0.0',
-              apparentName: 'example_workspace',
-              isRoot: true,
-              depth: 0,
-              dependencies: [
-                { key: 'rules_cc@0.1.1', name: 'rules_cc', version: '0.1.1' },
-                { key: 'rules_java@8.14.0', name: 'rules_java', version: '8.14.0' },
-                { key: 'rules_python@0.40.0', name: 'rules_python', version: '0.40.0' },
-                { key: 'googletest@1.14.0.bcr.1', name: 'googletest', version: '1.14.0.bcr.1' }
-              ],
-              dependencyCount: 4
-            },
-            {
-              key: 'rules_cc@0.1.1',
-              name: 'rules_cc',
-              version: '0.1.1',
-              apparentName: 'rules_cc',
-              depth: 1,
-              dependencies: [],
-              dependencyCount: 0
-            },
-            {
-              key: 'rules_java@8.14.0',
-              name: 'rules_java',
-              version: '8.14.0',
-              apparentName: 'rules_java',
-              depth: 1,
-              dependencies: [],
-              dependencyCount: 0
-            },
-            {
-              key: 'rules_python@0.40.0',
-              name: 'rules_python',
-              version: '0.40.0',
-              apparentName: 'rules_python',
-              depth: 1,
-              dependencies: [],
-              dependencyCount: 0
-            },
-            {
-              key: 'googletest@1.14.0.bcr.1',
-              name: 'googletest',
-              version: '1.14.0.bcr.1',
-              apparentName: 'googletest',
-              depth: 1,
-              dependencies: [],
-              dependencyCount: 0
-            }
-          ],
-          dependencies: [
-            { from: '<root>', to: 'rules_cc@0.1.1', type: 'direct', version: '0.1.1' },
-            { from: '<root>', to: 'rules_java@8.14.0', type: 'direct', version: '8.14.0' },
-            { from: '<root>', to: 'rules_python@0.40.0', type: 'direct', version: '0.40.0' },
-            { from: '<root>', to: 'googletest@1.14.0.bcr.1', type: 'direct', version: '1.14.0.bcr.1' }
-          ],
-          statistics: {
-            totalModules: 5,
-            directDependencies: 4,
-            devDependencies: 0,
-            indirectDependencies: 0
-          }
-        };
-        error = 'Using sample data. Install Bazel to see actual module graph.';
-      }
+
     } finally {
       loading = false;
     }
   }
 
-  async function selectModule(module: any) {
+  async function selectModule(module: GetModuleGraphResponse['modules'][0]) {
+      selectedModule = (await api.getModuleInfo({ moduleName: module.name })).module;
+  }
+
+  async function loadDotGraph() {
     try {
-      selectedModule = await api.getModuleInfo(module.name);
+      loadingGraph = true;
+      console.log('Loading DOT graph...');
+      const result = await api.getModuleGraphDot({ options: [] });
+      dotGraph = result.dot;
+      console.log('DOT graph loaded, length:', dotGraph.length);
+
+      // Render the DOT graph to SVG
+      await renderDotGraph(dotGraph);
     } catch (err: any) {
-      console.error('Failed to load module details:', err);
-      // Provide mock data for demonstration
-      selectedModule = {
-        ...module,
-        directDependents: [],
-        transitiveDependents: [],
-        directDependencies: module.dependencies || [],
-        transitiveDependencies: []
-      };
+      console.error('Failed to load DOT graph:', err);
+      error = err.message || 'Failed to load DOT graph';
+    } finally {
+      loadingGraph = false;
     }
+  }
+
+  async function renderDotGraph(dot: string) {
+    try {
+      console.log('Rendering DOT graph...');
+      const graphviz = await Graphviz.load();
+      const svg = graphviz.dot(dot);
+      graphSvg = svg;
+      console.log('DOT graph rendered, SVG length:', svg.length);
+    } catch (err) {
+      console.error('Failed to render DOT graph:', err);
+      graphSvg = '';
+    }
+  }
+
+  // Load DOT graph when switching to graphviz view
+  $: if (viewMode === 'graphviz' && !dotGraph && !loadingGraph) {
+    loadDotGraph();
   }
 
   function toggleModule(moduleKey: string) {
@@ -141,7 +96,7 @@
     } else {
       expandedModules.add(moduleKey);
     }
-    expandedModules = expandedModules;
+    expandedModules = new Set(expandedModules);
   }
 
   function handleModuleActivation(event: KeyboardEvent, moduleKey: string) {
@@ -184,7 +139,7 @@
            module.key.toLowerCase().includes(query);
   }) || [];
 
-  $: rootModule = moduleGraph?.modules?.find((m: any) => m.isRoot);
+  $: rootModule = moduleGraph?.modules?.find((m: any) => m.key === moduleGraph?.root);
 </script>
 
 <div class="space-y-6">
@@ -207,7 +162,13 @@
         on:click={() => viewMode = 'graph'}
         class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors {viewMode === 'graph' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}"
       >
-        Graph View
+        ELK Graph
+      </button>
+      <button
+        on:click={() => viewMode = 'graphviz'}
+        class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors {viewMode === 'graphviz' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}"
+      >
+        Graphviz
       </button>
     </div>
   </div>
@@ -278,7 +239,7 @@
                   <p class="text-sm text-muted-foreground mt-1">
                     Version: {formatVersion(rootModule.version)}
                   </p>
-                  {#if rootModule.apparentName && rootModule.apparentName !== rootModule.name}
+                  {#if rootModule.repoName !== rootModule.name}
                     <p class="text-sm text-muted-foreground">
                       Module: {rootModule.name}
                     </p>
@@ -298,7 +259,6 @@
         <!-- Module List -->
         <div class="space-y-2">
           {#each filteredModules as module}
-            {#if !module.isRoot}
               <div class="bg-card border rounded-lg">
                 <div
                   role="button"
@@ -309,7 +269,7 @@
                 >
                   <div class="flex items-start gap-3">
                     <div class="p-2 bg-muted rounded-lg">
-                      {#if module.extension_usages?.length > 0}
+                      {#if module.extensionUsages?.length > 0}
                         <Code class="w-5 h-5 text-muted-foreground" />
                       {:else}
                         <Package class="w-5 h-5 text-muted-foreground" />
@@ -327,12 +287,7 @@
                             {module.dependencyCount} deps
                           </span>
                         {/if}
-                        {#if module.depth}
-                          <span class="flex items-center gap-1">
-                            <Layers class="w-3 h-3" />
-                            Depth: {module.depth}
-                          </span>
-                        {/if}
+                      
                         {#if module.tags?.length > 0}
                           <span class="flex items-center gap-1">
                             <Tag class="w-3 h-3" />
@@ -369,7 +324,7 @@
                                 <span class="text-muted-foreground">
                                   {dep.name}@{formatVersion(dep.version)}
                                 </span>
-                                {#if dep.dev_dependency}
+                                {#if dep.devDependency}
                                   <span class="text-xs bg-muted px-2 py-0.5 rounded">dev</span>
                                 {/if}
                               </div>
@@ -378,13 +333,13 @@
                         </div>
                       {/if}
 
-                      {#if module.extension_usages?.length > 0}
+                      {#if module.extensionUsages?.length}
                         <div>
                           <h4 class="text-sm font-semibold mb-2">Extensions</h4>
                           <div class="space-y-1">
-                            {#each module.extension_usages as ext}
+                            {#each module.extensionUsages as ext}
                               <div class="text-sm text-muted-foreground py-1">
-                                {ext.extension_name} from {ext.extension_bzl_file}
+                                {ext.extensionName} from {ext.extensionBzlFile}
                               </div>
                             {/each}
                           </div>
@@ -394,7 +349,6 @@
                   </div>
                 {/if}
               </div>
-            {/if}
           {/each}
         </div>
       </div>
@@ -417,11 +371,11 @@
                 </div>
               {/if}
 
-              {#if selectedModule.directDependents?.length > 0}
+              {#if selectedModule.dependencies?.length > 0}
                 <div>
                   <h4 class="text-sm font-semibold text-muted-foreground mb-1">Used By</h4>
                   <div class="space-y-1">
-                    {#each selectedModule.directDependents as dep}
+                    {#each selectedModule.dependencies as dep}
                       <div class="text-sm">{dep.name}</div>
                     {/each}
                   </div>
@@ -432,8 +386,8 @@
         {/if}
       </div>
     </div>
-    {:else}
-      <!-- Graph View -->
+    {:else if viewMode === 'graph'}
+      <!-- ELK Graph View -->
       <div class="space-y-4">
         <!-- Controls -->
         <div class="flex items-center justify-between">
@@ -472,9 +426,7 @@
           <div class="bg-card border rounded-lg p-4">
             <h3 class="font-semibold text-lg mb-4">
               {formatModuleName(selectedModule)}
-              {#if selectedModule.isRoot}
-                <span class="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">ROOT</span>
-              {/if}
+     
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -487,49 +439,65 @@
                   <p class="text-sm font-mono">{selectedModule.key}</p>
                 </div>
               {/if}
-              {#if selectedModule.depth !== undefined}
-                <div>
-                  <h4 class="text-sm font-semibold text-muted-foreground mb-1">Depth</h4>
-                  <p class="text-sm">{selectedModule.depth}</p>
-                </div>
-              {/if}
+             
             </div>
 
-            {#if selectedModule.directDependencies?.length > 0}
+            {#if selectedModule.dependencies?.length > 0}
               <div class="mt-4">
-                <h4 class="text-sm font-semibold text-muted-foreground mb-2">Direct Dependencies ({selectedModule.directDependencies.length})</h4>
+                <h4 class="text-sm font-semibold text-muted-foreground mb-2">Direct Dependencies ({selectedModule.dependencies.length})</h4>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {#each selectedModule.directDependencies.slice(0, 6) as dep}
+                  {#each selectedModule.dependencies.slice(0, 6) as dep}
                     <div class="text-sm bg-muted/50 px-2 py-1 rounded">
                       {dep.name}@{formatVersion(dep.version)}
                     </div>
                   {/each}
-                  {#if selectedModule.directDependencies.length > 6}
+                  {#if selectedModule.dependencies.length > 6}
                     <div class="text-sm text-muted-foreground px-2 py-1">
-                      +{selectedModule.directDependencies.length - 6} more
-                    </div>
+                      +{selectedModule.dependencies.length - 6} more
+                     </div>
                   {/if}
                 </div>
               </div>
             {/if}
 
-            {#if selectedModule.directDependents?.length > 0}
+            {#if selectedModule.resolvedDependencies?.length}
               <div class="mt-4">
-                <h4 class="text-sm font-semibold text-muted-foreground mb-2">Used By ({selectedModule.directDependents.length})</h4>
+                <h4 class="text-sm font-semibold text-muted-foreground mb-2">Used By ({selectedModule.resolvedDependencies.length})</h4>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {#each selectedModule.directDependents.slice(0, 6) as dep}
+                  {#each selectedModule.resolvedDependencies.slice(0, 6) as dep}
                     <div class="text-sm bg-muted/50 px-2 py-1 rounded">
                       {dep.name}
                     </div>
                   {/each}
-                  {#if selectedModule.directDependents.length > 6}
+                  {#if selectedModule.dependencies.length > 6}
                     <div class="text-sm text-muted-foreground px-2 py-1">
-                      +{selectedModule.directDependents.length - 6} more
+                      +{selectedModule.resolvedDependencies.length - 6} more
                     </div>
                   {/if}
                 </div>
               </div>
             {/if}
+          </div>
+        {/if}
+      </div>
+    {:else if viewMode === 'graphviz'}
+      <!-- Graphviz View -->
+      <div class="space-y-4">
+        {#if loadingGraph}
+          <div class="flex items-center justify-center py-12">
+            <div class="text-muted-foreground">Loading graph...</div>
+          </div>
+        {:else if graphSvg}
+          <div class="bg-card border rounded-lg p-4 overflow-auto" style="max-height: 800px;">
+            {@html graphSvg}
+          </div>
+        {:else if dotGraph}
+          <div class="bg-card border rounded-lg p-4">
+            <pre class="text-xs overflow-auto max-h-96">{dotGraph}</pre>
+          </div>
+        {:else}
+          <div class="bg-card border rounded-lg p-4">
+            <p class="text-muted-foreground">No graph data available</p>
           </div>
         {/if}
       </div>

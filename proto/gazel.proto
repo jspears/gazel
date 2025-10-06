@@ -291,6 +291,7 @@ message StreamQueryRequest {
   string query = 1;
   string output_format = 2;
   bool parse_xml = 3;
+  string query_type = 4; // "query", "aquery", or "cquery"
 }
 message StreamQueryResponse {
   oneof data {
@@ -304,6 +305,7 @@ message StreamQueryResponse {
 message BuildTargetRequest {
   string target = 1;
   repeated string options = 2;
+  string command = 3; // "build", "test", or "run" (default: "build")
 }
 message BuildTargetResponse {
   bool success = 1;
@@ -358,6 +360,13 @@ message GetModuleInfoRequest {
 }
 message GetModuleInfoResponse {
   Module module = 1;
+}
+
+message GetModuleGraphDotRequest {
+  repeated string options = 1; // Additional options like --depth, --from, etc.
+}
+message GetModuleGraphDotResponse {
+  string dot = 1; // DOT format graph
 }
 
 message GetQueryTemplatesRequest {}
@@ -452,6 +461,27 @@ message SearchResult {
   string content = 3;
 }
 
+// Command History Messages
+message GetCommandHistoryRequest {
+  int32 limit = 1; // Maximum number of history items to return (default: 50)
+}
+
+message GetCommandHistoryResponse {
+  repeated CommandHistoryItem history = 1;
+}
+
+message CommandHistoryItem {
+  string id = 1;
+  string command = 2; // "build", "test", "run"
+  string target = 3;
+  repeated string options = 4;
+  int64 timestamp = 5;
+  bool success = 6;
+  string output = 7;
+  string error = 8;
+  int32 duration_ms = 9;
+}
+
 // ============================================================================
 // Services
 // ============================================================================
@@ -489,9 +519,13 @@ service GazelService {
   // Module operations
   rpc GetModuleGraph(GetModuleGraphRequest) returns (GetModuleGraphResponse);
   rpc GetModuleInfo(GetModuleInfoRequest) returns (GetModuleInfoResponse);
+  rpc GetModuleGraphDot(GetModuleGraphDotRequest) returns (GetModuleGraphDotResponse);
 
   // File operations
   rpc GetBuildFile(GetBuildFileRequest) returns (GetBuildFileResponse);
   rpc GetTargetsByFile(GetTargetsByFileRequest) returns (GetTargetsByFileResponse);
   rpc SearchInFiles(SearchInFilesRequest) returns (SearchInFilesResponse);
+
+  // Command history operations
+  rpc GetCommandHistory(GetCommandHistoryRequest) returns (GetCommandHistoryResponse);
 }

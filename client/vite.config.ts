@@ -6,7 +6,11 @@ export default defineConfig({
   plugins: [
     viteTSConfigPaths(),
     svelte({
-
+       compilerOptions: {
+        // Enable dev mode features
+        dev: true,
+      },
+      inspector:true,
     })
   ],
   server: {

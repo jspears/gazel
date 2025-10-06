@@ -1,58 +1,69 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher } from 'svelte';
   import { Folder, FileCode, Package, ExternalLink, Target, Clock, ChevronDown, ChevronRight, RefreshCw, Info } from 'lucide-svelte';
   import { api } from '../client.js';
-//  import type { WorkspaceInfo, BuildFile } from '$lib/types';
   import { storage } from '../lib/storage.js';
-  import type { BuildFile, WorkspaceInfo, BazelInfo } from 'proto/gazel_pb.js';
+  import type { WorkspaceInfo, BazelInfo, GetWorkspaceFilesResponse_WorkspaceFile } from 'proto/gazel_pb.js';
+  import { onMount } from 'svelte';
 
-  const dispatch = createEventDispatcher();
+  interface Props {
+    onNavigateToFile?: (path: string) => void;
+    onNavigateToTargets?: (target: string) => void;
+    onOpenWorkspacePicker?: () => void;
+  }
 
-  let workspaceInfo: WorkspaceInfo | null = null;
-  let bazelInfo: BazelInfo | null = null;
-  let buildFiles: BuildFile[] = [];
-  let loading = true;
-  let error: string | null = null;
-  let recentTargets = storage.getRecentTargets();
-  let recentFilesExpanded = true;
-  let recentTargetsExpanded = true;
+  let {
+    onNavigateToFile,
+    onNavigateToTargets,
+    onOpenWorkspacePicker
+  }: Props = $props();
 
-  onMount(async () => {
-    try {
-      loading = true;
-      const [info, files, bzlInfo] = await Promise.all([
-        api.getWorkspaceInfo(),
-        api.getWorkspaceFiles(),
-        api.getBazelInfo()
-      ]);
+  let workspaceInfo = $state<WorkspaceInfo | null>(null);
+  let bazelInfo = $state<BazelInfo | null>(null);
+  let buildFiles = $state<GetWorkspaceFilesResponse_WorkspaceFile[]>([]);
+  let loading = $state(true); 
+  let error = $state<string | null>(null);
+  let recentTargets = $state(storage.getRecentTargets());
+  let recentFilesExpanded = $state(true);
+  let recentTargetsExpanded = $state(true);
 
-      workspaceInfo = info;
-      buildFiles = files.files;
-      bazelInfo = bzlInfo.info;
-    } catch (err: any) {
-      // Don't show error if request was aborted due to page reload (workspace switching)
-      if (!err.isAborted) {
-        error = err.message;
+  onMount(() => {
+    (async () => {
+      try {
+        loading = true;
+        const [info, files, bzlInfo] = await Promise.all([
+          api.getWorkspaceInfo({}),
+          api.getWorkspaceFiles({}),
+          api.getBazelInfo({})
+        ]);
+
+        workspaceInfo = info.info;
+        buildFiles = files.files ?? [];
+        bazelInfo = bzlInfo.info;
+      } catch (err: unknown) {
+        // Don't show error if request was aborted due to page reload (workspace switching)
+        if (err && typeof err === 'object' && 'isAborted' in err && !err.isAborted) {
+          error = err && typeof err === 'object' && 'message' in err ? String(err.message) : 'Unknown error';
+        }
+      } finally {
+        loading = false;
       }
-    } finally {
-      loading = false;
-    }
+    })();
   });
 
   function openFile(path: string) {
-    dispatch('navigate-to-file', { path });
+    onNavigateToFile?.(path);
   }
 
   function viewWorkspaceFile() {
     // Find the MODULE.bazel file and navigate to it
     const moduleFile = buildFiles.find(f => f.type === 'module' || f.type === 'workspace');
     if (moduleFile) {
-      dispatch('navigate-to-file', { path: moduleFile.path });
+      onNavigateToFile?.(moduleFile.path);
     }
   }
 
-  function openWorkspacePicker() {
-    dispatch('open-workspace-picker');
+  function handleOpenWorkspacePicker() {
+    onOpenWorkspacePicker?.();
   }
 </script>
 
@@ -87,7 +98,7 @@
             <dt class="text-muted-foreground">Path</dt>
             <dd class="font-mono text-xs break-all">
               <button
-                on:click={openWorkspacePicker}
+                onclick={handleOpenWorkspacePicker}
                 class="text-left hover:text-primary transition-colors cursor-pointer group flex items-center gap-1"
                 title="Click to switch workspace"
               >
@@ -99,7 +110,7 @@
         </dl>
         {#if buildFiles.some(f => f.type === 'workspace' || f.type === 'module')}
           <button
-            on:click={viewWorkspaceFile}
+            onclick={viewWorkspaceFile}
             class="mt-4 w-full px-3 py-2 bg-muted text-muted-foreground rounded-md hover:bg-muted/80 hover:text-foreground text-sm transition-colors"
           >
             View {buildFiles.some(f => f.type === 'module') ? 'MODULE.bazel' : 'WORKSPACE'} File
@@ -156,7 +167,7 @@
 
     <div class="bg-card p-6 rounded-lg border">
       <button
-        on:click={() => recentFilesExpanded = !recentFilesExpanded}
+        onclick={() => recentFilesExpanded = !recentFilesExpanded}
         class="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
       >
         <div class="flex items-center gap-3">
@@ -173,7 +184,7 @@
         <div class="space-y-2">
         {#each buildFiles.slice(0, 10) as file}
           <button
-            on:click={() => openFile(file.path)}
+            onclick={() => openFile(file.path)}
             class="w-full flex items-center justify-between py-2 px-3 hover:bg-muted rounded-md transition-colors cursor-pointer group"
             title="Click to view {file.path}"
           >
@@ -200,7 +211,7 @@
     {#if recentTargets.length > 0}
       <div class="bg-card p-6 rounded-lg border">
         <button
-          on:click={() => recentTargetsExpanded = !recentTargetsExpanded}
+          onclick={() => recentTargetsExpanded = !recentTargetsExpanded}
           class="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
         >
           <div class="flex items-center gap-3">
@@ -217,7 +228,7 @@
           <div class="space-y-2">
           {#each recentTargets.slice(0, 10) as target}
             <button
-              on:click={() => dispatch('navigate-to-targets', { target: target.name })}
+              onclick={() => onNavigateToTargets?.(target.name)}
               class="w-full flex items-center justify-between py-2 px-3 hover:bg-muted rounded-md transition-colors cursor-pointer group"
               title="Click to view {target.name}"
             >
