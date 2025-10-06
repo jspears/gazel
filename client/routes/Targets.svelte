@@ -141,12 +141,13 @@
       loading = true;
       error = null;
       displayLimit = 100; // Reset display limit when loading new targets
-      const result = await api.listTargets({});
-      targets = result.targets;
-      console.log({targets});
-      filteredTargets = targets;
-      byPackage = result.byPackage;
+      targets = [];
+      byPackage = {};
+      const result = await api.searchTargets({query: '//...'});
+      filteredTargets = result.targets;
+   
     } catch (err: any) {
+      console.trace(err)
       // Don't show error if request was aborted due to page reload (workspace switching)
       if (!err.isAborted) {
         error = err.message;
@@ -538,9 +539,7 @@
 
 
   $: uniqueTypes = [...new Set(targets.map(t => t.kind).filter(Boolean))];
-$:{
-  console.log({uniqueTypes});
-}
+
   // Filter targets based on hidden state
   $: visibleTargets = showHiddenTargets
     ? filteredTargets

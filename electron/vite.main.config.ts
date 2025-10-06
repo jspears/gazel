@@ -16,6 +16,7 @@ const protoAlias = existsSync(protoGeneratedDir) ? protoGeneratedDir : protoSour
 
 // https://vitejs.dev/config
 export default defineConfig({
+  plugins: [viteTSConfigPaths()],
   resolve: {
     alias: {
       proto: protoAlias,
@@ -37,7 +38,6 @@ export default defineConfig({
         entryFileNames: 'main.cjs',
       },
       plugins: [
-        viteTSConfigPaths(),
         nodeResolve({
           preferBuiltins: true,
           extensions: ['.js', '.ts', '.cjs', '.mjs', '.json'],

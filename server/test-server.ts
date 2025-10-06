@@ -37,14 +37,24 @@ async function testService() {
     console.log();
 
     // Test listTargets
-    console.log("3. Testing listTargets:");
+    console.log("3. Testing listTargets (streaming):");
     const listTargetsReq = create(ListTargetsRequestSchema, {
       pattern: "//...",
       format: "label",
     });
-    const targets = await service.listTargets(listTargetsReq);
-    console.log("   ✓ Total targets:", targets.total);
-    console.log("   ✓ Packages found:", Object.keys(targets.byPackage).length);
+    let targetCount = 0;
+    const packages = new Set<string>();
+    for await (const response of service.listTargets(listTargetsReq)) {
+      if (response.data.case === 'target') {
+        targetCount++;
+        if (response.data.value.package) {
+          packages.add(response.data.value.package);
+        }
+      } else if (response.data.case === 'complete') {
+        console.log("   ✓ Total targets:", response.data.value.total);
+      }
+    }
+    console.log("   ✓ Packages found:", packages.size);
     console.log();
 
     // Test executeQuery

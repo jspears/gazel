@@ -62,7 +62,6 @@
   }
 
   let treeRoot = $state(buildTree(targets));
-  console.log(treeRoot);
 </script>
 
 <div class="max-h-[600px] overflow-y-auto">

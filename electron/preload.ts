@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IpcTransport } from './electron-ipc-transport';
+import { IpcTransport } from './electron-ipc-transport.js';
 
 
 // Expose protected methods that allow the renderer process to use

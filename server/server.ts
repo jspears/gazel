@@ -27,6 +27,7 @@ import {
   type ListTargetsRequest,
   type ListTargetsResponse,
   ListTargetsResponseSchema,
+  ListTargetsCompleteSchema,
   BazelTargetSchema,
   BazelAttributeSchema,
   TargetListSchema,
@@ -106,7 +107,7 @@ import {
   type GetCommandHistoryResponse,
   GetCommandHistoryResponseSchema,
   CommandHistoryItemSchema,
-} from "../proto/gazel_pb.js";
+} from "proto/gazel_pb.js";
 import bazelService from "./services/bazel.js";
 import parserService from "./services/parser.js";
 import config, { setWorkspace } from "./config.js";
@@ -585,9 +586,9 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   }
 
   /**
-   * List all targets
+   * List all targets (streaming)
    */
-  async listTargets(request: ListTargetsRequest): Promise<ListTargetsResponse> {
+  async *listTargets(request: ListTargetsRequest): AsyncGenerator<ListTargetsResponse> {
     try {
       // Ensure we have valid defaults for pattern and format
       const pattern = request.pattern || "//...";
@@ -607,8 +608,9 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
         targets = parserService.parseLabelOutput(result.stdout);
       }
 
-      // Convert to proto format
-      const protoTargets = targets.map((target) => {
+      // Stream each target individually
+      let count = 0;
+      for (const target of targets) {
         const label = target.full || target.label || "";
         const kind = target.ruleType || target.kind || "";
 
@@ -630,7 +632,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
           }
         }
 
-        return create(BazelTargetSchema, {
+        const protoTarget = create(BazelTargetSchema, {
           label: label,
           kind: kind,
           package: pkg,
@@ -640,25 +642,34 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
           srcs: target.srcs || [],
           attributes: target.attributes,
         });
-      });
 
-      // Group targets by package
-      const byPackage: Record<string, any> = {};
-      protoTargets.forEach((target) => {
-        const pkg = target.package || "unknown";
-        if (!byPackage[pkg]) {
-          byPackage[pkg] = create(TargetListSchema, { targets: [] });
-        }
-        byPackage[pkg].targets.push(target);
-      });
+        // Yield each target
+        yield create(ListTargetsResponseSchema, {
+          data: {
+            case: "target",
+            value: protoTarget,
+          },
+        });
+        count++;
+      }
 
-      return create(ListTargetsResponseSchema, {
-        total: protoTargets.length,
-        targets: protoTargets,
-        byPackage,
+      // Send completion message with total count
+      yield create(ListTargetsResponseSchema, {
+        data: {
+          case: "complete",
+          value: create(ListTargetsCompleteSchema, {
+            total: count,
+          }),
+        },
       });
     } catch (error: any) {
-      throw new Error(`Failed to list targets: ${error.message}`);
+      // Send error message
+      yield create(ListTargetsResponseSchema, {
+        data: {
+          case: "error",
+          value: `Failed to list targets: ${error.message}`,
+        },
+      });
     }
   }
 

@@ -1,10 +1,13 @@
-import { create, type DescMethodStreaming,type MessageShape, type DescMessage, type DescMethodUnary, type MessageInitShape, fromBinary } from "@bufbuild/protobuf";
+import { create, type DescMethodStreaming,type MessageShape, type DescMessage, type DescMethodUnary, type MessageInitShape, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { type StreamResponse,type UnaryResponse, type Transport } from "@connectrpc/connect";
 import {  ipcRenderer as _ipcRenderer, IpcRenderer } from 'electron';
 
 export class IpcTransport implements Transport {
   constructor(private ipcRenderer:typeof _ipcRenderer = _ipcRenderer) {
-    console.log('IpcTransport initialized');
+    console.log('IpcTransport initialized', {
+      hasUnary: typeof this.unary === 'function',
+      hasStream: typeof this.stream === 'function'
+    });
   }
 
    unary = async <I extends DescMessage, O extends DescMessage>(
@@ -15,13 +18,22 @@ export class IpcTransport implements Transport {
     input: MessageInitShape<I>,
     _contextValues?: unknown
   ):Promise<UnaryResponse<I, O>> => {
+    // Convert input to binary for IPC transfer
+    const inputMessage = create(method.input, input);
+    const binaryInput = toBinary(method.input, inputMessage);
+
+    // Convert Uint8Array to Buffer for IPC transfer
+   // const bufferInput = Buffer.from(binaryInput);
+
     const result = await this.ipcRenderer.invoke('grpc:unary:request', {
       method: method.localName,
       service: method.parent.name,
-      data: create(method.input, input)
+      data: binaryInput
     });
 
-    const message = fromBinary(method.output, result);
+    // Convert Buffer back to Uint8Array
+    const uint8Result = result instanceof Buffer ? new Uint8Array(result) : result;
+    const message = fromBinary(method.output, uint8Result);
     return {
       stream: false,
       message,
@@ -32,14 +44,14 @@ export class IpcTransport implements Transport {
     }
   }
 
-  async stream<I extends DescMessage, O extends DescMessage>(
+  stream = async <I extends DescMessage, O extends DescMessage>(
     method: DescMethodStreaming<I, O>,
     signal: AbortSignal | undefined,
     _timeoutMs: number | undefined,
     _header: HeadersInit | undefined,
     input: AsyncIterable<MessageInitShape<I>>,
     _contextValues?: unknown
-  ): Promise<StreamResponse<I, O>> {
+  ): Promise<StreamResponse<I, O>> => {
     // Generate a unique stream ID for this streaming call
     const streamId = `stream-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
@@ -57,19 +69,22 @@ export class IpcTransport implements Transport {
 
       // Set up IPC listeners
       const handleMessage = (_event: Electron.IpcRendererEvent, data: unknown) => {
-        const message = create(method.output, data as MessageInitShape<O>);
+        // Data comes as binary from the main process - convert Buffer to Uint8Array
+        const uint8Data = data instanceof Buffer ? new Uint8Array(data) : data as Uint8Array;
+        const value = fromBinary(method.output, uint8Data);
+        console.log('[ipcTransport] handleMessage', value);
         if (resolveNext) {
-          resolveNext({ value: message, done: false });
+          resolveNext({ value, done: false });
           resolveNext = null;
         } else {
-          messageQueue.push(message);
+          messageQueue.push(value);
         }
       };
 
       const handleError = (_event: Electron.IpcRendererEvent, error: string) => {
         const err = new Error(error);
         if (resolveNext) {
-          resolveNext({ value: undefined as any, done: true });
+          resolveNext({ value: undefined, done: true });
           resolveNext = null;
         }
         errorQueue.push(err);
@@ -78,7 +93,7 @@ export class IpcTransport implements Transport {
       const handleComplete = () => {
         isComplete = true;
         if (resolveNext) {
-          resolveNext({ value: undefined as any, done: true });
+          resolveNext({ value: undefined, done: true });
           resolveNext = null;
         }
       };
@@ -91,7 +106,7 @@ export class IpcTransport implements Transport {
       const handleAbort = () => {
         isComplete = true;
         if (resolveNext) {
-          resolveNext({ value: undefined as any, done: true });
+          resolveNext({ value: undefined, done: true });
           resolveNext = null;
         }
         ipcRenderer.send('grpc:stream:abort', streamId);
@@ -102,18 +117,26 @@ export class IpcTransport implements Transport {
       }
 
       try {
-        // Collect input messages if it's a client streaming or bidirectional streaming method
-        const inputMessages: MessageInitShape<I>[] = [];
+        // For server streaming, we only send one input message
+        // For client/bidirectional streaming, we'd need to handle multiple messages
+        let inputMessage: MessageInitShape<I> | undefined;
         for await (const msg of input) {
-          inputMessages.push(msg);
+          inputMessage = msg;
+          break; // Only take the first message for server streaming
         }
+
+        // Convert input to binary for IPC transfer
+        const binaryInput = toBinary(method.input, create(method.input, inputMessage))
+
+        // Convert Uint8Array to Buffer for IPC transfer
+        const bufferInput = Buffer.from(binaryInput);
 
         // Start the stream on the main process
         await ipcRenderer.invoke('grpc:stream:start', {
           streamId,
-          method: method.name,
+          method: method.localName,
           service: method.parent.name,
-          data: inputMessages.map(msg => create(method.input, msg))
+          data: bufferInput
         });
 
         // Yield messages as they arrive

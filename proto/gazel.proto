@@ -214,9 +214,14 @@ message ListTargetsRequest {
   string format = 2;
 }
 message ListTargetsResponse {
+  oneof data {
+    BazelTarget target = 1;
+    ListTargetsComplete complete = 2;
+    string error = 3;
+  }
+}
+message ListTargetsComplete {
   int32 total = 1;
-  repeated BazelTarget targets = 2;
-  map<string, TargetList> by_package = 3;
 }
 
 message TargetList {
@@ -496,7 +501,7 @@ service GazelService {
   rpc GetBazelInfo(GetBazelInfoRequest) returns (GetBazelInfoResponse);
 
   // Target operations
-  rpc ListTargets(ListTargetsRequest) returns (ListTargetsResponse);
+  rpc ListTargets(ListTargetsRequest) returns (stream ListTargetsResponse);
   rpc GetTarget(GetTargetRequest) returns (GetTargetResponse);
   rpc GetTargetDependencies(GetTargetDependenciesRequest) returns (GetTargetDependenciesResponse);
   rpc GetTargetOutputs(GetTargetOutputsRequest) returns (GetTargetOutputsResponse);

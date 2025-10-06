@@ -10,6 +10,9 @@ const electronDir = path.dirname(__filename);
 const workspaceRoot = path.dirname(electronDir);
 const clientRoot = path.resolve(workspaceRoot, 'client');
 
+console.log('[vite.renderer.config] electronDir:', electronDir);
+console.log('[vite.renderer.config] index.html path:', path.resolve(electronDir, 'index.html'));
+console.log('[vite.renderer.config] index.html exists:', existsSync(path.resolve(electronDir, 'index.html')));
 
 const protoGeneratedDir = path.resolve(workspaceRoot, 'bazel-bin/proto');
 const protoSourceDir = path.resolve(workspaceRoot, 'proto');
@@ -18,8 +21,14 @@ const protoAlias = existsSync(protoGeneratedDir) ? protoGeneratedDir : protoSour
 // https://vitejs.dev/config
 export default defineConfig({
   base: './',
-  root: electronDir,
+  root: path.resolve(electronDir),
   publicDir: path.resolve(clientRoot, 'public'),
+  server: {
+    // Explicitly set the entry point for dev server
+    fs: {
+      strict: false,
+    },
+  },
   build: {
     rollupOptions: {
       input: path.resolve(electronDir, 'index.html'),

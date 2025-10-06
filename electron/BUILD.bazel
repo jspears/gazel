@@ -55,11 +55,10 @@ copy_to_bin(
 )
 
 # Build and package with Electron Forge
-# Run with: bazel build //electron:package
+# Run with: bazel run //electron:package
 genrule(
     name = "package",
     srcs = [
-        ":index_html",
         ":main_js",
         ":preload_js",
         ":package_json",
@@ -73,23 +72,36 @@ genrule(
         "//proto:index",
         "//server:server_ts",
     ],
-    outs = ["package.stamp"],
+    outs = ["package.sh"],
     cmd = """
-        # Change to workspace root
-        cd $$(dirname $(location //:package_json))
+        cat > $@ << 'INNEREOF'
+#!/usr/bin/env bash
+set -euo pipefail
 
-        # Run electron-forge package
-        pnpm package
+# Get the real workspace directory
+if [ -z "$${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
+    echo "Error: This target must be run with 'bazel run //electron:package'" >&2
+    echo "BUILD_WORKSPACE_DIRECTORY is not set" >&2
+    exit 1
+fi
 
-        # Create stamp file
-        echo "Packaged at $$(date)" > $(location package.stamp)
+cd "$$BUILD_WORKSPACE_DIRECTORY"
+
+# Run electron-forge package
+echo "📦 Packaging Electron app..."
+node_modules/.bin/electron-forge package
+
+echo "✅ Package complete!"
+INNEREOF
+        chmod +x $@
     """,
+    executable = True,
     local = True,
     tags = ["no-sandbox"],
 )
 
 # Make distributable packages (installers)
-# Run with: bazel build //electron:make
+# Run with: bazel run //electron:make
 genrule(
     name = "make",
     srcs = [
@@ -106,17 +118,30 @@ genrule(
         "//proto:index",
         "//server:server_ts",
     ],
-    outs = ["make.stamp"],
+    outs = ["make.sh"],
     cmd = """
-        # Change to workspace root
-        cd $$(dirname $(location //:package_json))
+        cat > $@ << 'INNEREOF'
+#!/usr/bin/env bash
+set -euo pipefail
 
-        # Run electron-forge make
-        pnpm make
+# Get the real workspace directory
+if [ -z "$${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
+    echo "Error: This target must be run with 'bazel run //electron:make'" >&2
+    echo "BUILD_WORKSPACE_DIRECTORY is not set" >&2
+    exit 1
+fi
 
-        # Create stamp file
-        echo "Made installers at $$(date)" > $(location make.stamp)
+cd "$$BUILD_WORKSPACE_DIRECTORY"
+
+# Run electron-forge make
+echo "🔨 Making Electron installers..."
+node_modules/.bin/electron-forge make
+
+echo "✅ Make complete!"
+INNEREOF
+        chmod +x $@
     """,
+    executable = True,
     local = True,
     tags = ["no-sandbox"],
 )

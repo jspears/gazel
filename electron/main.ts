@@ -112,8 +112,9 @@ function setupGrpcHandlers() {
         throw new Error(`Unknown method: ${method}`);
       }
 
-      // Convert the data to the proper message type
-      const inputMessage = create(methodDef.input, data);
+      // Convert Buffer to Uint8Array, then to the proper message type
+      const uint8Data = data instanceof Buffer ? new Uint8Array(data) : data;
+      const inputMessage = fromBinary(methodDef.input, uint8Data);
 
       // Call the service method
       const serviceMethod = gazelService[method];
@@ -124,7 +125,8 @@ function setupGrpcHandlers() {
       const result = await serviceMethod.call(gazelService, inputMessage);
 
       // Convert result to binary for IPC transfer
-      return toBinary(methodDef.output, result);
+      const binaryResult = toBinary(methodDef.output, result);
+      return Buffer.from(binaryResult);
       } catch (error) {
         console.error('Unary handler error:', error);
         throw new ConnectError(
@@ -154,14 +156,15 @@ function setupGrpcHandlers() {
       }
 
       // Find the method in the service definition
-      const methodDef = GazelService.methods.find(m => m.name === method);
+      const methodDef = GazelService.methods.find(m => m.localName === method);
       if (!methodDef || methodDef.kind !== 'server_streaming') {
         event.reply(`grpc:stream:error:${streamId}`, `Unknown streaming method: ${method}`);
         return;
       }
 
-      // Convert the data to the proper message type
-      const inputMessage = create(methodDef.input, data);
+      // Convert Buffer to Uint8Array, then to the proper message type
+      const uint8Data = data instanceof Buffer ? new Uint8Array(data) : data;
+      const inputMessage = fromBinary(methodDef.input, uint8Data);
 
       // Call the service method
       const serviceMethod = (gazelService as any)[method];
@@ -177,9 +180,10 @@ function setupGrpcHandlers() {
       try {
         for await (const message of generator) {
           const binaryData = toBinary(methodDef.output, message);
-          event.reply(`grpc:stream:data:${streamId}`, binaryData);
+          const bufferData = Buffer.from(binaryData);
+          event.reply(`grpc:stream:message:${streamId}`, bufferData);
         }
-        event.reply(`grpc:stream:end:${streamId}`);
+        event.reply(`grpc:stream:complete:${streamId}`);
       } catch (error: any) {
         event.reply(`grpc:stream:error:${streamId}`, error.message || 'Stream error');
       }
