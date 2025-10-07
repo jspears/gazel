@@ -16,7 +16,7 @@
   hljs.registerLanguage('starlark', python); // Use Python highlighting for Starlark
   hljs.registerLanguage('bazel', python); // Use Python highlighting for Bazel
 
-  export let fileToOpen: string | null = null;
+  export let file: string | null = null;
 
   const dispatch = createEventDispatcher();
 
@@ -25,7 +25,7 @@
   let fileContent = '';
   let highlightedContent = '';
   let fileTargets: Array<{ruleType: string; name: string; line: number}> = [];
-  let searchQuery = '';
+  let searchQuery = file ?? '';
   let searchResults: Array<{file: string; line: number; content: string}> = [];
   let loading = false;
   let error: string | null = null;
@@ -51,9 +51,8 @@
   });
 
   // Watch for fileToOpen changes from parent component
-  $: if (fileToOpen) {
-    selectFile(fileToOpen);
-    fileToOpen = null; // Reset after handling
+  $: if (file) {
+    selectFile(file);
   }
 
   // Re-apply highlighting when content changes
@@ -255,11 +254,7 @@
 
   // Event handlers for TargetDetails component navigation
   function handleTargetNavigation(event: CustomEvent) {
-    const { target } = event.detail;
-    if (target) {
-      // Pass the event up to the parent component
-      dispatch('navigate-to-targets', { target });
-    }
+    fileContentTab = event.detail
   }
 
   function handleRunTarget(event: CustomEvent) {
@@ -457,7 +452,7 @@ async function runTargetByName(targetName: string) {
 
         {#if selectedFile && activeTab === 'files'}
           {@const file = selectedFile.split('/').pop()}
-          {@const isBuildFile = file && (file.startsWith('BUILD') || fileName.includes('BUILD'))}
+          {@const isBuildFile = file && (file.startsWith('BUILD'))}
           {#if isBuildFile}
             <div class="flex gap-2">
               <button

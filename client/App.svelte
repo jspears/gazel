@@ -40,9 +40,9 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
   import SettingsModal from './components/Settings.svelte';
   import { api } from './client.js';
   import { storage } from './lib/storage.js';
-  import { navigation as nav, initNavigation, navigateToTab, updateParam, type AppState, copyUrlToClipboard } from './lib/navigation.js';
+  import { navigation as nav, initNavigation, navigateToTab,  copyUrlToClipboard } from './lib/navigation.js';
 
-  let activeTab: keyof typeof Routes = $derived(nav.tab || 'workspace');
+  let activeTab: keyof typeof Routes = $derived($nav.tab || 'workspace');
   let TabComponent = $derived(Routes[activeTab] || Routes.workspace);
   let showWorkspacePicker = $state(false);
   let showSettings = $state(false);
@@ -50,7 +50,8 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
   let currentWorkspaceName: string | null = $state('');
   let checkingWorkspace = $state(false);
   let showCopied = $state(false);
-
+  
+  $inspect(activeTab);
 
   async function shareUrl() {
     const success = await copyUrlToClipboard();
@@ -147,6 +148,7 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
 
   // Handle state changes from browser navigation (back/forward)
   function handleStateChange(state: Record<string,string>) {
+    console.log('[App] handleStateChange called', state);
     activeTab =  RouteKeys.includes(state.tab) ? state.tab  as keyof typeof Routes: 'workspace';
   }
     

@@ -15,10 +15,13 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const electronDir = path.dirname(__filename);
+const entitlementsPath = path.join(electronDir, 'entitlements.plist');
 
 // Debug: Log notarization configuration
 const hasNotarizationEnv = !!(process.env.APPLE_API_KEY && process.env.APPLE_API_KEY_ID && process.env.APPLE_API_ISSUER);
 console.log('[forge.config] Notarization will be:', hasNotarizationEnv ? 'ENABLED' : 'DISABLED');
+console.log('[forge.config] Entitlements path:', entitlementsPath);
+console.log('[forge.config] Entitlements exists:', fs.existsSync(entitlementsPath));
 if (hasNotarizationEnv) {
   console.log('[forge.config] API Key ID:', process.env.APPLE_API_KEY_ID);
   console.log('[forge.config] API Issuer:', process.env.APPLE_API_ISSUER);
@@ -35,8 +38,17 @@ const config: ForgeConfig = {
     // The renderer packaging issue has been fixed with the packageAfterCopy hook
     asar: true,
     // macOS code signing configuration
-    // Enable code signing for macOS builds
-    osxSign: {},
+    // Enable code signing for macOS builds with custom entitlements
+    osxSign: {
+      optionsForFile: () => {
+        // Return custom entitlements for all files
+        return {
+          entitlements: entitlementsPath,
+          'entitlements-inherit': entitlementsPath,
+          hardenedRuntime: true,
+        };
+      },
+    },
     // macOS notarization configuration using App Store Connect API key
     // Requires environment variables to be set (see .env.example)
     // Note: Notarization requires the app to be signed first

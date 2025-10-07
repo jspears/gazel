@@ -16,6 +16,7 @@
 		"@connectrpc/connect-node": "^2.1.0",
 		"dotenv": "^17.2.2",
 		"sax": "^1.4.1",
+		"tsconfig-paths": "^4.2.0",
 		"xml2js": "^0.6.2"
 	},
 	"devDependencies": {

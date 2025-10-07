@@ -2,13 +2,14 @@
 /**
  * Main gRPC server using Connect protocol
  */
-
+import './loader';
 import { connectNodeAdapter } from "@connectrpc/connect-node";
 import { createServer } from "node:http";
 import { GazelServiceImpl } from "./server.js";
 import { GazelService } from "proto/index.js";
 import config from "./config.js";
 import { printStartupBanner, printShutdownMessage } from "./utils/console-styles.js";
+import { loggingInterceptor } from './logging';
 
 // Create the service implementation
 const serviceImpl = new GazelServiceImpl();
@@ -17,7 +18,8 @@ const serviceImpl = new GazelServiceImpl();
 const server = createServer(
   connectNodeAdapter({
     requestPathPrefix: "/api",
-    routes: (router) => {
+    interceptors: [loggingInterceptor],
+    routes(router) {
       router.service(GazelService, serviceImpl);
     },
   })

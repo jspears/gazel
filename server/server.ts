@@ -1401,7 +1401,6 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   async getModuleInfo(
     request: GetModuleInfoRequest
   ): Promise<GetModuleInfoResponse> {
-    try {
       const { moduleName } = request;
 
       // Get the full module graph first
@@ -1427,9 +1426,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       return create(GetModuleInfoResponseSchema, {
         module: protoModule,
       });
-    } catch (error: any) {
-      throw new Error(`Failed to get module info: ${error.message}`);
-    }
+ 
   }
 
   /**
@@ -1642,7 +1639,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
    */
   async saveQuery(
     request: SaveQueryRequest
-  ): Promise<SaveQueryResponse> {
+  ) {
     const { name, query, description } = request;
 
     // This would typically save to a database
@@ -1656,9 +1653,10 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       updatedAt: { seconds: BigInt(Math.floor(Date.now() / 1000)), nanos: 0 },
     });
 
-    return create(SaveQueryResponseSchema, {
+    const resp:SaveQueryResponse = create(SaveQueryResponseSchema, {
       query: savedQuery,
     });
+    return resp;
   }
 
   /**
@@ -1666,12 +1664,12 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
    */
   async deleteQuery(
     _request: DeleteQueryRequest
-  ): Promise<DeleteQueryResponse> {
+  ) {
     // This would typically delete from a database
     // For now, just return success
-    return create(DeleteQueryResponseSchema, {
+    return Promise.resolve(create(DeleteQueryResponseSchema, {
       success: true,
-    });
+    }));
   }
 
   /**
@@ -1679,7 +1677,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
    */
   async *streamRun(
     request: StreamRunRequest
-  ): AsyncGenerator<StreamRunResponse> {
+  ) {
     const { target, options = [] } = request;
 
     if (!target) {
@@ -1738,7 +1736,6 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   async getBuildFile(
     request: GetBuildFileRequest
   ): Promise<GetBuildFileResponse> {
-    try {
       const { path: filePath } = request;
 
       if (!filePath) {
@@ -1752,40 +1749,28 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       const lines = content.split("\n");
 
       // Parse targets from the BUILD file
-      const targets: Array<{ ruleType: string; name: string; line: number }> = [];
 
       // Simple regex-based parsing to find target definitions
       const targetRegex = /^(\w+)\s*\(\s*name\s*=\s*["']([^"']+)["']/;
 
-      lines.forEach((line, index) => {
+      const targets = lines.flatMap((line, index) => {
         const match = line.match(targetRegex);
-        if (match) {
-          targets.push({
+        return match ? [create(BuildFileTargetSchema, {
             ruleType: match[1],
             name: match[2],
             line: index + 1,
-          });
-        }
+          })] : [];
       });
 
-      // Convert to proto format
-      const protoTargets = targets.map((t) =>
-        create(BuildFileTargetSchema, {
-          ruleType: t.ruleType,
-          name: t.name,
-          line: t.line,
-        })
-      );
+
 
       return create(GetBuildFileResponseSchema, {
         path: filePath,
         content,
-        targets: protoTargets,
+        targets,
         lines: lines.length,
       });
-    } catch (error: any) {
-      throw new Error(`Failed to get build file: ${error.message}`);
-    }
+    
   }
 
   /**
