@@ -197,16 +197,6 @@ importers:
         specifier: ^5.3.0
         version: 5.9.3
 
-  bzl-ts:
-    dependencies:
-      '@bufbuild/protobuf':
-        specifier: ^2.9.0
-        version: 2.9.0
-    devDependencies:
-      '@bufbuild/protoc-gen-es':
-        specifier: ^2.9.0
-        version: 2.9.0(@bufbuild/protobuf@2.9.0)
-
   client:
     dependencies:
       '@bufbuild/buf':
@@ -218,6 +208,9 @@ importers:
       '@connectrpc/connect':
         specifier: ^2.1.0
         version: 2.1.0(@bufbuild/protobuf@2.9.0)
+      '@speajus/gazel-proto':
+        specifier: workspace:*
+        version: link:../proto
       lucide-svelte:
         specifier: ^0.544.0
         version: 0.544.0(svelte@5.39.8)
@@ -266,9 +259,6 @@ importers:
 
   server:
     dependencies:
-      '@bufbuild/buf':
-        specifier: ^1.57.2
-        version: 1.57.2
       '@bufbuild/protobuf':
         specifier: ^2.9.0
         version: 2.9.0
@@ -281,6 +271,9 @@ importers:
       '@connectrpc/connect-node':
         specifier: ^2.1.0
         version: 2.1.0(@bufbuild/protobuf@2.9.0)(@connectrpc/connect@2.1.0(@bufbuild/protobuf@2.9.0))
+      '@speajus/gazel-proto':
+        specifier: workspace:*
+        version: link:../proto
       dotenv:
         specifier: ^17.2.2
         version: 17.2.3

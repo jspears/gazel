@@ -40,9 +40,10 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
   import SettingsModal from './components/Settings.svelte';
   import { api } from './client.js';
   import { storage } from './lib/storage.js';
-  import { navigation as nav, initNavigation, navigateToTab,  copyUrlToClipboard } from './lib/navigation.js';
+  import { nav,   copyUrlToClipboard, navigateToTab, initNavigation } from './lib/navigation.js';
+  import { get } from 'svelte/store';
 
-  let activeTab: keyof typeof Routes = $derived($nav.tab || 'workspace');
+  let activeTab: keyof typeof Routes = $derived(get(nav).tab || 'workspace');
   let TabComponent = $derived(Routes[activeTab] || Routes.workspace);
   let showWorkspacePicker = $state(false);
   let showSettings = $state(false);
@@ -286,7 +287,7 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
 
   // Props to pass to route components
   let routeProps = $derived({
-    ...$nav,
+    ...get(nav),
     onNavigateToFile: handleNavigateToFile,
     onNavigateToTargets: handleNavigateToTargets,
     onOpenWorkspacePicker: handleOpenWorkspacePicker,

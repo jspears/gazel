@@ -10,6 +10,7 @@ export const loggingInterceptor: Interceptor = (next) => async (req) => {
         );
         return response;
       } catch (error) {
+        console.trace(error);
         const endTime = performance.now();
         if (error instanceof ConnectError) {
           console.error(

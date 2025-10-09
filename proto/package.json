@@ -1,9 +1,11 @@
 {
+    "name":"@speajus/gazel-proto",
+    "type": "module",
+    "main": "index.js",
     "dependencies": {
         "@bufbuild/protobuf": "^2.9.0"
     },
     "devDependencies": {
         "@bufbuild/protoc-gen-es": "^2.9.0"
-    },
-    "type": "module"
+    }
 }

@@ -50,7 +50,7 @@ export function updateUrl(state: AppState, replace = false) {
     if (value != null ) params.append(key, value);
   });
   
-  navigation.set(state);
+  nav.set(state);
 
   const url = params.toString() ? `?${params.toString()}` : window.location.pathname;
   
@@ -150,8 +150,8 @@ export function initNavigation(onStateChange: (state: AppState, location: string
   // Handle browser back/forward buttons
   window.addEventListener('popstate', (event) => {
     const state = Object.assign({},event.state as AppState, parseUrlParams());
-    navigation.set(state);
-    navigation.subscribe((state) => {
+    nav.set(state);
+    nav.subscribe((state) => {
       onStateChange(state, document.location.pathname);
     });
     onStateChange(state, document.location.pathname);
@@ -186,4 +186,4 @@ export async function copyUrlToClipboard(): Promise<boolean> {
     return false;
   }
 }
-export const navigation = writable(getCurrentState());
+export const nav = writable(getCurrentState());

@@ -3,7 +3,7 @@
   import { api } from '../client.js';
   import { Package, GitBranch, Tag, AlertCircle, ChevronRight, ChevronDown, ExternalLink, Layers, Code } from 'lucide-svelte';
   import ElkModuleGraph from '../components/ElkModuleGraph.svelte';
-  import type {  GetModuleGraphResponse } from 'proto/gazel_pb.js';
+  import type {  GetModuleGraphResponse } from '@speajus/gazel-proto';
   import { Graphviz } from '@hpcc-js/wasm/graphviz';
 
   let loading = true;

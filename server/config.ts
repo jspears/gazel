@@ -8,7 +8,7 @@ dotenv.config();
  * Find the Bazel executable in the system PATH
  * Tries bazelisk first, then falls back to bazel
  */
-function findBazelExecutable(): string {
+export function findBazelExecutable(): string {
   // If explicitly set via environment variable, use that
   if (process.env.BAZEL_EXECUTABLE) {
     return process.env.BAZEL_EXECUTABLE;
@@ -76,6 +76,7 @@ export function setBazelExecutable(executable: string): string {
 
   // Use the provided executable path
   config.bazelExecutable = executable;
+
   return executable;
 }
 

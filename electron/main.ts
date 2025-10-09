@@ -5,7 +5,7 @@ import { app, BrowserWindow, ipcMain, protocol, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GazelServiceImpl } from '../server/server.ts';
-import { GazelService } from 'proto/gazel_pb';
+import { GazelService } from '@speajus/gazel-proto';
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import { Code, ConnectError } from '@connectrpc/connect';
 
@@ -98,10 +98,31 @@ function setupGrpcHandlers() {
     service: string;
     method: string;
     data:any;
+    metadata?: { workspace?: string; executable?: string };
   }) => {
 
-    
-      const { service, method, data } = request;
+
+      const { service, method, data, metadata } = request;
+
+      // Apply metadata to server config if provided
+      if (metadata) {
+        if (metadata.workspace) {
+          const { setWorkspace } = await import('../server/config.js');
+          setWorkspace(metadata.workspace);
+          console.log(`[IPC] Set workspace from metadata: ${metadata.workspace}`);
+        }
+        if (metadata.executable) {
+          const { setBazelExecutable } = await import('../server/config.js');
+          const actualPath = setBazelExecutable(metadata.executable);
+          console.log(`[IPC] Set bazel executable from metadata: ${actualPath}`);
+
+          // Also update the BazelService instance
+          if (gazelService && typeof (gazelService as any).setBazelExecutable === 'function') {
+            (gazelService as any).setBazelExecutable(actualPath);
+          }
+        }
+      }
+
       if (service !== 'GazelService') {
         throw new Error(`Unknown service: ${service}`);
       }
@@ -137,7 +158,7 @@ function setupGrpcHandlers() {
             error.cause
           );
       }
-   
+
   });
 
   // Handle streaming RPC calls
@@ -146,9 +167,29 @@ function setupGrpcHandlers() {
     service: string;
     method: string;
     data: any;
+    metadata?: { workspace?: string; executable?: string };
   }) => {
     try {
-      const { streamId, service, method, data } = request;
+      const { streamId, service, method, data, metadata } = request;
+
+      // Apply metadata to server config if provided
+      if (metadata) {
+        if (metadata.workspace) {
+          const { setWorkspace } = await import('../server/config.js');
+          setWorkspace(metadata.workspace);
+          console.log(`[IPC Stream] Set workspace from metadata: ${metadata.workspace}`);
+        }
+        if (metadata.executable) {
+          const { setBazelExecutable } = await import('../server/config.js');
+          const actualPath = setBazelExecutable(metadata.executable);
+          console.log(`[IPC Stream] Set bazel executable from metadata: ${actualPath}`);
+
+          // Also update the BazelService instance
+          if (gazelService && typeof (gazelService as any).setBazelExecutable === 'function') {
+            (gazelService as any).setBazelExecutable(actualPath);
+          }
+        }
+      }
 
       if (service !== 'GazelService') {
         event.reply(`grpc:stream:error:${streamId}`, `Unknown service: ${service}`);

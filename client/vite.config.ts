@@ -13,6 +13,12 @@ export default defineConfig({
       inspector:true,
     })
   ],
+  resolve: {
+    alias: {
+      '../build_pb.js': '../proto/_virtual_imports/build_proto/build_pb.js',
+      '../stardoc_output_pb.js': '../proto/_virtual_imports/build_proto/stardoc_output_pb.js',
+    }
+  },
   server: {
     port: 5173,
     proxy: {

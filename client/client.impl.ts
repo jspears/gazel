@@ -1,6 +1,6 @@
 
 import type { Client } from '@connectrpc/connect';
-import type { GazelService } from 'proto/gazel_pb.js';
+import type { GazelService } from '@speajus/gazel-proto';
 
 type GazelServiceClient = Client<typeof GazelService>;
 

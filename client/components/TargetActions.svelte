@@ -2,7 +2,7 @@
   import { GitBranch, Terminal } from 'lucide-svelte';
   import CopyButton from './CopyButton.svelte';
   import { navigateToTab } from '../lib/navigation.js';
-  import type { BazelTarget } from 'proto/gazel_pb.js';
+  import type { BazelTarget } from '@speajus/gazel-proto';
   import { toFull } from './target-util.js';
   import type { Snippet } from 'svelte';
   

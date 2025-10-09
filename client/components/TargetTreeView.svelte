@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { BazelTarget } from 'proto/gazel_pb.js';
+  import type { BazelTarget } from '@speajus/gazel-proto';
   import TreeNode, { type TreeNodeData } from './TreeNode.svelte';
+  import TargetItem from './TargetItem.svelte';
 
   interface Props {
     targets: BazelTarget[];
@@ -19,6 +20,18 @@
     onNavigateToGraph,
     onNavigateToCommands
   }: Props = $props();
+
+  function handleSelectTarget(event: CustomEvent) {
+    onSelectTarget?.(event);
+  }
+
+  function handleNavigateToGraph(event: CustomEvent) {
+    onNavigateToGraph?.(event);
+  }
+
+  function handleNavigateToCommands(event: CustomEvent) {
+    onNavigateToCommands?.(event);
+  }
 
   function buildTree(targetList: BazelTarget[]): TreeNodeData {
     const root: TreeNodeData = {
@@ -70,12 +83,25 @@
       No targets found
     </div>
   {:else}
-      <TreeNode
-        bind:node={treeRoot}
-        {selectedTarget}
-        {onSelectTarget}
-        {onNavigateToGraph}
-        {onNavigateToCommands}
-      />
+    <TreeNode
+      bind:node={treeRoot}
+      {selectedTarget}
+      {onSelectTarget}
+      {onNavigateToGraph}
+      {onNavigateToCommands}
+    >
+      {#snippet leafItem(node: TreeNodeData)}
+        {#each node.targets as target}
+          <TargetItem
+            {target}
+            selected={selectedTarget === target}
+            level={node.level}
+            {onSelectTarget}
+            {onNavigateToGraph}
+            {onNavigateToCommands}
+          />
+        {/each}
+      {/snippet}
+    </TreeNode>
   {/if}
 </div>

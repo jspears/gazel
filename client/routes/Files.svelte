@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher } from 'svelte';
-  import { FileCode, Search, File, FolderOpen, Target, ChevronRight, Play, TestTube, ExternalLink, X } from 'lucide-svelte';
+  import { onMount } from 'svelte';
+  import { FileCode, Search, File, FolderOpen, Folder, Target, ChevronRight, ChevronDown, Play, TestTube, ExternalLink, List, Network, X } from 'lucide-svelte';
   import { api } from '../client.js';
   import CopyButton from '../components/CopyButton.svelte';
   import TargetDetails from '../components/TargetDetails.svelte';
@@ -8,7 +8,8 @@
   import python from 'highlight.js/lib/languages/python';
   import bash from 'highlight.js/lib/languages/bash';
   import 'highlight.js/styles/atom-one-dark.css';
-  import type { BazelTarget, BuildFile, GetWorkspaceFilesResponse } from 'proto/gazel_pb.js';
+  import type { BazelTarget, BuildFile, GetWorkspaceFilesResponse } from '@speajus/gazel-proto';
+  import TreeNode, { type TreeNodeData } from '../components/TreeNode.svelte';
 
   // Register languages for syntax highlighting
   hljs.registerLanguage('python', python);
@@ -16,55 +17,120 @@
   hljs.registerLanguage('starlark', python); // Use Python highlighting for Starlark
   hljs.registerLanguage('bazel', python); // Use Python highlighting for Bazel
 
-  export let file: string | null = null;
+  interface Props {
+    file?: string | null;
+    onNavigateToGraph?: (detail: any) => void;
+    onNavigateToCommands?: (detail: any) => void;
+    onNavigateToTargets?: (detail: any) => void;
+  }
 
-  const dispatch = createEventDispatcher();
+  let {
+    file = $bindable(null),
+    onNavigateToGraph,
+    onNavigateToCommands,
+    onNavigateToTargets
+  }: Props = $props();
 
-  let buildFiles: GetWorkspaceFilesResponse['files'] = [];
-  let selectedFile: string | null = null;
-  let fileContent = '';
-  let highlightedContent = '';
-  let fileTargets: Array<{ruleType: string; name: string; line: number}> = [];
-  let searchQuery = file ?? '';
-  let searchResults: Array<{file: string; line: number; content: string}> = [];
-  let loading = false;
-  let error: string | null = null;
-  let activeTab: 'files' | 'workspace' | 'search' | 'actions' | 'targets' = 'files';
-  let selectedTarget: BazelTarget | null = null;
-  let highlightedLine: number | null = null;
-  let fileActions: BazelTarget[] = [];
-  let loadingActions = false;
-  let fileContentTab: 'content' | 'targets' = 'content';
-  let buildFileTargets: BazelTarget[] = [];
-  let loadingBuildTargets = false;
+  interface FileTreeNode extends TreeNodeData {
+    files: Array<{path: string; lastModified?: string}>;
+  }
+
+  let buildFiles = $state<GetWorkspaceFilesResponse['files']>([]);
+  let selectedFile = $state<string | null>(null);
+  let fileContent = $state('');
+  let highlightedContent = $state('');
+  let fileTargets = $state<Array<{ruleType: string; name: string; line: number}>>([]);
+  let searchQuery = $state(file ?? '');
+  let searchResults = $state<Array<{file: string; line: number; content: string}>>([]);
+  let loading = $state(false);
+  let error = $state<string | null>(null);
+  let activeTab = $state<'files' | 'workspace' | 'search' | 'actions' | 'targets'>('files');
+  let selectedTarget = $state<BazelTarget | null>(null);
+  let highlightedLine = $state<number | null>(null);
+  let fileRules = $state<Array<{name: string; ruleClass?: string; location?: string}>>([]);
+  let loadingActions = $state(false);
+  let fileContentTab = $state<'content' | 'targets'>('content');
+  let buildFileTargets = $state<BazelTarget[]>([]);
+  let loadingBuildTargets = $state(false);
 
   // Run modal state
-  let showRunModal = false;
-  let runOutput: string[] = [];
-  let runCommand = '';
-  let runStatus: 'idle' | 'running' | 'success' | 'error' = 'idle';
-  let runEventSource: EventSource | null = null;
-  let outputContainer: HTMLDivElement;
+  let showRunModal = $state(false);
+  let runOutput = $state<string[]>([]);
+  let runCommand = $state('');
+  let runStatus = $state<'idle' | 'running' | 'success' | 'error'>('idle');
+  let runEventSource = $state<EventSource | null>(null);
+  let outputContainer = $state<HTMLDivElement>();
 
   onMount(() => {
     loadBuildFiles();
   });
 
-  // Watch for fileToOpen changes from parent component
-  $: if (file) {
-    selectFile(file);
-  }
+  // Watch for file changes from parent component
+  $effect(() => {
+    if (file) {
+      selectFile(file);
+    }
+  });
 
   // Re-apply highlighting when content changes
-  $: if (fileContent && (activeTab === 'files' || activeTab === 'workspace')) {
-    applyHighlighting();
+  $effect(() => {
+    if (fileContent && (activeTab === 'files' || activeTab === 'workspace')) {
+      applyHighlighting();
+    }
+  });
+
+  function buildTree(files: GetWorkspaceFilesResponse['files']): FileTreeNode {
+    console.dir(files);
+    const root: FileTreeNode = {
+      name: '',
+      fullPath: '',
+      children: new Map(),
+      node: [] as GetWorkspaceFilesResponse['files'],
+      isExpanded: true,
+      level: 0
+    };
+
+    for (const file of files) {
+      let currentNode = root;
+      let fullPath = '';
+      const parts = file.path.split('/').filter(Boolean);
+
+      // Build the tree structure for the directory path
+      for (let i = 0; i < parts.length - 1; i++) {
+        const name = parts[i];
+        fullPath = fullPath ? `${fullPath}/${name}` : name;
+
+        let existingNode = currentNode.children.get(name);
+        if (!existingNode) {
+          existingNode = {
+            name,
+            fullPath,
+            children: new Map(),
+            node: [],
+            isExpanded: false,
+            level: currentNode.level + 1
+          };
+          currentNode.children.set(name, existingNode);
+        }
+        currentNode = existingNode;
+      }
+      
+      // Add file as a leaf node
+      currentNode.node.push(file);
+
+    }
+    console.log(root);
+
+    return root;
   }
+
+  let fileTree = $derived(buildTree(buildFiles ?? []));
 
   async function loadBuildFiles() {
     try {
       loading = true;
       const result = (await api.getWorkspaceFiles({}));
-      buildFiles = result.files;
+      buildFiles = result.files ?? [];
     } catch (err: any) {
       error = err.message;
     } finally {
@@ -90,12 +156,12 @@
       if (fileName && (fileName.startsWith('BUILD') || fileName.includes('BUILD'))) {
         // Load targets for BUILD file
         loadBuildFileTargets();
-        fileActions = [];
+        fileRules = [];
       } else if (fileName && !fileName.startsWith('WORKSPACE')) {
         // Load actions for non-BUILD/WORKSPACE files
         loadFileActions(path);
       } else {
-        fileActions = [];
+        fileRules = [];
         buildFileTargets = [];
       }
     } catch (err: any) {
@@ -114,11 +180,11 @@
       const fileName = filePath.split('/').pop();
       if (!fileName) return;
 
-      const result = await api.getTargetsByFile({file: fileName});
-      fileActions = result.targets;
+      const result = await api.getRulesByFile({file: fileName});
+      fileRules = result.rules;
     } catch (err) {
       console.error('Failed to load file actions:', err);
-      fileActions = [];
+      fileRules = [];
     } finally {
       loadingActions = false;
     }
@@ -184,6 +250,7 @@
     try {
       loading = true;
       const result = await api.searchInFiles(searchQuery);
+      
       searchResults = result.results;
       activeTab = 'search';
     } catch (err: any) {
@@ -345,6 +412,8 @@ async function runTargetByName(targetName: string) {
     // Pass the event up to the parent component
     dispatch('navigate-to-commands', event.detail);
   }
+  let tree = $derived(fileTree.children.values());
+  let viewMode: 'list' | 'tree' = $state('list');
 </script>
 
 <div class="space-y-6">
@@ -355,14 +424,14 @@ async function runTargetByName(targetName: string) {
         <input
           type="text"
           bind:value={searchQuery}
-          on:keydown={(e) => e.key === 'Enter' && searchFiles()}
+          onkeydown={(e) => e.key === 'Enter' && searchFiles()}
           placeholder="Search in BUILD files..."
           class="w-full pl-10 pr-4 py-2 border rounded-md bg-background"
         />
       </div>
     </div>
     <button
-      on:click={searchFiles}
+      onclick={searchFiles}
       class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
     >
       Search
@@ -371,66 +440,87 @@ async function runTargetByName(targetName: string) {
 
   <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
     <div class="bg-card rounded-lg border">
-      <div class="p-4 border-b">
+      <div class="p-4 border-b flex flex-1 justify-between">
         <h3 class="font-semibold flex items-center gap-2">
           <FolderOpen class="w-4 h-4" />
-          BUILD Files ({buildFiles.length})
+          BUILD  ({buildFiles.length})
         </h3>
+         <div class="flex no-wrap items-center gap-1 border rounded-md p-1">
+              <button
+                onclick={() => viewMode = 'list'}
+                class="p-1 rounded transition-colors"
+                class:bg-muted={viewMode === 'list'}
+                class:text-primary={viewMode === 'list'}
+                title="List view"
+              >
+                <List class="w-4 h-4" />
+              </button>
+              <button
+                onclick={() => viewMode = 'tree'}
+                class="p-1 rounded transition-colors"
+                class:bg-muted={viewMode === 'tree'}
+                class:text-primary={viewMode === 'tree'}
+                title="Tree view"
+              >
+                <Network class="w-4 h-4" />
+              </button>
+            </div>
       </div>
       <div class="max-h-[600px] overflow-y-auto">
-        {#each buildFiles as file}
-          <button
-            on:click={() => selectFile(file.path)}
-            class="w-full text-left px-4 py-2 hover:bg-muted border-b last:border-b-0"
-            class:bg-muted={selectedFile === file.path}
-          >
-            <div class="flex items-center gap-2">
-              <FileCode class="w-4 h-4 text-muted-foreground flex-shrink-0" />
-              <div class="flex-1 min-w-0">
-                <div class="font-mono text-sm truncate">{file.path}</div>
-                {#if file.lastModified}
-                  <div class="text-xs text-muted-foreground">
-                    {new Date(Number(file.lastModified)).toLocaleDateString()}
+        {#if viewMode === 'tree'}
+        {#each tree as node}
+          <TreeNode {node} >
+            {#snippet leafItem(node: FileTreeNode)}
+              {#each node.node as file}
+                
+                <button
+                  onclick={() => selectFile(file.path)}
+                  class="w-full text-left px-4 py-2 hover:bg-muted border-b last:border-b-0 transition-colors"
+                  class:bg-muted={selectedFile === file.path}
+                >
+                  <div class="flex items-center gap-2">
+                    <FileCode class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <div class="flex-1 min-w-0">
+                      <div class="font-mono text-sm truncate">{file.name}</div>
+                      {#if file.lastModified}
+                        <div class="text-xs text-muted-foreground">
+                          {new Date(Number(file.lastModified)).toLocaleDateString()}
+                        </div>
+                      {/if}
+                    </div>
                   </div>
-                {/if}
-              </div>
-            </div>
-          </button>
+                </button>
+              {/each}
+            {/snippet}
+          </TreeNode>
         {/each}
-      </div>
-    </div>
-
-    {#if fileTargets.length > 0 && activeTab === 'files'}
-      <div class="bg-card rounded-lg border">
-        <div class="p-4 border-b">
-          <h3 class="font-semibold flex items-center gap-2">
-            <Target class="w-4 h-4" />
-            Targets ({fileTargets.length})
-          </h3>
-        </div>
-        <div class="max-h-[600px] overflow-y-auto">
-          {#each fileTargets as target}
+        {:else if viewMode === 'list'}
+          {#each buildFiles as file}
             <button
-              on:click={() => selectTargetFromFile(target)}
-              class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 group"
-              class:bg-muted={highlightedLine === target.line}
+              onclick={() => selectFile(file.path)}
+              class="w-full text-left px-4 py-2 hover:bg-muted border-b last:border-b-0 transition-colors"
+              class:bg-muted={selectedFile === file.path}
             >
-              <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <FileCode class="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 <div class="flex-1 min-w-0">
-                  <div class="font-mono text-sm truncate">{target.name}</div>
-                  <div class="text-xs text-muted-foreground">
-                    {target.ruleType} • Line {target.line}
-                  </div>
+                  <div class="font-mono text-sm truncate">{file.path}</div>
+                  {#if file.lastModified}
+                    <div class="text-xs text-muted-foreground">
+                      {new Date(Number(file.lastModified)).toLocaleDateString()}
+                    </div>
+                  {/if}
                 </div>
-                <ChevronRight class="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
               </div>
             </button>
           {/each}
-        </div>
+        {/if}
       </div>
-    {/if}
+    </div>
 
-    <div class="{fileTargets.length > 0 && activeTab === 'files' ? 'lg:col-span-2' : 'lg:col-span-3'} bg-card rounded-lg border">
+
+
+    <div class="lg:col-span-3 bg-card rounded-lg border">
       <div class="p-4 border-b">
         <div class="flex items-center justify-between mb-2">
           <h3 class="font-semibold">
@@ -439,7 +529,7 @@ async function runTargetByName(targetName: string) {
             {:else if activeTab === 'search'}
               Search Results ({searchResults.length})
             {:else if activeTab === 'actions'}
-              File Actions ({fileActions.length})
+              Rules Using This File ({fileRules.length})
             {:else if activeTab === 'targets'}
               Targets ({fileTargets.length})
             {:else if selectedFile}
@@ -456,13 +546,13 @@ async function runTargetByName(targetName: string) {
           {#if isBuildFile}
             <div class="flex gap-2">
               <button
-                on:click={() => fileContentTab = 'content'}
+                onclick={() => fileContentTab = 'content'}
                 class="px-3 py-1 text-sm rounded-md transition-colors {fileContentTab === 'content' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
               >
                 Content
               </button>
               <button
-                on:click={() => { fileContentTab = 'targets'; loadBuildFileTargets(); }}
+                onclick={() => { fileContentTab = 'targets'; loadBuildFileTargets(); }}
                 class="px-3 py-1 text-sm rounded-md transition-colors {fileContentTab === 'targets' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}"
               >
                 Targets {#if buildFileTargets.length > 0}({buildFileTargets.length}){/if}
@@ -503,24 +593,24 @@ async function runTargetByName(targetName: string) {
           {/if}
         {:else if activeTab === 'actions'}
           {#if loadingActions}
-            <div class="text-muted-foreground">Loading actions...</div>
-          {:else if fileActions.length === 0}
-            <div class="text-muted-foreground">No targets use this file</div>
+            <div class="text-muted-foreground">Loading rules...</div>
+          {:else if fileRules.length === 0}
+            <div class="text-muted-foreground">No rules use this file</div>
           {:else}
             <div class="space-y-2">
-              {#each fileActions as action}
+              {#each fileRules as rule}
                 <div class="p-3 border rounded-md hover:bg-muted/50 transition-colors">
                   <div class="flex items-center justify-between">
                     <div>
-                      <div class="font-mono text-sm font-medium">{action.label}</div>
-                      {#if action.kind }
+                      <div class="font-mono text-sm font-medium">{rule.name}</div>
+                      {#if rule.ruleClass }
                         <div class="text-xs text-muted-foreground mt-1">
-                          Type: {action.kind }
+                          Type: {rule.ruleClass }
                         </div>
                       {/if}
-                      {#if action.package}
+                      {#if rule.location}
                         <div class="text-xs text-muted-foreground">
-                          Package: {action.package}
+                          Location: {rule.location}
                         </div>
                       {/if}
                     </div>
@@ -538,7 +628,7 @@ async function runTargetByName(targetName: string) {
                   <Target class="w-4 h-4 text-muted-foreground" />
                   <div>
                     <button
-                      on:click={() => dispatch('navigate-to-targets', { target: target.name })}
+                      onclick={() => onNavigateToTargets?.({ target: target.name })}
                       class="font-mono text-sm hover:text-primary transition-colors"
                     >
                       {target.name}
@@ -549,10 +639,10 @@ async function runTargetByName(targetName: string) {
                   </div>
                 </div>
                 <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                 111 <CopyButton text={target.name} />
+                 <CopyButton text={target.name} />
                   {#if target.ruleType && (target.ruleType.includes('binary') || target.ruleType.includes('test'))}
                     <button
-                      on:click={() => runTargetByName(target.name)}
+                      onclick={() => runTargetByName(target.name)}
                       class="p-1 hover:bg-primary/10 rounded transition-colors"
                       title="Run {target.name}"
                     >
@@ -614,7 +704,7 @@ async function runTargetByName(targetName: string) {
           <p class="text-sm text-muted-foreground font-mono mt-1">{runCommand}</p>
         </div>
         <button
-          on:click={closeRunModal}
+          onclick={closeRunModal}
           class="p-2 hover:bg-muted rounded-md transition-colors"
           title="Close"
         >
@@ -645,7 +735,7 @@ async function runTargetByName(targetName: string) {
           {/if}
         </div>
         <button
-          on:click={closeRunModal}
+          onclick={closeRunModal}
           class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
         >
           Close

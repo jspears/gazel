@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink, Play, X, Clock, ChevronDown, GitBranch, Terminal, List, Network } from 'lucide-svelte';
   import { api } from '../client.js';
-  import type { BazelTarget, StreamRunResponse } from 'proto/gazel_pb.js';
+  import type { BazelTarget, StreamRunResponse } from '@speajus/gazel-proto';
   import { createEventDispatcher } from 'svelte';
   import { storage } from '../lib/storage.js';
   import CopyButton from '../components/CopyButton.svelte';

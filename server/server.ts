@@ -1,6 +1,8 @@
 import { type ServiceImpl } from "@connectrpc/connect";
-import { create } from "@bufbuild/protobuf";
+import { create, fromJson, fromJsonString } from "@bufbuild/protobuf";
 import {
+  RuleSchema,
+  type Rule, 
   GazelService,
   type GetWorkspaceInfoRequest,
   type GetWorkspaceInfoResponse,
@@ -96,9 +98,10 @@ import {
   type GetBuildFileResponse,
   GetBuildFileResponseSchema,
   BuildFileTargetSchema,
-  type GetTargetsByFileRequest,
-  type GetTargetsByFileResponse,
-  GetTargetsByFileResponseSchema,
+  type GetRulesByFileRequest,
+  type GetRulesByFileResponse,
+  GetRulesByFileRequestSchema,
+  GetRulesByFileResponseSchema,
   type SearchInFilesRequest,
   type SearchInFilesResponse,
   SearchInFilesResponseSchema,
@@ -110,7 +113,10 @@ import {
   type UpdateBazelExecutableRequest,
   type UpdateBazelExecutableResponse,
   UpdateBazelExecutableResponseSchema,
-} from "proto/gazel_pb.js";
+  ModuleDependency,
+  Module,
+  Dependency,
+} from "@speajus/gazel-proto";
 import bazelService from "./services/bazel.js";
 import parserService from "./services/parser.js";
 import config, { setWorkspace, setBazelExecutable } from "./config.js";
@@ -1219,17 +1225,12 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   ): Promise<GetModuleGraphResponse> {
     try {
       // Try to execute bazel mod graph command with JSON output
-      console.log("Executing: bazel mod graph --output=json");
       const result = await bazelService.execute(["mod", "graph", "--output", "json"]);
-      console.log("Bazel mod graph stdout length:", result.stdout.length);
-      console.log("Bazel mod graph stderr:", result.stderr);
-
+     
       // Parse the JSON output - Bazel returns a tree structure, not a flat list
       let rootModule: any;
       try {
         rootModule = JSON.parse(result.stdout);
-        console.log("Parsed module graph root:", rootModule.key, rootModule.name);
-        console.log("Direct dependencies:", rootModule.dependencies?.length || 0);
       } catch (parseError) {
         console.error("Failed to parse module graph JSON:", parseError);
         console.error("Raw stdout:", result.stdout.substring(0, 500));
@@ -1250,20 +1251,20 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       // Flatten the tree structure into a list of modules
       const moduleMap = new Map<string, any>();
 
-      function flattenModule(mod: any) {
+      const flattenModule = (mod: Dependency | Module): void => {
         if (!mod || !mod.key) return;
 
         // Skip if already processed (handles unexpanded references)
         if (moduleMap.has(mod.key)) return;
-
+        const [name, version] = mod.key.split("@");
+        mod.name = name;
+        mod.version = version;
         moduleMap.set(mod.key, mod);
 
         // Recursively process dependencies
-        if (mod.dependencies && Array.isArray(mod.dependencies)) {
+        if ('dependencies' in mod && Array.isArray(mod.dependencies)) {
           for (const dep of mod.dependencies) {
-            if (!dep.unexpanded) {
               flattenModule(dep);
-            }
           }
         }
       }
@@ -1275,18 +1276,12 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
 
       // Convert to proto format
       const protoModules = Array.from(moduleMap.values()).map(
-        (mod: any) => {
+        (mod) => {
           // Convert dependencies - only include direct dependencies, not unexpanded ones
           const dependencies = (mod.dependencies || [])
-            .filter((dep: any) => !dep.unexpanded)
-            .map((dep: any) =>
-              create(DependencySchema, {
-                key: dep.key || "",
-                name: dep.name || "",
-                version: dep.version || "",
-                devDependency: dep.devDependency || false,
-                registry: dep.registry || "",
-              })
+            .filter((dep) => !dep.unexpanded)
+            .map((dep) =>
+              create(DependencySchema,dep)
             );
 
           // Convert extension usages
@@ -1295,11 +1290,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
               extensionBzlFile: ext.extensionBzlFile || "",
               extensionName: ext.extensionName || "",
               location: ext.location
-                ? create(LocationSchema, {
-                    file: ext.location.file || "",
-                    line: ext.location.line || 0,
-                    column: ext.location.column || 0,
-                  })
+                ? create(LocationSchema, ext.location)
                 : undefined,
               imports: ext.imports || {},
               devDependency: ext.devDependency || false,
@@ -1312,11 +1303,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
             name: mod.name || "",
             version: mod.version || "",
             location: mod.location
-              ? create(LocationSchema, {
-                  file: mod.location.file || "",
-                  line: mod.location.line || 0,
-                  column: mod.location.column || 0,
-                })
+              ? create(LocationSchema, mod.location)
               : undefined,
             compatibilityLevel: mod.compatibilityLevel || 0,
             repoName: mod.repoName || mod.name || "",
@@ -1749,17 +1736,15 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       const lines = content.split("\n");
 
       // Parse targets from the BUILD file
-
+      const rulesByFile = await this.getRulesByFile(create(GetRulesByFileRequestSchema, { file: filePath }));
       // Simple regex-based parsing to find target definitions
-      const targetRegex = /^(\w+)\s*\(\s*name\s*=\s*["']([^"']+)["']/;
 
-      const targets = lines.flatMap((line, index) => {
-        const match = line.match(targetRegex);
-        return match ? [create(BuildFileTargetSchema, {
-            ruleType: match[1],
-            name: match[2],
-            line: index + 1,
-          })] : [];
+      const targets = rulesByFile.rules.map((rule, index) => {
+        return create(BuildFileTargetSchema, {
+            ruleType: rule.ruleClass || '',
+            name: rule.name?.split(':').pop() || '',
+            line: Number(rule.location?.split(":")[1]) || 0,
+          })
       });
 
 
@@ -1774,12 +1759,11 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   }
 
   /**
-   * Get targets that use a specific file
+   * Get rules for a specific file
    */
-  async getTargetsByFile(
-    request: GetTargetsByFileRequest
-  ): Promise<GetTargetsByFileResponse> {
-    try {
+  async getRulesByFile(
+    request: GetRulesByFileRequest
+  ): Promise<GetRulesByFileResponse> {
       const { file } = request;
 
       if (!file) {
@@ -1787,34 +1771,40 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       }
 
       // Query for targets that have this file in their srcs
-      const query = `attr(srcs, ${file}, //...)`;
+      const query = file
+          .replace(/[\/^]?BUILD(?:.bazel)?$/, ":all")
+          .replace(/^(?:\/\/)?/, "//")
+      ;
+      const rules: Rule[] = [];
 
-      try {
-        const result = await bazelService.query(query, "label_kind");
-        const targets = parserService.parseLabelKindOutput(result.stdout);
-
-        // Convert to proto format
-        const protoTargets = targets.map((target) =>
-          create(BazelTargetSchema,target)
-        );
-
-        return create(GetTargetsByFileResponseSchema, {
-          file,
-          total: protoTargets.length,
-          targets: protoTargets,
-        });
-      } catch (queryError) {
-        // If query fails, return empty results
-        return create(GetTargetsByFileResponseSchema, {
-          file,
-          total: 0,
-          targets: [],
-        });
+      function parse(value: string):Rule | null {
+        // Parse the wrapper object first
+        const wrapper = JSON.parse(value);
+        // Extract the rule from the wrapper if it exists
+        if (wrapper.type === "RULE" && wrapper.rule) {
+          return fromJson(RuleSchema, wrapper.rule) as Rule;
+        }
+        // If it's not a RULE type, return null
+        return null;
       }
+      try {
+        for await (const message of bazelService.streamJsonProto(
+            {query, queryType: "query"}, parse
+        )) {
+          if (message.case === "json" && message.value !== null) {
+            rules.push(message.value as Rule);
+          }
+        }
+
+      return create(GetRulesByFileResponseSchema, {
+        file,
+        rules,
+      });
     } catch (error: any) {
-      throw new Error(`Failed to get targets by file: ${error.message}`);
+      throw new Error(`Failed to get rules by file: ${error.message}`);
     }
   }
+
 
   /**
    * Search in files

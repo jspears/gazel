@@ -2,12 +2,37 @@ import { create, type DescMethodStreaming,type MessageShape, type DescMessage, t
 import { type StreamResponse,type UnaryResponse, type Transport } from "@connectrpc/connect";
 import {  ipcRenderer as _ipcRenderer, IpcRenderer } from 'electron';
 
+/**
+ * Function to retrieve metadata for gRPC requests
+ * This should be set by the client application to provide workspace and executable info
+ */
+type MetadataProvider = () => { workspace?: string; executable?: string };
+
+let metadataProvider: MetadataProvider | undefined;
+
+/**
+ * Set the metadata provider function
+ */
+export function setMetadataProvider(provider: MetadataProvider): void {
+  metadataProvider = provider;
+}
+
 export class IpcTransport implements Transport {
   constructor(private ipcRenderer:typeof _ipcRenderer = _ipcRenderer) {
     console.log('IpcTransport initialized', {
       hasUnary: typeof this.unary === 'function',
       hasStream: typeof this.stream === 'function'
     });
+  }
+
+  /**
+   * Get metadata for the current request
+   */
+  private getMetadata(): { workspace?: string; executable?: string } {
+    if (metadataProvider) {
+      return metadataProvider();
+    }
+    return {};
   }
 
    unary = async <I extends DescMessage, O extends DescMessage>(
@@ -22,13 +47,14 @@ export class IpcTransport implements Transport {
     const inputMessage = create(method.input, input);
     const binaryInput = toBinary(method.input, inputMessage);
 
-    // Convert Uint8Array to Buffer for IPC transfer
-   // const bufferInput = Buffer.from(binaryInput);
+    // Get metadata for this request
+    const metadata = this.getMetadata();
 
     const result = await this.ipcRenderer.invoke('grpc:unary:request', {
       method: method.localName,
       service: method.parent.name,
-      data: binaryInput
+      data: binaryInput,
+      metadata
     });
 
     // Convert Buffer back to Uint8Array
@@ -131,12 +157,16 @@ export class IpcTransport implements Transport {
         // Convert Uint8Array to Buffer for IPC transfer
         const bufferInput = Buffer.from(binaryInput);
 
+        // Get metadata for this request (need to access from outer scope)
+        const metadata = metadataProvider ? metadataProvider() : {};
+
         // Start the stream on the main process
         await ipcRenderer.invoke('grpc:stream:start', {
           streamId,
           method: method.localName,
           service: method.parent.name,
-          data: bufferInput
+          data: bufferInput,
+          metadata
         });
 
         // Yield messages as they arrive

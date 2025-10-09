@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { Play, Save, BookOpen, Trash2, Clock } from 'lucide-svelte';
   import { api } from '../client.js';
-  import type { QueryTemplate, SavedQuery, BazelTarget } from 'proto/gazel_pb.js';
+  import type { QueryTemplate, SavedQuery, BazelTarget } from '@speajus/gazel-proto';
   import { storage } from '../lib/storage.js';
   import { toFull } from '../components/target-util.js';
   import { Graphviz } from '@hpcc-js/wasm/graphviz';

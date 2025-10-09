@@ -1,8 +1,6 @@
-load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
-load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_library")
-load("@aspect_rules_swc//swc:defs.bzl", "swc")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_library", "js_run_binary")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_config", "ts_project")
 load("@npm//:defs.bzl", "npm_link_all_packages")
-load("@aspect_rules_ts//ts:defs.bzl", "ts_config")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -13,23 +11,23 @@ ts_config(
     src = "tsconfig.json",
     visibility = ["//visibility:public"],
     deps = [
-        "//:tsconfig"
+        "//:tsconfig",
     ],
 )
+
 # TypeScript compilation for server
 ts_project(
     name = "server_ts",
-    tsconfig = ":tsconfig",
     data = ["package.json"],
+    tsconfig = ":tsconfig",
     deps = [
-        "//proto:index",
-        "//:node_modules",
         ":node_modules",
         ":node_modules/@bufbuild/protobuf",
         ":node_modules/@connectrpc/connect",
         ":node_modules/@connectrpc/connect-node",
         ":node_modules/@types/node",
         ":node_modules/dotenv",
+        "//proto:pkg",
     ],
 )
 
@@ -38,23 +36,25 @@ js_library(
     name = "server_lib",
     srcs = [":server_ts"],
     deps = [
-        "//proto:index",
+        ":node_modules",
         "//:node_modules/@bufbuild/protobuf",
         "//:node_modules/@connectrpc/connect",
-        ":node_modules",
+        "//proto:pkg",
     ],
 )
 
 # Server binary
 js_binary(
     name = "run",
+    chdir = package_name(),
     data = [
-        ":server_lib",
-        "//proto:index",
-        "//proto:gazel_ts_proto",
-        "//:node_modules",
+        "loader.ts",
+        ":server_ts",
         ":node_modules",
+        "//:node_modules",
+        "//proto:pkg",
+        ":node_modules/tsconfig-paths",
+        "//:build_pb_root",
     ],
     entry_point = "main.js",
-    chdir = package_name(),
 )

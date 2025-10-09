@@ -4,8 +4,9 @@
   import CopyButton from './CopyButton.svelte';
   import AttributesDisplay from './AttributesDisplay.svelte';
   import { api } from '../client.js';
-  import type { BazelTarget } from 'proto/gazel_pb.js';
+  import type { BazelTarget } from '@speajus/gazel-proto';
   import { toFull } from './target-util.js';
+  import { getRuleDocumentationUrl, getRuleSourceName } from '../lib/bazel-registry.js';
 
   const dispatch = createEventDispatcher();
 
@@ -166,9 +167,28 @@
     </div>
     
     {#if target.kind}
+      {@const ruleDoc = getRuleDocumentationUrl(target.kind)}
       <div>
         <h4 class="text-sm font-medium text-muted-foreground mb-1">Type</h4>
-        <p class="font-mono {compact ? 'text-sm' : ''}">{target.kind}</p>
+        <div class="flex items-center gap-2">
+          {#if ruleDoc}
+            <a
+              href={ruleDoc.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="font-mono {compact ? 'text-sm' : ''} text-primary hover:underline flex items-center gap-1"
+              title="View {target.kind} documentation"
+            >
+              {target.kind}
+              <ExternalLink class="w-3 h-3" />
+            </a>
+            <span class="text-xs text-muted-foreground">
+              ({getRuleSourceName(ruleDoc.source)})
+            </span>
+          {:else}
+            <p class="font-mono {compact ? 'text-sm' : ''}">{target.kind}</p>
+          {/if}
+        </div>
         <p class="text-xs text-muted-foreground mt-1">
           Expected: {getExpectedOutputs(target.kind || '')}
         </p>

@@ -1,25 +1,31 @@
-<script lang="ts" context="module">
-export interface TreeNodeData {
+<script lang="ts" module>
+  import type { BazelTarget } from '@speajus/gazel-proto';
+
+  export interface TreeNodeData<T> {
     name: string;
     fullPath: string;
-    children: Map<string, TreeNodeData>;
-    targets: BazelTarget[];
+    children: Map<string, TreeNodeData<T>>;
+    node: T;
     isExpanded: boolean;
     level: number;
   }
 </script>
-<script lang="ts">
+
+<script lang="ts" generics="T">
   import { ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-svelte';
   import { slide } from 'svelte/transition';
-  import type { BazelTarget } from 'proto/gazel_pb.js';
-  import TargetItem from './TargetItem.svelte';
+  import type { Snippet } from 'svelte';
   import TreeNode from './TreeNode.svelte';
+
   interface Props {
-    node: TreeNodeData;
-    selectedTarget?: BazelTarget | null;
+    node: TreeNodeData<T>;
+    selectedTarget?: T | null;
     onSelectTarget?: (event: CustomEvent) => void;
     onNavigateToGraph?: (event: CustomEvent) => void;
     onNavigateToCommands?: (event: CustomEvent) => void;
+    leafItem?: Snippet<[TreeNodeData<T>]>;
+    children?: Snippet;
+    isExpanded?: boolean;
   }
 
   let {
@@ -27,7 +33,10 @@ export interface TreeNodeData {
     selectedTarget = null,
     onSelectTarget,
     onNavigateToGraph,
-    onNavigateToCommands
+    onNavigateToCommands,
+    leafItem,
+    children: childrenSnippetm,
+    expanded = false,
   }: Props = $props();
 
   function toggleExpand() {
@@ -59,22 +68,21 @@ export interface TreeNodeData {
     onNavigateToCommands?.(event);
   }
 
-  // Cache the target count calculation
-  function countAllTargets(n: TreeNodeData): number {
-    let count = n.targets.length;
-    for (const child of n.children.values()) {
-      count += countAllTargets(child);
-    }
-    return count;
-  }
+  // // Cache the target count calculation
+  // function countAllTargets(n: TreeNodeData): number {
+  //   let count = n.targets.length;
+  //   for (const child of n.children.values()) {
+  //     count += countAllTargets(child);
+  //   }
+  //   return count;
+  // }
 
   let hasChildren = $derived(node.children.size > 0);
-  let isLeaf = $derived(!hasChildren && node.targets.length > 0);
-  let children = $state(Array.from(node.children.values()));
-  let targetCount = $derived(countAllTargets(node));
-  let isExpanded = $state(node.isExpanded);
+  let childNodes = $state(Array.from(node.children.values()));
+  let isExpanded = $state(expanded || node.isExpanded);
 </script>
- <!-- Directory node -->
+
+  <!-- Directory node -->
   <button
     onclick={toggleExpand}
     onkeydown={handleKeydown}
@@ -98,55 +106,27 @@ export interface TreeNodeData {
       {/if}
 
       <span class="folder-name">{node.name}</span>
-      <span class="folder-count">({targetCount})</span>
     </div>
   </button>
 
   {#if isExpanded}
     <div class="folder-children" transition:slide={{ duration: 200 }}>
       <!-- Recursively render children -->
-       {#each children, index}
+      {#each childNodes as childNode, index}
         <TreeNode
-          bind:node={children[index]}
+          bind:node={childNodes[index]}
           {selectedTarget}
           {onSelectTarget}
           {onNavigateToGraph}
           {onNavigateToCommands}
-        />
+          {leafItem}
+        >
+            {@render childrenSnippet?.()}
+        </TreeNode>
       {/each}
-      {#each node.targets as target}
-    <TargetItem
-      {target}
-      selected={selectedTarget === target}
-      level={node.level}
-      onSelectTarget={handleSelectTarget}
-      onNavigateToGraph={handleNavigateToGraph}
-      onNavigateToCommands={handleNavigateToCommands}
-    />
-  {/each}
-      <!-- Render targets at this level if any -->
-      <!-- {#each node.targets as target}
-        <TargetItem
-          {target}
-          selected={selectedTarget === target}
-          level={node.level + 1}
-          onSelectTarget={handleSelectTarget}
-          onNavigateToGraph={handleNavigateToGraph}
-          onNavigateToCommands={handleNavigateToCommands}
-        />
-      {/each} -->
+      {@render leafItem?.(node)}
     </div>
   {/if}
-  <!--{#each node.targets as target}
-    <TargetItem
-      {target}
-      selected={selectedTarget === target}
-      level={node.level}
-      onSelectTarget={handleSelectTarget}
-      onNavigateToGraph={handleNavigateToGraph}
-      onNavigateToCommands={handleNavigateToCommands}
-    />
-  {/each}-->
 
 <style>
   .folder-node {

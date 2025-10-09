@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { BazelTarget } from 'proto/gazel_pb.js';
-  import { Target } from 'lucide-svelte';
+  import type { BazelTarget } from '@speajus/gazel-proto';
+  import { Target, ExternalLink } from 'lucide-svelte';
   import TargetActions from './TargetActions.svelte';
+  import { getRuleDocumentationUrl } from '../lib/bazel-registry.js';
 
   interface Props {
     target: BazelTarget;
@@ -26,6 +27,12 @@
     }
   }
 
+  function handleKindClick(e: MouseEvent) {
+    // Prevent the target item from being selected when clicking the kind link
+    e.stopPropagation();
+  }
+
+  let ruleDoc = $derived(target.kind ? getRuleDocumentationUrl(target.kind) : null);
 </script>
 
 <div
@@ -38,15 +45,29 @@
   class:selected
 >
   <div class="target-content">
-    <Target class="target-icon" />
+    <Target class="w-4 h-4 text-muted-foreground flex-shrink-0" />
     <div class="target-info">
       <span class="target-name">{target.name}</span>
       {#if target.kind}
-        <span class="target-kind">{target.kind}</span>
+        {#if ruleDoc}
+          <a
+            href={ruleDoc.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onclick={handleKindClick}
+            class="target-kind-link"
+            title="View {target.kind} documentation"
+          >
+            {target.kind}
+            <ExternalLink class="w-2.5 h-2.5 inline ml-0.5" />
+          </a>
+        {:else}
+          <span class="target-kind">{target.kind}</span>
+        {/if}
       {/if}
     </div>
   </div>
-  
+
   <div class="target-actions">
     <TargetActions  {target}    />
   </div>
@@ -87,13 +108,6 @@
     min-width: 0;
   }
 
-  .target-icon {
-    width: 1rem;
-    height: 1rem;
-    color: hsl(var(--muted-foreground));
-    flex-shrink: 0;
-  }
-
   .target-info {
     display: flex;
     flex-direction: column;
@@ -113,6 +127,20 @@
     font-size: 0.75rem;
     color: hsl(var(--muted-foreground));
     margin-top: 0.125rem;
+  }
+
+  .target-kind-link {
+    font-size: 0.75rem;
+    color: hsl(var(--primary));
+    margin-top: 0.125rem;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    transition: text-decoration 0.15s ease;
+  }
+
+  .target-kind-link:hover {
+    text-decoration: underline;
   }
 
   .target-actions {

@@ -1,7 +1,8 @@
 {
-	"name": "gazel-server",
+	"name": "@speajus/gazel-server",
 	"version": "1.0.0",
 	"main": "main.js",
+	"type": "module",
 	"scripts": {
 		"start": "node main.js",
 		"dev": "tsx watch main.ts",
@@ -9,7 +10,6 @@
 		"test": "node test-server.js"
 	},
 	"dependencies": {
-		"@bufbuild/buf": "^1.57.2",
 		"@bufbuild/protobuf": "^2.9.0",
 		"@bufbuild/protoc-gen-es": "^2.9.0",
 		"@connectrpc/connect": "^2.1.0",
@@ -17,7 +17,9 @@
 		"dotenv": "^17.2.2",
 		"sax": "^1.4.1",
 		"tsconfig-paths": "^4.2.0",
-		"xml2js": "^0.6.2"
+		"xml2js": "^0.6.2",
+        "@speajus/gazel-proto": "workspace:*"
+		
 	},
 	"devDependencies": {
 		"@types/node": "^22.18.6",

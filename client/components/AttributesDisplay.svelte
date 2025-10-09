@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-svelte';
-  import type { BazelAttribute } from 'proto/gazel_pb.js';
+  import type { BazelAttribute } from '@speajus/gazel-proto';
 
   export let attributes: BazelAttribute[] = [];
   export let collapsible = true;

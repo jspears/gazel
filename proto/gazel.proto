@@ -5,6 +5,7 @@ package gazel.api.v1;
 option go_package = "github.com/jspears/gazel/api/v1;gazelv1";
 
 import "google/protobuf/timestamp.proto";
+import "build.proto";
 
 // ============================================================================
 // Core Types
@@ -440,13 +441,12 @@ message BuildFileTarget {
   int32 line = 3;
 }
 
-message GetTargetsByFileRequest {
+message GetRulesByFileRequest {
   string file = 1;
 }
-message GetTargetsByFileResponse {
+message GetRulesByFileResponse {
   string file = 1;
-  int32 total = 2;
-  repeated BazelTarget targets = 3;
+  repeated blaze_query.Rule rules = 2;
 }
 
 message SearchInFilesRequest {
@@ -539,7 +539,7 @@ service GazelService {
 
   // File operations
   rpc GetBuildFile(GetBuildFileRequest) returns (GetBuildFileResponse);
-  rpc GetTargetsByFile(GetTargetsByFileRequest) returns (GetTargetsByFileResponse);
+  rpc GetRulesByFile(GetRulesByFileRequest) returns (GetRulesByFileResponse);
   rpc SearchInFiles(SearchInFilesRequest) returns (SearchInFilesResponse);
 
   // Command history operations

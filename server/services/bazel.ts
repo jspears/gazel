@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import config from '../config.js';
 import type { CommandResult, CachedQuery, WorkspaceInfo } from '../types/index.js';
+import { childToStream } from "../utils/stream-util.js";
 
 const execAsync = promisify(exec);
 
@@ -366,6 +367,9 @@ class BazelService {
    * Update the workspace path dynamically
    */
   setWorkspace(newWorkspace: string): void {
+    if (this.workspace === newWorkspace) {
+      return;
+    }
     this.workspace = newWorkspace;
     this.clearCache();
   }
@@ -374,9 +378,39 @@ class BazelService {
    * Update the Bazel executable path dynamically
    */
   setBazelExecutable(newExecutable: string): void {
+    if (this.executable === newExecutable) {
+      return;
+    }
     this.executable = newExecutable;
     this.clearCache();
     console.log(`[BazelService] Bazel executable updated to: ${newExecutable}`);
+  }
+
+  /**
+   * Stream query results using streamed_jsonproto format
+   * This method spawns a Bazel process and yields JSON objects as they arrive
+   *
+   * @param query - The Bazel query expression
+   * @param queryType - The type of query: 'query', 'cquery', or 'aquery'
+   * @returns AsyncGenerator that yields parsed JSON objects
+   */
+  async *streamJsonProto({
+    query,
+    queryType = 'query',
+  }: {
+    query: string;
+    queryType?: 'query' | 'cquery' | 'aquery';
+  }, parser = JSON.parse
+  ) {
+
+    const child = spawn(config.bazelExecutable, [queryType, query, '--output=streamed_jsonproto'], {
+      cwd: config.bazelWorkspace,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    console.log(`Spawning child process in ${config.bazelWorkspace}`);
+    yield* childToStream(child, parser);
+    // yield* spawnToStream(config.bazelExecutable, [queryType, '--output=streamed_jsonproto', query], parser);
   }
 }
 

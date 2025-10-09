@@ -2,7 +2,7 @@
   import { Folder, FileCode, Package, ExternalLink, Target, Clock, ChevronDown, ChevronRight, RefreshCw, Info } from 'lucide-svelte';
   import { api } from '../client.js';
   import { storage } from '../lib/storage.js';
-  import type { WorkspaceInfo, BazelInfo, GetWorkspaceFilesResponse_WorkspaceFile } from 'proto/gazel_pb.js';
+  import type { WorkspaceInfo, BazelInfo, GetWorkspaceFilesResponse_WorkspaceFile } from '@speajus/gazel-proto';
   import { onMount } from 'svelte';
 
   interface Props {
