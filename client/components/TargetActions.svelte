@@ -17,11 +17,11 @@
   let fullTarget = $derived(toFull(target));
 
   function navigateToGraph() {
-    navigateToTab('graph', {target:'//'+fullTarget});
+    navigateToTab('graph', {target: fullTarget});
   }
 
   function navigateToCommands() {
-    navigateToTab('commands', {target:'//'+fullTarget});
+    navigateToTab('commands', {target: fullTarget});
   }
 </script>
 

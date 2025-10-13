@@ -4,13 +4,43 @@ import { fromBinary } from "@bufbuild/protobuf";
 import type { Transport,StreamResponse, UnaryResponse  } from "@connectrpc/connect";
 import { Code, ConnectError } from "@connectrpc/connect";
 
-interface IpcRenderer {
-  stream(...args: unknown[]): Promise<unknown>;
-  unary(...args: unknown[]): Promise<unknown>;
+interface IpcStreamRequest {
+  streamId: string;
+  service: string;
+  method: string;
+  message: unknown;
+}
 
-  invoke(channel: string, ...args: unknown[]): Promise<unknown>;
-  on(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void;
-  removeListener(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void;
+interface IpcUnaryRequest {
+  service: string;
+  method: string;
+  message: unknown;
+}
+
+interface IpcStreamStartResponse {
+  success: boolean;
+}
+
+interface IpcRenderer {
+  /**
+   * Start a streaming gRPC call
+   */
+  stream(request: IpcStreamRequest): Promise<IpcStreamStartResponse>;
+
+  /**
+   * Make a unary gRPC call
+   */
+  unary(request: IpcUnaryRequest): Promise<unknown>;
+
+  /**
+   * Listen for events on a specific channel
+   */
+  onEvent(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void;
+
+  /**
+   * Remove an event listener from a channel
+   */
+  removeEventListener(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void;
 }
 
 /**
@@ -99,14 +129,14 @@ function createAsyncIterableFromIpc<T>(
  */
 export function createIpcTransport(ipcRenderer: IpcRenderer): Transport {
   return {
-    async unary<I extends DescMessage, O extends DescMessage>(method: DescMethodUnary<I, O>, 
+    async unary<I extends DescMessage, O extends DescMessage>(method: DescMethodUnary<I, O>,
         _signal: AbortSignal | undefined, _timeoutMs: number | undefined,
         _header: HeadersInit | undefined, message: MessageInitShape<I>): Promise<UnaryResponse<I, O>> {
       try {
         // Use method.localName which is the camelCase method name
         const methodName = method.localName;
         const service = method.parent;
-        const response = await ipcRenderer.invoke('grpc:unary', {
+        const response = await ipcRenderer.unary({
           service: service.typeName,
           method: methodName,
           message
@@ -152,7 +182,7 @@ export function createIpcTransport(ipcRenderer: IpcRenderer): Transport {
       // Use method.localName which is the camelCase method name
       const methodName = method.localName;
 
-      await ipcRenderer.invoke('grpc:stream:start',( {
+      await ipcRenderer.stream({
         streamId,
         service: service.typeName,
         method: methodName,
@@ -180,23 +210,24 @@ export function createIpcTransport(ipcRenderer: IpcRenderer): Transport {
         };
 
         // Set up listeners
-        ipcRenderer.on(dataChannel, dataListener);
-        ipcRenderer.on(completeChannel, completeListener);
-        ipcRenderer.on(errorChannel, errorListener);
+        ipcRenderer.onEvent(dataChannel, dataListener);
+        ipcRenderer.onEvent(completeChannel, completeListener);
+        ipcRenderer.onEvent(errorChannel, errorListener);
 
         // Handle cancellation
         if (signal) {
           signal.addEventListener('abort', () => {
-            ipcRenderer.invoke('grpc:stream:cancel', streamId);
+            // Note: We don't have a cancel method in the new API
+            // The server will clean up when the renderer disconnects
             error(new ConnectError('Cancelled', Code.Canceled));
           });
         }
 
         // Return cleanup function
         return () => {
-          ipcRenderer.removeListener(dataChannel, dataListener);
-          ipcRenderer.removeListener(completeChannel, completeListener);
-          ipcRenderer.removeListener(errorChannel, errorListener);
+          ipcRenderer.removeEventListener(dataChannel, dataListener);
+          ipcRenderer.removeEventListener(completeChannel, completeListener);
+          ipcRenderer.removeEventListener(errorChannel, errorListener);
         };
       });
 

@@ -1,68 +1,65 @@
 import { contextBridge, ipcRenderer } from 'electron';
-//Protected methods that allow the renderer process to use
+
+// Types for the IPC API
+interface IpcStreamRequest {
+  streamId: string;
+  service: string;
+  method: string;
+  message: unknown;
+}
+
+interface IpcUnaryRequest {
+  service: string;
+  method: string;
+  message: unknown;
+}
+
+interface IpcStreamStartResponse {
+  success: boolean;
+}
+
+// Protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
-  stream: (...args: unknown[]) => ipcRenderer.invoke('grpc:stream:start', ...args),
-  unary: (...args: unknown[]) => ipcRenderer.invoke('grpc:unary:request', ...args),
-  
-  // Expose IPC methods for the transport
-  ipc: {
-
-    invoke(channel: string, ...args: unknown[]): Promise<unknown> {
-      return ipcRenderer.invoke(channel, ...args);
-    },
-    on(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void {
-      ipcRenderer.on(channel, listener);
-    },
-    removeListener(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void {
-      ipcRenderer.removeListener(channel, listener);
-    }
+  /**
+   * Start a streaming gRPC call
+   * @param request - The stream request containing streamId, service, method, and message
+   * @returns Promise that resolves when the stream is started
+   */
+  stream(request: IpcStreamRequest): Promise<IpcStreamStartResponse> {
+    return ipcRenderer.invoke('grpc:stream:start', request);
   },
-  // gRPC-over-IPC methods
-  // grpc: {
-  //   unary(service: string, method: M, data = {}){
-  //     return ipcRenderer.invoke('grpc:unary:request', { 
-  //       service,
-  //        method,
-  //         data });
-  //   },
-  //   stream: {
-  //     start: (streamId: string, service: string, method: string, data = {}) =>
-  //       ipcRenderer.send('grpc:stream:start', { streamId, service, method, data }),
-      
-  //     cancel: (streamId: string) =>
-  //       ipcRenderer.send('grpc:stream:cancel', streamId),
-      
-  //     onData: (streamId: string, callback: (data: any) => void) => {
-  //       const channel = `grpc:stream:data:${streamId}`;
-  //       const handler = (_event: any, data: any) => callback(data);
-  //       ipcRenderer.on(channel, handler);
-  //       return () => ipcRenderer.removeListener(channel, handler);
-  //     },
-      
-  //     onEnd: (streamId: string, callback: () => void) => {
-  //       const channel = `grpc:stream:end:${streamId}`;
-  //       const handler = () => callback();
-  //       ipcRenderer.once(channel, handler);
-  //       return () => ipcRenderer.removeListener(channel, handler);
-  //     },
-      
-  //     onError: (streamId: string, callback: (error: string) => void) => {
-  //       const channel = `grpc:stream:error:${streamId}`;
-  //       const handler = (_event: any, error: string) => callback(error);
-  //       ipcRenderer.once(channel, handler);
-  //       return () => ipcRenderer.removeListener(channel, handler);
-  //     }
-  //   }
-  // },
-  // grpc: new IpcTransport(ipcRenderer),
+
+  /**
+   * Make a unary gRPC call
+   * @param request - The unary request containing service, method, and message
+   * @returns Promise that resolves with the response
+   */
+  unary(request: IpcUnaryRequest): Promise<unknown> {
+    return ipcRenderer.invoke('grpc:unary', request);
+  },
+
+  /**
+   * Listen for events on a specific channel
+   * @param channel - The IPC channel to listen on
+   * @param listener - The callback function to handle events
+   */
+  onEvent(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void {
+    ipcRenderer.on(channel, listener);
+  },
+
+  /**
+   * Remove an event listener from a channel
+   * @param channel - The IPC channel to remove the listener from
+   * @param listener - The callback function to remove
+   */
+  removeEventListener(channel: string, listener: (event: unknown, ...args: unknown[]) => void): void {
+    ipcRenderer.removeListener(channel, listener);
+  },
+
   // Platform information
   platform: process.platform,
-  isElectron: true,
-  onStreamData: (channel: string, callback: (data: any) => void) => {
-    ipcRenderer.on(channel, callback);
-    return () => ipcRenderer.removeListener(channel, callback);
-  }
+  isElectron: true
 });
 
 // Helper function to safely serialize arguments for IPC
