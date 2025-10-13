@@ -145,9 +145,11 @@
         } else if (response.data.case === 'complete') {
           // All targets loaded
           console.log(`Loaded ${response.data.value.total} targets`);
+          loading = false;
         } else if (response.data.case === 'error') {
           console.error('Error loading targets:', response.data.value);
           error = response.data.value;
+          loading = false;
         }
       }
 
@@ -696,6 +698,11 @@
             </div>
           </div>
         </div>
+        {#if loading}
+          <div class="text-muted-foreground">Loading targets...</div>
+        {:else if filteredTargets.length === 0}
+          <div class="text-muted-foreground">No targets found</div>
+        {:else}
         {#if viewMode === 'list'}
           <div class="max-h-[600px] overflow-y-auto">
             {#each visibleTargets.slice(0, displayLimit) as target}
@@ -746,6 +753,7 @@
             onNavigateToGraph={(e) => navigateToGraph(e.detail.target)}
             onNavigateToCommands={(e) => navigateToCommands(e.detail.target)}
           />
+        {/if}
         {/if}
       </div>
 
