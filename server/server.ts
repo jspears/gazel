@@ -48,6 +48,7 @@ import {
   type SearchTargetsRequest,
   type SearchTargetsResponse,
   SearchTargetsResponseSchema,
+  SearchTargetsCompleteSchema,
   type ExecuteQueryRequest,
   type ExecuteQueryResponse,
   ExecuteQueryResponseSchema,
@@ -398,7 +399,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
     console.log(`[switchWorkspace] Attempting to switch to: ${workspace}`);
 
     if (!workspace) {
-      const msg = "Workspace path is required";
+      const msg = "workspace is required";
       console.error(`[switchWorkspace] Error: ${msg}`);
       return create(SwitchWorkspaceResponseSchema, {
         success: false,
@@ -924,11 +925,11 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   }
 
   /**
-   * Search targets
+   * Search targets (streaming)
    */
-  async searchTargets(
+  async *searchTargets(
     request: SearchTargetsRequest
-  ): Promise<SearchTargetsResponse> {
+  ): AsyncGenerator<SearchTargetsResponse> {
     try {
       const { query, type, package: packageFilter } = request;
 
@@ -948,18 +949,38 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       const result = await bazelService.query(bazelQuery, "label_kind");
       const targets = parserService.parseLabelKindOutput(result.stdout);
 
-      // Convert to proto format
-      const protoTargets = targets.map((target) =>
-        create(BazelTargetSchema,target)
-      );
+      // Stream each target individually
+      let count = 0;
+      for (const target of targets) {
+        const protoTarget = create(BazelTargetSchema, target);
 
-      return create(SearchTargetsResponseSchema, {
-        query,
-        total: protoTargets.length,
-        targets: protoTargets,
+        yield create(SearchTargetsResponseSchema, {
+          data: {
+            case: "target",
+            value: protoTarget,
+          },
+        });
+        count++;
+      }
+
+      // Send completion message with total count
+      yield create(SearchTargetsResponseSchema, {
+        data: {
+          case: "complete",
+          value: {
+            query,
+            total: count,
+          },
+        },
       });
     } catch (error: any) {
-      throw new Error(`Failed to search targets: ${error.message}`);
+      // Send error message
+      yield create(SearchTargetsResponseSchema, {
+        data: {
+          case: "error",
+          value: `Failed to search targets: ${error.message}`,
+        },
+      });
     }
   }
 

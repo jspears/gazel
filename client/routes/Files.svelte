@@ -581,11 +581,11 @@ async function runTargetByName(targetName: string) {
                     compact={true}
                     showActions={true}
                     showNavigation={false}
-                    on:navigate-to-file={handleNavigateToFile}
-                    on:navigate-to-graph={handleNavigateToGraph}
-                    on:navigate-to-commands={handleNavigateToCommands}
-                    on:navigate-to-target={handleTargetNavigation}
-                    on:run-target={handleRunTarget}
+                   onnavigate-to-file={handleNavigateToFile}
+                   onnavigate-to-graph={handleNavigateToGraph}
+                   onnavigate-to-commands={handleNavigateToCommands}
+                   onnavigate-to-target={handleTargetNavigation}
+                   onrun-target={handleRunTarget}
                   />
                 </div>
               {/each}

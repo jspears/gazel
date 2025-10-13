@@ -320,7 +320,7 @@
     {nodes} 
     {edges}
     fitView
-    on:nodeclick={handleNodeClick}
+   onnodeclick={handleNodeClick}
   >
     <Background variant={BackgroundVariant.Dots} />
     <Controls />

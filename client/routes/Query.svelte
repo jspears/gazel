@@ -239,7 +239,7 @@
 
         <div class="flex items-end gap-2">
           <button
-            on:click={executeQuery}
+           onclick={executeQuery}
             disabled={loading || !query.trim()}
             class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
           >
@@ -247,7 +247,7 @@
             Execute
           </button>
           <button
-            on:click={() => saveDialogOpen = true}
+           onclick={() => saveDialogOpen = true}
             disabled={!query.trim()}
             class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50 flex items-center gap-2"
           >
@@ -273,7 +273,7 @@
           <div class="max-h-[300px] overflow-y-auto">
             {#each exampleTemplates as template}
               <button
-                on:click={() => useTemplate(template)}
+               onclick={() => useTemplate(template)}
                 class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 transition-colors"
               >
                 <div class="flex items-center gap-2 mb-1">
@@ -307,7 +307,7 @@
         <div class="max-h-[400px] overflow-y-auto">
           {#each regularTemplates as template}
             <button
-              on:click={() => useTemplate(template)}
+             onclick={() => useTemplate(template)}
               class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0 transition-colors"
             >
               <div class="flex items-center gap-2 mb-1">
@@ -340,7 +340,7 @@
           {#each savedQueries as saved}
             <div class="px-4 py-3 hover:bg-muted border-b last:border-b-0 flex items-center justify-between">
               <button
-                on:click={() => useSavedQuery(saved)}
+               onclick={() => useSavedQuery(saved)}
                 class="flex-1 text-left"
               >
                 <div class="font-medium text-sm">{saved.name}</div>
@@ -349,7 +349,7 @@
                 {/if}
               </button>
               <button
-                on:click={() => deleteQuery(saved.id)}
+               onclick={() => deleteQuery(saved.id)}
                 class="p-1 hover:bg-destructive/10 rounded"
               >
                 <Trash2 class="w-4 h-4 text-destructive" />
@@ -367,7 +367,7 @@
           </h3>
           {#if recentQueries.length > 0}
             <button
-              on:click={() => {
+             onclick={() => {
                 storage.clearRecentQueries();
                 recentQueries = [];
               }}
@@ -383,7 +383,7 @@
           {/if}
           {#each recentQueries as recent}
             <button
-              on:click={() => {
+             onclick={() => {
                 query = recent.query;
                 outputFormat = recent.format;
               }}
@@ -476,13 +476,13 @@
           </div>
           <div class="flex gap-2 justify-end">
             <button
-              on:click={() => saveDialogOpen = false}
+             onclick={() => saveDialogOpen = false}
               class="px-4 py-2 border rounded-md hover:bg-muted"
             >
               Cancel
             </button>
             <button
-              on:click={saveQuery}
+             onclick={saveQuery}
               disabled={!queryName.trim()}
               class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
             >

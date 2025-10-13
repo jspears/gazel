@@ -26,6 +26,7 @@
     "build:prod": "$npm_execpath run build && echo 'Build complete. To deploy: cd dist && npm install && npm start'",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && svelte-check",
+    "test": "node --import tsx --test server/**/*.test.ts",
     "env": "env"
   },
   "dependencies": {

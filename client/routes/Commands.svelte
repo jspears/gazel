@@ -194,7 +194,7 @@
 
       <div class="flex gap-2">
         <button
-          on:click={() => { commandType = 'build'; executeCommand(); }}
+         onclick={() => { commandType = 'build'; executeCommand(); }}
           disabled={loading || !target.trim()}
           class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
         >
@@ -202,7 +202,7 @@
           Build
         </button>
         <button
-          on:click={() => { commandType = 'test'; executeCommand(); }}
+         onclick={() => { commandType = 'test'; executeCommand(); }}
           disabled={loading || !target.trim()}
           class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
         >
@@ -210,7 +210,7 @@
           Test
         </button>
         <button
-          on:click={streamBuild}
+         onclick={streamBuild}
           disabled={loading || isStreaming || !target.trim()}
           class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50 flex items-center gap-2"
         >
@@ -218,7 +218,7 @@
           Stream Build
         </button>
         <button
-          on:click={streamRun}
+         onclick={streamRun}
           disabled={loading || isStreaming || !target.trim()}
           class="px-4 py-2 bg-accent text-accent-foreground rounded-md hover:bg-accent/90 disabled:opacity-50 flex items-center gap-2"
         >
@@ -227,7 +227,7 @@
         </button>
         {#if isStreaming}
           <button
-            on:click={stopStreaming}
+           onclick={stopStreaming}
             class="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 flex items-center gap-2"
           >
             <XCircle class="w-4 h-4" />
@@ -236,14 +236,14 @@
         {/if}
         <div class="ml-auto flex gap-2">
           <button
-            on:click={() => cleanBazel(false)}
+           onclick={() => cleanBazel(false)}
             disabled={loading}
             class="px-4 py-2 border rounded-md hover:bg-muted disabled:opacity-50"
           >
             Clean
           </button>
           <button
-            on:click={() => cleanBazel(true)}
+           onclick={() => cleanBazel(true)}
             disabled={loading}
             class="px-4 py-2 border rounded-md hover:bg-muted disabled:opacity-50"
           >
@@ -262,7 +262,7 @@
           Command History
         </h3>
         <button
-          on:click={clearHistory}
+         onclick={clearHistory}
           class="p-1 hover:bg-destructive/10 rounded"
         >
           <Trash2 class="w-4 h-4 text-destructive" />
@@ -274,7 +274,7 @@
         {/if}
         {#each history as cmd}
           <button
-            on:click={() => useHistoryCommand(cmd)}
+           onclick={() => useHistoryCommand(cmd)}
             class="w-full text-left px-4 py-3 hover:bg-muted border-b last:border-b-0"
           >
             <div class="flex items-center justify-between mb-1">

@@ -3,7 +3,7 @@
     "compilerOptions": {
             "verbatimModuleSyntax": false,
              "module": "ES2022",
-            "moduleResolution": "bundler",
+            "moduleResolution": "bundler"
     }
     // "compilerOptions": {
     //    "verbatimModuleSyntax": false,

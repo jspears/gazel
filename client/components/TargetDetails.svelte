@@ -228,7 +228,7 @@
           <p class="font-mono {compact ? 'text-sm' : ''}">{target.location}</p>
           {#if getBuildFilePath(target) && showNavigation}
             <button
-              on:click={navigateToBuildFile}
+             onclick={navigateToBuildFile}
               class="p-1 hover:bg-muted rounded flex items-center gap-1 text-xs text-primary"
               title="View in BUILD file"
             >
@@ -243,7 +243,7 @@
     {#if isExecutableTarget(target) && showActions}
       <div>
         <button
-          on:click={runTarget}
+         onclick={runTarget}
           class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md flex items-center gap-2 transition-colors"
         >
           {#if (target.ruleType || target.type || '').includes('test')}
@@ -281,7 +281,7 @@
         <div class="space-y-1 max-h-40 overflow-y-auto bg-muted/30 p-2 rounded">
           {#each targetDependencies as dep}
             <button
-              on:click={() => navigateToTarget(dep)}
+             onclick={() => navigateToTarget(dep)}
               class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
             >
               <ChevronRight class="w-3 h-3" />
@@ -304,7 +304,7 @@
         <div class="space-y-1 max-h-40 overflow-y-auto bg-muted/30 p-2 rounded">
           {#each targetReverseDependencies as rdep}
             <button
-              on:click={() => navigateToTarget(rdep)}
+             onclick={() => navigateToTarget(rdep)}
               class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
             >
               <ChevronRight class="w-3 h-3" />

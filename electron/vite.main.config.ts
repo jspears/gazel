@@ -14,12 +14,18 @@ const protoGeneratedDir = path.resolve(workspaceRoot, 'bazel-bin/proto');
 const protoSourceDir = path.resolve(workspaceRoot, 'proto');
 const protoAlias = existsSync(protoGeneratedDir) ? protoGeneratedDir : protoSourceDir;
 
+console.log('[vite.main.config] Proto alias:', protoAlias);
+
 // https://vitejs.dev/config
 export default defineConfig({
   plugins: [viteTSConfigPaths()],
   resolve: {
     alias: {
       proto: protoAlias,
+      '@speajus/gazel-proto': protoAlias,
+      // Resolve Bazel proto imports for build_pb.js
+      '../build_pb.js': path.resolve(workspaceRoot, 'bazel-bin/proto/_virtual_imports/build_proto/build_pb.js'),
+      '../stardoc_output_pb.js': path.resolve(workspaceRoot, 'bazel-bin/proto/_virtual_imports/build_proto/stardoc_output_pb.js'),
     },
   },
   build: {

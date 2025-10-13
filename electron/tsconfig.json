@@ -1,10 +1,4 @@
 {
-  "extends": "../tsconfig.json",
-  "compilerOptions": {
-     "paths": {
-      "proto/*": ["./bazel-bin/proto/*", "./proto/*"],
-      "$client/*": ["./client/*"],
-    }
-  }
+  "extends": "../tsconfig.json"
 }
 

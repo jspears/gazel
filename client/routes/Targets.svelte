@@ -60,8 +60,13 @@
 
  
   onMount(async () => {
+    console.log('loading targets...');
+    try {
     await loadTargets();
-
+    }catch(err){
+      console.trace(err)
+      console.error('Failed to load targets:', err);
+    }
     // Load search history
     searchHistory = storage.getSearchHistory();
 
@@ -103,33 +108,6 @@
 
     document.addEventListener('click', handleClickOutside);
 
-    // Set up intersection observer for infinite scrolling
-    if (typeof IntersectionObserver !== 'undefined') {
-      const observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting && !loadingMore && displayLimit < visibleTargets.length) {
-              loadMoreTargets();
-            }
-          });
-        },
-        { threshold: 0.1 }
-      );
-
-      // Observe the load more element when it's available
-      const checkElement = setInterval(() => {
-        if (loadMoreElement) {
-          observer.observe(loadMoreElement);
-          clearInterval(checkElement);
-        }
-      }, 100);
-
-      return () => {
-        observer.disconnect();
-        clearInterval(checkElement);
-        document.removeEventListener('click', handleClickOutside);
-      };
-    }
 
     return () => {
       document.removeEventListener('click', handleClickOutside);
@@ -137,15 +115,45 @@
   });
 
   async function loadTargets() {
-    try {
       loading = true;
       error = null;
       displayLimit = 100; // Reset display limit when loading new targets
       targets = [];
+      filteredTargets = [];
       byPackage = {};
-      const result = await api.searchTargets({query: '//...'});
-      filteredTargets = result.targets;
-   
+
+      try {
+
+      // Stream targets as they load
+      for await (const response of api.searchTargets({query: '//...'})) {
+        if (response.data.case === 'target') {
+          // Convert protobuf message to plain object to avoid cloning issues with Svelte reactivity
+          const protoTarget = response.data.value;
+          const plainTarget: BazelTarget = {
+            label: protoTarget.label,
+            kind: protoTarget.kind,
+            package: protoTarget.package,
+            name: protoTarget.name,
+            location: protoTarget.location,
+            attributes: protoTarget.attributes,
+            dependencies: protoTarget.dependencies,
+            visibility: protoTarget.visibility,
+            tags: protoTarget.tags,
+          } as BazelTarget;
+          // Add target to the list as it arrives
+          filteredTargets = [...filteredTargets, plainTarget];
+        } else if (response.data.case === 'complete') {
+          // All targets loaded
+          console.log(`Loaded ${response.data.value.total} targets`);
+        } else if (response.data.case === 'error') {
+          console.error('Error loading targets:', response.data.value);
+          error = response.data.value;
+        }
+      }
+
+      // Store the final list in targets for filtering
+      targets = filteredTargets;
+
     } catch (err: any) {
       console.trace(err)
       // Don't show error if request was aborted due to page reload (workspace switching)
@@ -204,8 +212,20 @@
       loading = true;
       error = null;
       usingFallbackSearch = false;
-      const result = await api.searchTargets({query: searchQuery, type: selectedType});
-      filteredTargets = result.targets;
+      filteredTargets = [];
+
+      // Stream search results as they arrive
+      for await (const response of api.searchTargets({query: searchQuery, type: selectedType})) {
+        if (response.data.case === 'target') {
+          // Add target to the list as it arrives
+          filteredTargets = [...filteredTargets, response.data.value];
+        } else if (response.data.case === 'complete') {
+          // Search complete
+          console.log(`Found ${response.data.value.total} targets matching "${response.data.value.query}"`);
+        } else if (response.data.case === 'error') {
+          error = response.data.value;
+        }
+      }
     } catch (err: any) {
       // If the Bazel query fails, fall back to string search
       console.log('Bazel query failed, falling back to string search:', err.message);
@@ -228,27 +248,27 @@
       }
 
       // Search in target label
-      if (target.label && target.label.toLowerCase().includes(query)) {
+      if (target.label?.toLowerCase().includes(query)) {
         return true;
       }
 
       // Search in package name
-      if (target.package && target.package.toLowerCase().includes(query)) {
+      if (target?.package.toLowerCase().includes(query)) {
         return true;
       }
 
       // Search in rule type
-      if (target.type && target.type.toLowerCase().includes(query)) {
+      if (target.type?.toLowerCase().includes(query)) {
         return true;
       }
 
       // Search in visibility
-      if (target.visibility && target.visibility.some(v => v.toLowerCase().includes(query))) {
+      if (target.visibility?.some(v => v.toLowerCase().includes(query))) {
         return true;
       }
 
       // Search in tags
-      if (target.tags && target.tags.some(tag => tag.toLowerCase().includes(query))) {
+      if (target.tags?.some(tag => tag.toLowerCase().includes(query))) {
         return true;
       }
 
@@ -257,7 +277,7 @@
         return true;
       }
 
-      if (target.deps && target.deps.some(dep => dep.toLowerCase().includes(query))) {
+      if (target.deps?.some(dep => dep.toLowerCase().includes(query))) {
         return true;
       }
 
@@ -271,7 +291,7 @@
   }
 
   async function selectTarget(target: BazelTarget, addToHistory = true) {
-    console.log({target});
+    console.log('selectTarget:', target.package, target.name, target.kind);
     selectedTarget = target;
     targetOutputs = [];
     targetReverseDependencies = [];
@@ -623,9 +643,12 @@
     </div>
   {/if}
 
-  {#if loading}
+  {#if loading && filteredTargets.length === 0}
     <div class="flex items-center justify-center py-12">
-      <div class="text-muted-foreground">Loading targets...</div>
+      <div class="flex items-center gap-2">
+        <div class="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"></div>
+        <span class="text-muted-foreground">Loading targets...</span>
+      </div>
     </div>
   {:else if error}
     <div class="bg-destructive/10 text-destructive p-4 rounded-md">
@@ -635,10 +658,16 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="bg-card rounded-lg border">
         <div class="p-4 border-b flex items-center justify-between">
-          <h3 class="font-semibold">
+          <h3 class="font-semibold flex items-center gap-2">
             Targets ({visibleTargets.length})
             {#if hiddenCount > 0 && !showHiddenTargets}
               <span class="text-xs text-muted-foreground ml-1">(+{hiddenCount} hidden)</span>
+            {/if}
+            {#if loading}
+              <div class="flex items-center gap-1 text-xs text-muted-foreground font-normal">
+                <div class="animate-spin rounded-full h-3 w-3 border-2 border-primary border-t-transparent"></div>
+                <span>Loading...</span>
+              </div>
             {/if}
           </h3>
           <div class="flex items-center gap-2">

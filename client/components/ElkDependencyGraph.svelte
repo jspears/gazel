@@ -330,13 +330,13 @@
       <Panel position="top-left">
         <div class="flex gap-2">
           <button
-            on:click={() => layoutDirection = 'DOWN'}
+           onclick={() => layoutDirection = 'DOWN'}
             class="px-3 py-1 text-sm border rounded-md hover:bg-muted {layoutDirection === 'DOWN' ? 'bg-primary text-primary-foreground' : ''}"
           >
             Vertical
           </button>
           <button
-            on:click={() => layoutDirection = 'RIGHT'}
+           onclick={() => layoutDirection = 'RIGHT'}
             class="px-3 py-1 text-sm border rounded-md hover:bg-muted {layoutDirection === 'RIGHT' ? 'bg-primary text-primary-foreground' : ''}"
           >
             Horizontal

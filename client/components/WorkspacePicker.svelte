@@ -206,7 +206,7 @@
               >
                 <div class="flex items-start gap-3">
                   <button
-                    on:click={() => selectWorkspaceFromList(historyItem.path)}
+                   onclick={() => selectWorkspaceFromList(historyItem.path)}
                     class="flex-1 text-left flex items-start gap-3"
                   >
                     <div class="mt-1">
@@ -230,7 +230,7 @@
                     </div>
                   </button>
                   <button
-                    on:click={() => deleteWorkspaceFromHistory(historyItem.path)}
+                   onclick={() => deleteWorkspaceFromHistory(historyItem.path)}
                     class="p-2 hover:bg-destructive/10 rounded-md transition-colors group"
                     title="Remove from history"
                   >
@@ -250,7 +250,7 @@
           <div class="space-y-2">
             {#each workspaces as workspace}
               <button
-                on:click={() => selectWorkspaceFromList(workspace.path)}
+               onclick={() => selectWorkspaceFromList(workspace.path)}
                 class="w-full p-4 border rounded-lg hover:bg-muted/50 transition-colors text-left
                        {selectedWorkspace === workspace.path ? 'border-primary bg-muted' : ''}"
               >
@@ -286,7 +286,7 @@
           <input
             type="text"
             bind:value={customPath}
-            on:input={handleCustomPathInput}
+           oninput={handleCustomPathInput}
             placeholder="/path/to/your/bazel/workspace"
             class="flex-1 px-3 py-2 border rounded-md bg-background"
             disabled={switching}
@@ -299,7 +299,7 @@
 
       <div class="flex justify-end gap-3">
         <button
-          on:click={scanForWorkspaces}
+         onclick={scanForWorkspaces}
           disabled={scanning || switching}
           class="px-4 py-2 border rounded-md hover:bg-muted transition-colors flex items-center gap-2"
         >
@@ -307,7 +307,7 @@
           Rescan
         </button>
         <button
-          on:click={selectWorkspace}
+         onclick={selectWorkspace}
           disabled={(!selectedWorkspace && !customPath) || switching}
           class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 
                  transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

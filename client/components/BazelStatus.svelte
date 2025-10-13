@@ -121,7 +121,7 @@
   <!-- Retry Button -->
   {#if $connectionStatus === 'error'}
     <button
-      on:click={retry}
+     onclick={retry}
       disabled={retrying}
       class="px-3 py-1 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
     >

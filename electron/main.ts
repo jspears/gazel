@@ -4,10 +4,16 @@ import os from 'node:os';
 import { app, BrowserWindow, ipcMain, protocol, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GazelServiceImpl } from '../server/server.ts';
+import { GazelServiceImpl } from '../server/server.js';
 import { GazelService } from '@speajus/gazel-proto';
-import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
+import { fromBinary, toBinary } from '@bufbuild/protobuf';
 import { Code, ConnectError } from '@connectrpc/connect';
+import { setBazelExecutable, setWorkspace } from '../server/config.js';
+
+// Declare Electron Forge Vite plugin magic variables
+// These are injected at build time by the Vite plugin
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
+declare const MAIN_WINDOW_VITE_NAME: string;
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -94,37 +100,17 @@ function setupGrpcHandlers() {
   }
 
   // Handle unary RPC calls
-  ipcMain.handle('grpc:unary:request', async (_event, request: {
+  ipcMain.handle('grpc:unary', async (_event, request: {
     service: string;
     method: string;
-    data:any;
-    metadata?: { workspace?: string; executable?: string };
-  }) => {
+    message: unknown;
+   }) => {
+      const { service, method, message } = request;
 
+      logToFile('[IPC Unary] Received request', { service, method, expectedService: 'gazel.api.v1.GazelService' });
 
-      const { service, method, data, metadata } = request;
-
-      // Apply metadata to server config if provided
-      if (metadata) {
-        if (metadata.workspace) {
-          const { setWorkspace } = await import('../server/config.js');
-          setWorkspace(metadata.workspace);
-          console.log(`[IPC] Set workspace from metadata: ${metadata.workspace}`);
-        }
-        if (metadata.executable) {
-          const { setBazelExecutable } = await import('../server/config.js');
-          const actualPath = setBazelExecutable(metadata.executable);
-          console.log(`[IPC] Set bazel executable from metadata: ${actualPath}`);
-
-          // Also update the BazelService instance
-          if (gazelService && typeof (gazelService as any).setBazelExecutable === 'function') {
-            (gazelService as any).setBazelExecutable(actualPath);
-          }
-        }
-      }
-
-      if (service !== 'GazelService') {
-        throw new Error(`Unknown service: ${service}`);
+      if (service !== 'gazel.api.v1.GazelService') {
+        throw new Error(`Unknown service: ${service} (expected: gazel.api.v1.GazelService)`);
       }
 
       // Find the method in the service definition
@@ -133,111 +119,116 @@ function setupGrpcHandlers() {
         throw new Error(`Unknown method: ${method}`);
       }
 
-      // Convert Buffer to Uint8Array, then to the proper message type
-      const uint8Data = data instanceof Buffer ? new Uint8Array(data) : data;
-      const inputMessage = fromBinary(methodDef.input, uint8Data);
-
       // Call the service method
-      const serviceMethod = gazelService[method];
+      const methodName = methodDef.localName;
+      const serviceMethod = gazelService[methodName];
       if (typeof serviceMethod !== 'function') {
-        throw new Error(`Method not implemented: ${method}`);
+        throw new Error(`Method not implemented: ${methodName}`);
       }
-      try {
-      const result = await serviceMethod.call(gazelService, inputMessage);
 
-      // Convert result to binary for IPC transfer
-      const binaryResult = toBinary(methodDef.output, result);
-      return Buffer.from(binaryResult);
+      try {
+        const result = await serviceMethod.call(gazelService, message);
+        return result;
       } catch (error) {
         console.error('Unary handler error:', error);
-        throw new ConnectError(
-            `${service}#${method} ${error.message}`,
-            Code.ResourceExhausted,
-            new Headers(),
-            [],
-            error.cause
-          );
+        throw error;
       }
-
   });
 
+  // Track active streams for cancellation
+  const activeStreams = new Map<string, { cancel: () => void }>();
+
   // Handle streaming RPC calls
-  ipcMain.on('grpc:stream:start', async (event, request: {
+  ipcMain.handle('grpc:stream:start', async (event, request: {
     streamId: string;
     service: string;
     method: string;
-    data: any;
-    metadata?: { workspace?: string; executable?: string };
+    message: unknown;
   }) => {
+    const { streamId, service, method, message } = request;
+    const dataChannel = `grpc:stream:${streamId}:data`;
+    const completeChannel = `grpc:stream:${streamId}:complete`;
+    const errorChannel = `grpc:stream:${streamId}:error`;
+
+    logToFile('[IPC Stream] Starting stream', { streamId, method });
+
     try {
-      const { streamId, service, method, data, metadata } = request;
+      logToFile('[IPC Stream] Received request', { service, method, expectedService: 'gazel.api.v1.GazelService' });
 
-      // Apply metadata to server config if provided
-      if (metadata) {
-        if (metadata.workspace) {
-          const { setWorkspace } = await import('../server/config.js');
-          setWorkspace(metadata.workspace);
-          console.log(`[IPC Stream] Set workspace from metadata: ${metadata.workspace}`);
-        }
-        if (metadata.executable) {
-          const { setBazelExecutable } = await import('../server/config.js');
-          const actualPath = setBazelExecutable(metadata.executable);
-          console.log(`[IPC Stream] Set bazel executable from metadata: ${actualPath}`);
-
-          // Also update the BazelService instance
-          if (gazelService && typeof (gazelService as any).setBazelExecutable === 'function') {
-            (gazelService as any).setBazelExecutable(actualPath);
-          }
-        }
-      }
-
-      if (service !== 'GazelService') {
-        event.reply(`grpc:stream:error:${streamId}`, `Unknown service: ${service}`);
-        return;
+      if (service !== 'gazel.api.v1.GazelService') {
+        throw new Error(`Unknown service: ${service} (expected: gazel.api.v1.GazelService)`);
       }
 
       // Find the method in the service definition
       const methodDef = GazelService.methods.find(m => m.localName === method);
-      if (!methodDef || methodDef.kind !== 'server_streaming') {
-        event.reply(`grpc:stream:error:${streamId}`, `Unknown streaming method: ${method}`);
-        return;
+      if (!methodDef || methodDef.methodKind !== 'server_streaming') {
+        throw new Error(`Unknown streaming method: ${method}`);
       }
 
-      // Convert Buffer to Uint8Array, then to the proper message type
-      const uint8Data = data instanceof Buffer ? new Uint8Array(data) : data;
-      const inputMessage = fromBinary(methodDef.input, uint8Data);
-
-      // Call the service method
-      const serviceMethod = (gazelService as any)[method];
+      // Call the service method directly with the input
+      const methodName = methodDef.localName;
+      const serviceMethod = gazelService[methodName];
       if (typeof serviceMethod !== 'function') {
-        event.reply(`grpc:stream:error:${streamId}`, `Method not implemented: ${method}`);
-        return;
+        throw new Error(`Method not implemented: ${methodName}`);
       }
 
-      // Get the async generator
-      const generator = await serviceMethod.call(gazelService, inputMessage);
-
-      // Stream the results
-      try {
-        for await (const message of generator) {
-          const binaryData = toBinary(methodDef.output, message);
-          const bufferData = Buffer.from(binaryData);
-          event.reply(`grpc:stream:message:${streamId}`, bufferData);
+      let cancelled = false;
+      activeStreams.set(streamId, {
+        cancel: () => {
+          cancelled = true;
+          logToFile('[IPC Stream] Stream cancelled', { streamId, method });
         }
-        event.reply(`grpc:stream:complete:${streamId}`);
-      } catch (error: any) {
-        event.reply(`grpc:stream:error:${streamId}`, error.message || 'Stream error');
-      }
-    } catch (error: any) {
-      console.error('Stream handler error:', error);
-      event.reply(`grpc:stream:error:${request.streamId}`, error.message || 'Unknown error');
+      });
+
+      // Get the async generator and iterate through it in the background
+      (async () => {
+        try {
+          const generator = serviceMethod.call(gazelService, message);
+
+          for await (const msg of generator) {
+            if (cancelled) {
+              logToFile('[IPC Stream] Breaking due to cancellation', { streamId });
+              break;
+            }
+
+            // Serialize the message to binary for IPC transfer
+            // This avoids circular reference errors
+            const binaryMsg = toBinary(methodDef.output, msg);
+
+            // Send each message to the renderer
+            event.sender.send(dataChannel, binaryMsg);
+          }
+
+          // Send completion signal
+          if (!cancelled) {
+            event.sender.send(completeChannel);
+            logToFile('[IPC Stream] Stream completed', { streamId, method });
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          logToFile('[IPC Stream] Stream error', { streamId, method, error: errorMessage });
+          event.sender.send(errorChannel, errorMessage);
+        } finally {
+          activeStreams.delete(streamId);
+        }
+      })();
+
+      // Return immediately
+      return { success: true };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logToFile('[IPC Stream] Failed to start stream', { streamId, method, error: errorMessage });
+      throw error;
     }
   });
 
   // Handle stream cancellation
   ipcMain.on('grpc:stream:cancel', (_event, streamId: string) => {
-    // TODO: Implement stream cancellation if needed
-    console.log(`Stream cancelled: ${streamId}`);
+    const stream = activeStreams.get(streamId);
+    if (stream) {
+      stream.cancel();
+      activeStreams.delete(streamId);
+    }
   });
 }
 
@@ -303,18 +294,9 @@ async function createWindow() {
     logToFile('Renderer process gone', details);
   });
 
-  // Use Electron Forge's Vite plugin global variables
-  // These are automatically defined by the Vite plugin
-  // @ts-ignore - These globals are defined by Electron Forge Vite plugin
-  const MAIN_WINDOW_VITE_DEV_SERVER_URL = typeof globalThis.MAIN_WINDOW_VITE_DEV_SERVER_URL !== 'undefined'
-    ? globalThis.MAIN_WINDOW_VITE_DEV_SERVER_URL
-    : undefined;
-  // @ts-ignore
-  const MAIN_WINDOW_VITE_NAME = typeof globalThis.MAIN_WINDOW_VITE_NAME !== 'undefined'
-    ? globalThis.MAIN_WINDOW_VITE_NAME
-    : 'main_window';
-
-  logToFile('Vite plugin globals', {
+  // Use Electron Forge's Vite plugin magic variables
+  // These are declared at the top of the file and injected at build time
+  logToFile('Vite plugin magic variables', {
     MAIN_WINDOW_VITE_DEV_SERVER_URL,
     MAIN_WINDOW_VITE_NAME,
   });
@@ -322,6 +304,9 @@ async function createWindow() {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     // In development, load from Vite dev server
     logToFile('Loading renderer from dev server', { url: MAIN_WINDOW_VITE_DEV_SERVER_URL });
+    // Clear cache in development to avoid stale module issues
+    await mainWindow.webContents.session.clearCache();
+    logToFile('Cleared browser cache');
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL).catch(error => {
       logToFile('Failed to load dev server URL', error);
     });

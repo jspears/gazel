@@ -49,15 +49,24 @@ export function updateUrl(state: AppState, replace = false) {
   Object.entries(state).forEach(([key, value]) => {
     if (value != null ) params.append(key, value);
   });
-  
+
   nav.set(state);
 
   const url = params.toString() ? `?${params.toString()}` : window.location.pathname;
-  
+
+  // Create a serializable copy of the state (only string values)
+  // to avoid "An object could not be cloned" errors with History API
+  const serializableState: Record<string, string> = {};
+  Object.entries(state).forEach(([key, value]) => {
+    if (value != null && typeof value === 'string') {
+      serializableState[key] = value;
+    }
+  });
+
   if (replace) {
-    window.history.replaceState(state, '', url);
+    window.history.replaceState(serializableState, '', url);
   } else {
-    window.history.pushState(state, '', url);
+    window.history.pushState(serializableState, '', url);
   }
 }
 
@@ -146,17 +155,13 @@ export function updateParam(key: keyof AppState, value: string | undefined) {
 /**
  * Initialize navigation and set up event listeners
  */
-export function initNavigation(onStateChange: (state: AppState, location: string) => void) {
+export function initNavigation(onStateChange: (state: AppState) => void) {
   // Handle browser back/forward buttons
   window.addEventListener('popstate', (event) => {
-    const state = Object.assign({},event.state as AppState, parseUrlParams());
-    nav.set(state);
-    nav.subscribe((state) => {
-      onStateChange(state, document.location.pathname);
-    });
-    onStateChange(state, document.location.pathname);
+    nav.set(Object.assign({},event.state as AppState, parseUrlParams()));
   });
   
+   nav.subscribe(onStateChange);
   // Handle initial load
   const initialState = parseUrlParams();
   if (Object.keys(initialState).length > 0) {

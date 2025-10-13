@@ -232,3 +232,71 @@ genrule(
     local = True,
     tags = ["no-sandbox"],
 )
+
+# Debug mode - run with: bazel run //electron:debug
+# This starts Electron with --inspect flag for debugging
+genrule(
+    name = "debug",
+    srcs = [
+        ":main_js",
+        ":preload_js",
+        ":package_json",
+        ":forge_config",
+        ":vite_main_config",
+        ":vite_preload_config",
+        ":vite_renderer_config",
+        "//:node_modules",
+        "//:package_json",
+        "//client:client_src",
+        "//proto:index",
+        "//server:server_ts",
+    ],
+    outs = ["debug.sh"],
+    cmd = """
+        cat > $@ << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Get the real workspace directory (not the Bazel execroot)
+# When running through Bazel, BUILD_WORKSPACE_DIRECTORY is set
+if [[ -n "$${BUILD_WORKSPACE_DIRECTORY:-}" ]]; then
+    WORKSPACE_ROOT="$$BUILD_WORKSPACE_DIRECTORY"
+else
+    # Fallback: find workspace by looking for MODULE.bazel
+    SCRIPT_DIR="$$(cd "$$(dirname "$${BASH_SOURCE[0]}")" && pwd)"
+    WORKSPACE_ROOT="$$SCRIPT_DIR"
+
+    while [[ "$$WORKSPACE_ROOT" != "/" ]]; do
+        if [[ -f "$$WORKSPACE_ROOT/MODULE.bazel" ]] && [[ -f "$$WORKSPACE_ROOT/package.json" ]]; then
+            break
+        fi
+        WORKSPACE_ROOT="$$(dirname "$$WORKSPACE_ROOT")"
+    done
+
+    if [[ ! -f "$$WORKSPACE_ROOT/MODULE.bazel" ]]; then
+        echo "Error: Could not find workspace root" >&2
+        exit 1
+    fi
+fi
+
+cd "$$WORKSPACE_ROOT"
+
+echo "🐛 Starting Electron in debug mode..."
+echo "📍 Chrome DevTools will be available at chrome://inspect"
+echo "📍 Node.js debugger listening on ws://127.0.0.1:9229"
+echo "📍 Open chrome://inspect in Chrome to connect to the debugger"
+echo ""
+
+# Set environment variable to enable debugging
+export ELECTRON_ENABLE_LOGGING=1
+
+# Run Electron Forge start with inspect flag
+# Pass --inspect directly to electron via the -- separator
+exec node_modules/.bin/electron-forge start -- --inspect=9229
+EOF
+        chmod +x $@
+    """,
+    executable = True,
+    local = True,
+    tags = ["no-sandbox"],
+)

@@ -16,7 +16,8 @@ js_library(
     "**/*.css",
     "**/*.js",
     "**/*.html",
-   
+    "public/**/*",
+
 ]),
     deps = [
         "//proto:pkg",

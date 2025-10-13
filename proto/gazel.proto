@@ -271,9 +271,15 @@ message SearchTargetsRequest {
   string package = 3;
 }
 message SearchTargetsResponse {
+  oneof data {
+    BazelTarget target = 1;
+    SearchTargetsComplete complete = 2;
+    string error = 3;
+  }
+}
+message SearchTargetsComplete {
   string query = 1;
   int32 total = 2;
-  repeated BazelTarget targets = 3;
 }
 
 // Query Service Messages
@@ -517,7 +523,7 @@ service GazelService {
   rpc GetTargetDependencies(GetTargetDependenciesRequest) returns (GetTargetDependenciesResponse);
   rpc GetTargetOutputs(GetTargetOutputsRequest) returns (GetTargetOutputsResponse);
   rpc GetReverseDependencies(GetReverseDependenciesRequest) returns (GetReverseDependenciesResponse);
-  rpc SearchTargets(SearchTargetsRequest) returns (SearchTargetsResponse);
+  rpc SearchTargets(SearchTargetsRequest) returns (stream SearchTargetsResponse);
 
   // Query operations
   rpc ExecuteQuery(ExecuteQueryRequest) returns (ExecuteQueryResponse);

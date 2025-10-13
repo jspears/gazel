@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Clipboard, Check } from 'lucide-svelte';
+  import {stopPropagation} from './util.js';
   
   export let text: string;
   export let size: 'sm' | 'md' | 'lg' = 'sm';
@@ -43,7 +44,7 @@
 </script>
 
 <button
-  on:click|stopPropagation={copyToClipboard}
+ onclick={stopPropagation(copyToClipboard)}
   class="p-1 hover:bg-muted rounded transition-all {className}"
   title={copied ? 'Copied!' : 'Copy to clipboard'}
   type="button"

@@ -254,10 +254,10 @@
             bind:value={targetInput}
             placeholder="e.g., //clients/vscode:test or //..."
             class="flex-1 px-3 py-2 border rounded-md bg-background"
-            on:keydown={(e) => e.key === 'Enter' && fetchDependencyGraph()}
+           onkeydown={(e) => e.key === 'Enter' && fetchDependencyGraph()}
           />
           <button
-            on:click={() => useStreaming ? fetchDependencyGraphStreaming() : fetchDependencyGraph()}
+           onclick={() => useStreaming ? fetchDependencyGraphStreaming() : fetchDependencyGraph()}
             disabled={loading || !targetInput.trim()}
             class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
           >
@@ -346,7 +346,7 @@
         <div class="flex flex-wrap gap-2">
           {#each exampleTargets as target}
             <button
-              on:click={() => useExampleTarget(target)}
+             onclick={() => useExampleTarget(target)}
               class="px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
             >
               {target}
@@ -383,7 +383,7 @@
         
         <div class="flex items-center gap-2">
           <button
-            on:click={downloadDot}
+           onclick={downloadDot}
             class="px-3 py-1 text-sm border rounded-md hover:bg-muted flex items-center gap-1"
             title="Download as DOT"
           >
@@ -391,7 +391,7 @@
             DOT
           </button>
           <button
-            on:click={() => showRawXml = !showRawXml}
+           onclick={() => showRawXml = !showRawXml}
             class="px-3 py-1 text-sm border rounded-md hover:bg-muted"
             title="Toggle raw XML"
           >

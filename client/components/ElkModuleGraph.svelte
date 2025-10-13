@@ -241,7 +241,7 @@
         type: 'smoothstep',
         animated: false
       }}
-      on:nodeclick={handleNodeClick}
+     onnodeclick={handleNodeClick}
     >
       <Background variant={BackgroundVariant.Dots} />
       <Controls />

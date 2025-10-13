@@ -3,7 +3,8 @@
   import { ChevronDown, Check, Search } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
   import { fly } from 'svelte/transition';
-
+  import {stopPropagation} from './util.js';
+  
   export let value: string = '';
   export let types: string[] = [];
   export let placeholder: string = 'All types';
@@ -66,8 +67,8 @@
         class="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
         placeholder="Search types..."
         aria-label="Search types"
-        on:click|stopPropagation
-        on:keydown|stopPropagation
+       onclick={stopPropagation()}
+       onkeydown={stopPropagation()}
       />
     </div>
 

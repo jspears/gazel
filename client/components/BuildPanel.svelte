@@ -58,7 +58,7 @@
     <div class="flex items-center gap-2">
       {#if !isBuilding}
         <button
-          on:click={startBuild}
+         onclick={startBuild}
           disabled={$connectionStatus !== 'connected' || targets.length === 0}
           class="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -67,7 +67,7 @@
         </button>
       {:else}
         <button
-          on:click={stopBuild}
+         onclick={stopBuild}
           class="flex items-center gap-2 px-3 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600"
         >
           <Square class="w-4 h-4" />

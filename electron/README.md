@@ -60,6 +60,24 @@ pnpm start
 bazel run //electron:start
 ```
 
+### Option 3: Debug Mode with Inspector
+
+This mode starts Electron with the Node.js debugger enabled:
+
+```bash
+# With Bazel
+bazel run //electron:debug
+```
+
+**How to debug:**
+1. Run the debug target
+2. Open Chrome and navigate to `chrome://inspect`
+3. Click "Configure" and ensure `localhost:9229` is in the target discovery list
+4. Click "inspect" under the Remote Target to open DevTools
+5. Set breakpoints in your main process code (main.ts, server code, etc.)
+
+**Note:** The `--inspect` flag only enables debugging for the main process. To debug the renderer process, use the built-in DevTools (which open automatically in dev mode).
+
 ## Building and Packaging
 
 ### Package the App
@@ -131,6 +149,7 @@ The renderer Vite config sets up these aliases:
 
 - `//electron:start` - Development mode with Electron Forge
 - `//electron:dev` - Development mode with iBazel + Electron Forge
+- `//electron:debug` - Development mode with Node.js debugger enabled (--inspect)
 - `//electron:package` - Package the app
 - `//electron:make` - Create installers
 

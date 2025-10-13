@@ -38,6 +38,7 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
   import './default.min.css';
   import WorkspacePicker from './components/WorkspacePicker.svelte';
   import SettingsModal from './components/Settings.svelte';
+  import SplashScreen from './components/SplashScreen.svelte';
   import { api } from './client.js';
   import { storage } from './lib/storage.js';
   import { nav,   copyUrlToClipboard, navigateToTab, initNavigation } from './lib/navigation.js';
@@ -51,6 +52,8 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
   let currentWorkspaceName: string | null = $state('');
   let checkingWorkspace = $state(false);
   let showCopied = $state(false);
+  let isInitializing = $state(true);
+  let splashMessage = $state('Loading Gazel...');
   
   $inspect(activeTab);
 
@@ -70,25 +73,13 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
     const isLocalDev = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
 
     if (isLocalDev) {
-      // When running from Bazel, prioritize the known workspace path
-      const knownBazelWorkspace = '';
-
-      // Try the known Bazel workspace first
-      try {
-        const result = await api.switchWorkspace({workspace:knownBazelWorkspace});
-        if (result.success) {
-          console.log('Auto-set Bazel workspace:', knownBazelWorkspace);
-          return knownBazelWorkspace;
-        }
-      } catch (err) {
-        console.debug('Known Bazel workspace not valid:', knownBazelWorkspace);
-      }
-
+    
       // Fall back to stored workspace if the known one doesn't work
       const storedWorkspace = storage.getPreference('lastWorkspace');
-      if (storedWorkspace && storedWorkspace !== knownBazelWorkspace) {
+      if (storedWorkspace) {
         try {
           const result = await api.switchWorkspace({workspace:storedWorkspace});
+          
           if (result.success) {
             console.log('Auto-set stored workspace:', storedWorkspace);
             return storedWorkspace;
@@ -104,14 +95,20 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
 
 
   onMount(async () => {
-    // Send Bazel executable configuration to server on startup
-    await initializeBazelExecutable();
+    try {
+      splashMessage = 'Initializing Bazel...';
+      // Send Bazel executable configuration to server on startup
+      await initializeBazelExecutable();
 
-    await checkWorkspace();
+      splashMessage = 'Loading workspace...';
+      await checkWorkspace();
 
-    // Initialize navigation and restore state from URL
-     initNavigation(handleStateChange);
-
+      // Initialize navigation and restore state from URL
+      initNavigation(handleStateChange);
+    } finally {
+      // Hide splash screen after initialization is complete
+      isInitializing = false;
+    }
   });
 
   async function initializeBazelExecutable() {
@@ -294,16 +291,17 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
   });
 </script>
 
-{#if checkingWorkspace}
-  <div class="min-h-screen bg-background flex items-center justify-center">
-    <div class="text-muted-foreground">Checking workspace configuration...</div>
-  </div>
+{#if isInitializing || (checkingWorkspace && !currentWorkspace)}
+  <SplashScreen isLoading={true} message={splashMessage} />
 {:else if showWorkspacePicker}
   <div class="min-h-screen bg-background">
     <header class="border-b">
       <div class="container mx-auto px-4 py-4">
         <div class="flex items-center justify-between">
-          <h1 class="text-2xl font-bold">Gazel</h1>
+          <h1 class="text-2xl font-bold flex items-center gap-2">
+            <img src="/icon-32.png" alt="Gazel" class="w-6 h-6" />
+            Gazel
+          </h1>
         </div>
       </div>
     </header>
@@ -320,7 +318,10 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
       <div class="container mx-auto px-4 py-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <h1 class="text-2xl font-bold">Gazel</h1>
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+              <img src="/icon-32.png" alt="Gazel" class="w-6 h-6" />
+              Gazel
+            </h1>
             {#if currentWorkspaceName}
               <button
                 class="flex items-center gap-2 px-3 py-1 bg-muted hover:bg-muted/80 rounded-md transition-colors"
