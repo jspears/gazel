@@ -20,7 +20,7 @@ ts_config(
 exports_files([
     "tsconfig.json",
     "package.json",
-    "yarn.lock",
+    "pnpm-lock.yaml",
     ".npmrc",
 ], visibility = ["//visibility:public"])
 

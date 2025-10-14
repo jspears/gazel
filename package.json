@@ -143,5 +143,15 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "protobufjs",
+      "esbuild",
+      "electron-winstaller",
+      "svelte-preprocess",
+      "@bufbuild/buf"
+    ]
   }
 }

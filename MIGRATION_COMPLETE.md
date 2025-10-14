@@ -4,19 +4,24 @@
 
 ## Summary
 
-The Gazel project has been successfully migrated from yarn to Yarn. All configuration files, Bazel files, GitHub Actions workflows, and documentation have been updated.
+The Gazel project has been successfully migrated to use **Yarn for development** while maintaining **pnpm-lock.yaml for Bazel**. This hybrid approach provides the best of both worlds:
+- Simple development workflow with Yarn
+- Robust Bazel integration with pnpm-lock.yaml
+
+All configuration files, GitHub Actions workflows, and documentation have been updated.
 
 ## What Was Changed
 
 ### 1. Configuration Files ✅
 
 - **`.npmrc`**: Updated to use yarn configuration
-- **`package.json`**: 
-  - Added `workspaces` field
+- **`package.json`**:
+  - Added `workspaces` field (for Yarn)
   - Added `"private": true`
-  - Removed `pnpm` configuration section
-- **`pnpm-workspace.yaml`**: Deleted (replaced by workspaces in package.json)
-- **`yarn.lock`**: Generated (325 KB, 948 packages)
+  - Added `pnpm.onlyBuiltDependencies` (for Bazel/pnpm v9+)
+- **`pnpm-workspace.yaml`**: Maintained (required for Bazel)
+- **`yarn.lock`**: Generated (325 KB, 948 packages) - used by developers
+- **`pnpm-lock.yaml`**: Generated (252 KB) - used by Bazel only
 
 ### 2. Bazel Configuration ✅
 
