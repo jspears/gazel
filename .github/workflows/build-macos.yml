@@ -33,7 +33,10 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          echo "Installing dependencies..."
+          pnpm install --frozen-lockfile
+          echo "✓ Dependencies installed"
 
       - name: Setup Bazel
         uses: bazel-contrib/setup-bazel@0.9.0
@@ -48,6 +51,14 @@ jobs:
           echo "Generating protobuf files with Bazel..."
           bazel build //proto:index
           echo "✓ Proto files generated"
+
+      - name: Verify Electron Installation
+        run: |
+          echo "Checking electron installation..."
+          ls -la node_modules/electron || echo "Electron not in node_modules"
+          pnpm list electron || echo "Electron not listed"
+          echo "Attempting to locate electron binary..."
+          find node_modules/electron -name "electron" -type f 2>/dev/null || echo "No electron binary found"
 
       - name: Import Code Signing Certificate
         env:

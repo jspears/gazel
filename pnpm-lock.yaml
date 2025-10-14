@@ -133,7 +133,7 @@ importers:
         specifier: ^8.2.0
         version: 8.2.2
       electron:
-        specifier: ^38.1.2
+        specifier: ^38.2.1
         version: 38.2.1
       electron-builder:
         specifier: ^26.0.12
@@ -216,7 +216,7 @@ importers:
         version: 0.544.0(svelte@5.39.8)
       vite-tsconfig-paths:
         specifier: ^5.1.4
-        version: 5.1.4(typescript@5.4.5)(vite@5.4.20(@types/node@22.18.8))
+        version: 5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@22.18.8))
     devDependencies:
       '@bufbuild/protoc-gen-es':
         specifier: ^2.9.0
@@ -7749,10 +7749,6 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  tsconfck@3.1.6(typescript@5.4.5):
-    optionalDependencies:
-      typescript: 5.4.5
-
   tsconfck@3.1.6(typescript@5.9.3):
     optionalDependencies:
       typescript: 5.9.3
@@ -7840,17 +7836,6 @@ snapshots:
       core-util-is: 1.0.2
       extsprintf: 1.4.1
     optional: true
-
-  vite-tsconfig-paths@5.1.4(typescript@5.4.5)(vite@5.4.20(@types/node@22.18.8)):
-    dependencies:
-      debug: 4.4.3
-      globrex: 0.1.2
-      tsconfck: 3.1.6(typescript@5.4.5)
-    optionalDependencies:
-      vite: 5.4.20(@types/node@22.18.8)
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
 
   vite-tsconfig-paths@5.1.4(typescript@5.9.3)(vite@5.4.20(@types/node@22.18.8)):
     dependencies:
