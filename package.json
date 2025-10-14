@@ -5,6 +5,7 @@
   "type": "module",
   "main": ".vite/build/main.cjs",
   "private": true,
+  "packageManager": "yarn@4.10.3",
   "workspaces": [
     "app",
     "proto",

@@ -27,6 +27,12 @@ jobs:
           node-version: '20'
           cache: 'yarn'
 
+      - name: Enable Corepack and Setup Yarn
+        run: |
+          corepack enable
+          yarn --version
+          echo "✓ Yarn $(yarn --version) activated"
+
       - name: Install dependencies
         run: |
           echo "Installing dependencies..."

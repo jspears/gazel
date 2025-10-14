@@ -150,13 +150,19 @@ git commit -m "Add some-package"
 
 ## CI/CD Configuration
 
-GitHub Actions workflow uses Yarn:
+GitHub Actions workflow uses Yarn 4.10.3+ (specified in package.json):
 
 ```yaml
 - name: Setup Node.js
   uses: actions/setup-node@v4
   with:
+    node-version: '20'
     cache: 'yarn'
+
+- name: Enable Corepack and Setup Yarn
+  run: |
+    corepack enable
+    yarn --version
 
 - name: Install dependencies
   run: yarn install --frozen-lockfile
@@ -166,6 +172,13 @@ GitHub Actions workflow uses Yarn:
 
 - name: Build and Package App
   run: yarn electron-forge package
+```
+
+The Yarn version is controlled by the `packageManager` field in package.json:
+```json
+{
+  "packageManager": "yarn@4.10.3"
+}
 ```
 
 ## Benefits
