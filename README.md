@@ -302,6 +302,35 @@ gazel/
 - 🐛 [Report issues](https://github.com/jspears/gazel/issues)
 - 💬 [Start a discussion](https://github.com/jspears/gazel/discussions)
 
+## Distribution & Code Signing
+
+### Local Builds
+
+For local development and testing:
+```bash
+pnpm start              # Development mode with hot reload
+pnpm package            # Package unsigned app
+```
+
+### Signed Builds (macOS)
+
+For distribution to users, create signed and notarized builds:
+
+**Local signing:**
+```bash
+source .env             # Load your Apple credentials
+pnpm make               # Create signed + notarized installer
+```
+
+**Automated builds with GitHub Actions:**
+
+The project includes a GitHub Actions workflow for automated signed builds. See:
+- 📘 [GitHub Actions Setup Guide](GITHUB_ACTIONS_SIGNING.md) - Complete setup instructions
+- ✅ [Secrets Checklist](.github/SECRETS_CHECKLIST.md) - Quick reference for required secrets
+- 🔧 [Local Code Signing Setup](CODE_SIGNING_SETUP.md) - For local development
+
+The workflow automatically builds, signs, and notarizes your app on every push to main or when you create a release tag.
+
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
