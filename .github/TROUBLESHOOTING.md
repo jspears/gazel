@@ -103,6 +103,27 @@ Error: Notarization failed with status: Invalid
 
 ---
 
+### ❌ "Could not resolve ./gazel_pb.js"
+
+**Error:**
+```
+Could not resolve "./gazel_pb.js" from "proto/index.ts"
+```
+
+**Cause:** Protobuf files haven't been generated yet.
+
+**Solution:** ✅ Already fixed in the workflow! The workflow now:
+1. Installs Bazel (via Bazelisk)
+2. Generates proto files with `bazel build //proto:index`
+3. Then builds the Electron app
+
+**If you still see this error:**
+- Check that Bazel installation step completed successfully
+- Verify proto generation step shows "✓ Proto files generated"
+- Ensure `bazel-bin/proto/` directory contains generated files
+
+---
+
 ### ❌ "pnpm install failed"
 
 **Error:**

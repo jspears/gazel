@@ -35,6 +35,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.9.0
+        with:
+          # Bazelisk will automatically use the version specified in .bazelversion
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+
+      - name: Generate Proto Files
+        run: |
+          echo "Generating protobuf files with Bazel..."
+          bazel build //proto:index
+          echo "✓ Proto files generated"
+
       - name: Import Code Signing Certificate
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}

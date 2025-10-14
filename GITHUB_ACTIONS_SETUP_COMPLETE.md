@@ -19,6 +19,8 @@ A complete workflow that:
 - ✅ Fixed pnpm installation order (install pnpm before Node.js cache)
 - ✅ Updated to pnpm v9 to match local environment
 - ✅ Updated to pnpm/action-setup@v4
+- ✅ Added Bazel setup to generate protobuf files before building
+- ✅ Using bazel-contrib/setup-bazel action with caching for faster builds
 
 ### 2. Documentation Files
 
