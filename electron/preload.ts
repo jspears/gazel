@@ -57,6 +57,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeListener(channel, listener);
   },
 
+  /**
+   * Show file picker dialog for workspace files
+   * @returns Promise that resolves with the selected file path or null if cancelled
+   */
+  selectWorkspaceFile(): Promise<string | null> {
+    return ipcRenderer.invoke('dialog:selectWorkspaceFile');
+  },
+
   // Platform information
   platform: process.platform,
   isElectron: true

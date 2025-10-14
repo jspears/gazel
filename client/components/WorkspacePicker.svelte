@@ -1,23 +1,21 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Folder, Search, Check, AlertCircle, FolderOpen, Home, ChevronUp, Clock, X, Trash2 } from 'lucide-svelte';
+  import { Folder, Check, AlertCircle, Clock, Trash2, FileText } from 'lucide-svelte';
   import { api } from '../client.js';
   import { storage, type WorkspaceHistoryEntry } from '../lib/storage.js';
 
   export let onWorkspaceSelected: (workspace: string) => void;
   export let currentWorkspace: string | null = null;
 
-  let scanning = true;
   let switching = false;
   let error: string | null = null;
-  let workspaces: Array<{
-    path: string;
-    name: string;
-    type: 'current' | 'parent' | 'home' | 'discovered';
-  }> = [];
   let workspaceHistory: WorkspaceHistoryEntry[] = [];
   let customPath = '';
   let selectedWorkspace: string | null = null;
+  let isDragging = false;
+
+  // Detect if we're in Electron
+  const isElectron = typeof window !== 'undefined' && window.electronAPI?.isElectron;
 
   onMount(async () => {
     // Load workspace history
@@ -30,34 +28,11 @@
       // Pre-select the most recently used workspace
       selectedWorkspace = workspaceHistory[0].path;
     }
-
-    await scanForWorkspaces();
   });
-
-  async function scanForWorkspaces() {
-    try {
-      scanning = true;
-      error = null;
-      const result = await api.scanWorkspaces();
-      workspaces = result.workspaces;
-      
-      // Pre-select current workspace if it exists
-      if (currentWorkspace && workspaces.some(w => w.path === currentWorkspace)) {
-        selectedWorkspace = currentWorkspace;
-      } else if (workspaces.length === 1) {
-        // Auto-select if only one workspace found
-        selectedWorkspace = workspaces[0].path;
-      }
-    } catch (err: any) {
-      error = err.message || 'Failed to scan for workspaces';
-    } finally {
-      scanning = false;
-    }
-  }
 
   async function selectWorkspace() {
     if (!selectedWorkspace && !customPath) {
-      error = 'Please select a workspace or enter a custom path';
+      error = 'Please select a workspace or enter a path';
       return;
     }
 
@@ -68,25 +43,20 @@
       switching = true;
       error = null;
 
-
       const result = await api.switchWorkspace({ workspace: workspaceToUse});
 
       if (result.success) {
         // Find the workspace name if available
         let workspaceName: string | undefined;
-        const discoveredWorkspace = workspaces.find(w => w.path === workspaceToUse);
-        if (discoveredWorkspace) {
-          workspaceName = discoveredWorkspace.name;
+
+        // Check if it's in history
+        const historyWorkspace = workspaceHistory.find(w => w.path === workspaceToUse);
+        if (historyWorkspace) {
+          workspaceName = historyWorkspace.name;
         } else {
-          // Check if it's in history
-          const historyWorkspace = workspaceHistory.find(w => w.path === workspaceToUse);
-          if (historyWorkspace) {
-            workspaceName = historyWorkspace.name;
-          } else {
-            // Extract name from path (last directory name)
-            const parts = workspaceToUse.split('/').filter(p => p);
-            workspaceName = parts[parts.length - 1];
-          }
+          // Extract name from path (last directory name)
+          const parts = workspaceToUse.split('/').filter(p => p);
+          workspaceName = parts[parts.length - 1];
         }
 
         // Store the selected workspace with its name
@@ -96,7 +66,7 @@
         // Notify parent component
         onWorkspaceSelected(workspaceToUse);
       } else {
-        error = 'Failed to switch workspace';
+        error = result.message || 'Failed to switch workspace';
       }
     } catch (err: any) {
       error = err.message || 'Failed to switch workspace';
@@ -144,38 +114,120 @@
     }
   }
 
-  function getWorkspaceIcon(type: string) {
-    switch (type) {
-      case 'current':
-        return Folder;
-      case 'parent':
-        return ChevronUp;
-      case 'home':
-        return Home;
-      default:
-        return FolderOpen;
+  // Electron file picker
+  async function selectWorkspaceFile() {
+    if (!isElectron || !window.electronAPI) return;
+
+    try {
+      const dirPath = await window.electronAPI.selectWorkspaceFile();
+      if (dirPath) {
+        customPath = dirPath;
+        selectedWorkspace = null;
+        error = null;
+      }
+    } catch (err: any) {
+      error = err.message || 'Failed to select workspace file';
     }
   }
 
-  function getWorkspaceLabel(type: string) {
-    switch (type) {
-      case 'current':
-        return 'Current Directory';
-      case 'parent':
-        return 'Parent Directory';
-      case 'home':
-        return 'Home Projects';
-      default:
-        return 'Discovered';
+  // Drag-and-drop handlers for Electron
+  function handleDragOver(event: DragEvent) {
+    if (!isElectron) return;
+    event.preventDefault();
+    event.stopPropagation();
+    isDragging = true;
+  }
+
+  function handleDragLeave(event: DragEvent) {
+    if (!isElectron) return;
+    event.preventDefault();
+    event.stopPropagation();
+    isDragging = false;
+  }
+
+  async function handleDrop(event: DragEvent) {
+    if (!isElectron) return;
+    event.preventDefault();
+    event.stopPropagation();
+    isDragging = false;
+
+    const files = event.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+
+    // In Electron, files have a path property
+    const filePath = (file as any).path;
+    if (!filePath) {
+      error = 'Unable to get file path';
+      return;
+    }
+
+    // Validate file name
+    const validFileNames = ['BUILD.bazel', 'BUILD', 'MODULE.bazel', 'MODULE', 'WORKSPACE.bazel', 'WORKSPACE'];
+    if (!validFileNames.includes(file.name)) {
+      error = `Invalid file. Please drop one of: ${validFileNames.join(', ')}`;
+      return;
+    }
+
+    // Extract directory path
+    const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
+    if (!dirPath) {
+      error = 'Unable to determine workspace directory from file path.';
+      return;
+    }
+
+    // Automatically switch to this workspace
+    try {
+      switching = true;
+      error = null;
+
+      const result = await api.switchWorkspace({ workspace: dirPath });
+
+      if (result.success) {
+        // Extract workspace name from path
+        const parts = dirPath.split('/').filter(p => p);
+        const workspaceName = parts[parts.length - 1];
+
+        // Store the workspace
+        storage.setPreference('lastWorkspace', dirPath);
+        storage.setCurrentWorkspace(dirPath, workspaceName);
+
+        // Notify parent component
+        onWorkspaceSelected(dirPath);
+      } else {
+        error = result.message || 'Failed to switch workspace';
+      }
+    } catch (err: any) {
+      error = err.message || 'Failed to switch workspace';
+    } finally {
+      switching = false;
     }
   }
 </script>
 
-<div class="workspace-picker">
+<div
+  class="workspace-picker {isDragging && isElectron ? 'dragging' : ''}"
+  role="region"
+  aria-label="Workspace selection"
+  ondragover={handleDragOver}
+  ondragleave={handleDragLeave}
+  ondrop={handleDrop}
+>
+  {#if isDragging && isElectron}
+    <div class="drop-overlay">
+      <div class="drop-overlay-content">
+        <FileText class="w-16 h-16 mb-4" />
+        <p class="text-xl font-semibold">Drop workspace file here</p>
+        <p class="text-sm mt-2">BUILD.bazel, MODULE.bazel, or WORKSPACE.bazel</p>
+      </div>
+    </div>
+  {/if}
+
   <div class="header">
     <h2 class="text-2xl font-bold mb-2">Select Bazel Workspace</h2>
     <p class="text-muted-foreground">
-      Choose a Bazel workspace to explore, or enter a custom path.
+      Choose a Bazel workspace to explore{isElectron ? ', drop a workspace file,' : ''} or enter a custom path.
     </p>
   </div>
 
@@ -186,102 +238,80 @@
     </div>
   {/if}
 
-  {#if scanning}
-    <div class="flex items-center justify-center py-12">
-      <div class="text-muted-foreground">Scanning for Bazel workspaces...</div>
-    </div>
-  {:else}
-    <div class="space-y-6">
-      <!-- Workspace History Section -->
-      {#if workspaceHistory.length > 0}
-        <div>
-          <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Clock class="w-5 h-5" />
-            Recent Workspaces
-          </h3>
-          <div class="space-y-2">
-            {#each workspaceHistory as historyItem}
-              <div class="w-full p-4 border rounded-lg hover:bg-muted/50 transition-colors
-                         {selectedWorkspace === historyItem.path ? 'border-primary bg-muted' : ''}"
-              >
-                <div class="flex items-start gap-3">
-                  <button
-                   onclick={() => selectWorkspaceFromList(historyItem.path)}
-                    class="flex-1 text-left flex items-start gap-3"
-                  >
-                    <div class="mt-1">
-                      {#if selectedWorkspace === historyItem.path}
-                        <Check class="w-5 h-5 text-primary" />
-                      {:else if currentWorkspace === historyItem.path}
-                        <Folder class="w-5 h-5 text-primary" />
-                      {:else}
-                        <Clock class="w-5 h-5 text-muted-foreground" />
-                      {/if}
-                    </div>
-                    <div class="flex-1">
-                      <div class="font-semibold flex items-center gap-2">
-                        {historyItem.name || 'Unnamed Workspace'}
-                        {#if currentWorkspace === historyItem.path}
-                          <span class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Current</span>
-                        {/if}
-                      </div>
-                      <div class="text-sm text-muted-foreground font-mono">{historyItem.path}</div>
-                      <div class="text-xs text-muted-foreground mt-1">Last used: {formatDate(historyItem.lastUsed)}</div>
-                    </div>
-                  </button>
-                  <button
-                   onclick={() => deleteWorkspaceFromHistory(historyItem.path)}
-                    class="p-2 hover:bg-destructive/10 rounded-md transition-colors group"
-                    title="Remove from history"
-                  >
-                    <Trash2 class="w-4 h-4 text-muted-foreground group-hover:text-destructive" />
-                  </button>
-                </div>
-              </div>
-            {/each}
-          </div>
-        </div>
-      {/if}
-
-      <!-- Discovered Workspaces Section -->
-      {#if workspaces.length > 0}
-        <div>
-          <h3 class="text-lg font-semibold mb-3">Discovered Workspaces</h3>
-          <div class="space-y-2">
-            {#each workspaces as workspace}
-              <button
-               onclick={() => selectWorkspaceFromList(workspace.path)}
-                class="w-full p-4 border rounded-lg hover:bg-muted/50 transition-colors text-left
-                       {selectedWorkspace === workspace.path ? 'border-primary bg-muted' : ''}"
-              >
-                <div class="flex items-start gap-3">
+  <div class="space-y-6">
+    <!-- Workspace History Section -->
+    {#if workspaceHistory.length > 0}
+      <div>
+        <h3 class="text-lg font-semibold mb-3 flex items-center gap-2">
+          <Clock class="w-5 h-5" />
+          Recent Workspaces
+        </h3>
+        <div class="space-y-2">
+          {#each workspaceHistory as historyItem}
+            <div class="w-full p-4 border rounded-lg hover:bg-muted/50 transition-colors
+                       {selectedWorkspace === historyItem.path ? 'border-primary bg-muted' : ''}"
+            >
+              <div class="flex items-start gap-3">
+                <button
+                 onclick={() => selectWorkspaceFromList(historyItem.path)}
+                  class="flex-1 text-left flex items-start gap-3"
+                >
                   <div class="mt-1">
-                    {#if selectedWorkspace === workspace.path}
+                    {#if selectedWorkspace === historyItem.path}
                       <Check class="w-5 h-5 text-primary" />
+                    {:else if currentWorkspace === historyItem.path}
+                      <Folder class="w-5 h-5 text-primary" />
                     {:else}
-                      <svelte:component this={getWorkspaceIcon(workspace.type)} class="w-5 h-5 text-muted-foreground" />
+                      <Clock class="w-5 h-5 text-muted-foreground" />
                     {/if}
                   </div>
                   <div class="flex-1">
-                    <div class="font-semibold">{workspace.name}</div>
-                    <div class="text-sm text-muted-foreground font-mono">{workspace.path}</div>
-                    <div class="text-xs text-muted-foreground mt-1">{getWorkspaceLabel(workspace.type)}</div>
+                    <div class="font-semibold flex items-center gap-2">
+                      {historyItem.name || 'Unnamed Workspace'}
+                      {#if currentWorkspace === historyItem.path}
+                        <span class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Current</span>
+                      {/if}
+                    </div>
+                    <div class="text-sm text-muted-foreground font-mono">{historyItem.path}</div>
+                    <div class="text-xs text-muted-foreground mt-1">Last used: {formatDate(historyItem.lastUsed)}</div>
                   </div>
-                </div>
-              </button>
-            {/each}
-          </div>
+                </button>
+                <button
+                 onclick={() => deleteWorkspaceFromHistory(historyItem.path)}
+                  class="p-2 hover:bg-destructive/10 rounded-md transition-colors group"
+                  title="Remove from history"
+                >
+                  <Trash2 class="w-4 h-4 text-muted-foreground group-hover:text-destructive" />
+                </button>
+              </div>
+            </div>
+          {/each}
         </div>
-      {:else}
-        <div class="bg-muted/50 p-6 rounded-lg text-center">
-          <Folder class="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-          <p class="text-muted-foreground">No Bazel workspaces found automatically.</p>
-          <p class="text-sm text-muted-foreground mt-1">Enter a custom path below.</p>
+      </div>
+    {/if}
+
+      {#if isElectron}
+        <!-- Electron: File Picker Button -->
+        <div>
+          <h3 class="text-lg font-semibold mb-3">Select Workspace File</h3>
+          <button
+            onclick={selectWorkspaceFile}
+            disabled={switching}
+            class="w-full p-6 border-2 border-dashed rounded-lg hover:bg-muted/50 transition-colors text-center"
+          >
+            <FileText class="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <p class="text-muted-foreground mb-2">
+              Click to select a workspace file
+            </p>
+            <p class="text-xs text-muted-foreground">
+              Supported files: BUILD.bazel, BUILD, MODULE.bazel, MODULE, WORKSPACE.bazel, WORKSPACE
+            </p>
+          </button>
         </div>
       {/if}
 
       <div>
-        <h3 class="text-lg font-semibold mb-3">Custom Path</h3>
+        <h3 class="text-lg font-semibold mb-3">{isElectron ? 'Or Enter' : 'Enter'} Workspace Path</h3>
         <div class="flex gap-2">
           <input
             type="text"
@@ -299,24 +329,15 @@
 
       <div class="flex justify-end gap-3">
         <button
-         onclick={scanForWorkspaces}
-          disabled={scanning || switching}
-          class="px-4 py-2 border rounded-md hover:bg-muted transition-colors flex items-center gap-2"
-        >
-          <Search class="w-4 h-4" />
-          Rescan
-        </button>
-        <button
          onclick={selectWorkspace}
           disabled={(!selectedWorkspace && !customPath) || switching}
-          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 
+          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90
                  transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {switching ? 'Switching...' : 'Select Workspace'}
         </button>
       </div>
     </div>
-  {/if}
 </div>
 
 <style>
@@ -324,6 +345,35 @@
     max-width: 800px;
     margin: 0 auto;
     padding: 2rem;
+    position: relative;
+  }
+
+  .workspace-picker.dragging {
+    pointer-events: none;
+  }
+
+  .drop-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: hsl(var(--primary) / 0.1);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    pointer-events: all;
+  }
+
+  .drop-overlay-content {
+    background: hsl(var(--background));
+    border: 3px dashed hsl(var(--primary));
+    border-radius: 1rem;
+    padding: 3rem;
+    text-align: center;
+    color: hsl(var(--primary));
   }
 
   .header {

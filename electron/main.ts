@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 
-import { app, BrowserWindow, ipcMain, protocol, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, shell, dialog } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GazelServiceImpl } from '../server/server.js';
@@ -91,6 +91,53 @@ function setupLogging() {
     logToFile('Renderer console event', { level, args });
     console.log(`[Renderer:${level}]`, ...args);
   });
+}
+
+// Set up dialog handlers
+function setupDialogHandlers() {
+  logToFile('Setting up dialog handlers');
+
+  // Handle workspace file selection
+  ipcMain.handle('dialog:selectWorkspaceFile', async () => {
+    logToFile('dialog:selectWorkspaceFile handler invoked');
+
+    if (!mainWindow) {
+      logToFile('No main window available for dialog');
+      return null;
+    }
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Workspace File',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Bazel Workspace Files', extensions: ['bazel'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      message: 'Select a BUILD.bazel, MODULE.bazel, or WORKSPACE.bazel file'
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      logToFile('File selection cancelled');
+      return null;
+    }
+
+    const filePath = result.filePaths[0];
+    const fileName = path.basename(filePath);
+
+    // Validate file name
+    const validFileNames = ['BUILD.bazel', 'BUILD', 'MODULE.bazel', 'MODULE', 'WORKSPACE.bazel', 'WORKSPACE'];
+    if (!validFileNames.includes(fileName)) {
+      logToFile('Invalid workspace file selected', { fileName, filePath });
+      return null;
+    }
+
+    // Return the directory path
+    const dirPath = path.dirname(filePath);
+    logToFile('Workspace file selected', { fileName, dirPath });
+    return dirPath;
+  });
+
+  logToFile('Dialog handlers registered');
 }
 
 // Set up gRPC-over-IPC handlers
@@ -381,6 +428,7 @@ app.whenReady().then(() => {
   logToFile('gazel file protocol registered');
 
   setupLogging();
+  setupDialogHandlers();
   setupGrpcHandlers();
   createWindow();
 
