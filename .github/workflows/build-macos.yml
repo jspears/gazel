@@ -52,14 +52,6 @@ jobs:
           bazel build //proto:index
           echo "✓ Proto files generated"
 
-      - name: Verify Electron Installation
-        run: |
-          echo "Checking electron installation..."
-          ls -la node_modules/electron || echo "Electron not in node_modules"
-          pnpm list electron || echo "Electron not listed"
-          echo "Attempting to locate electron binary..."
-          find node_modules/electron -name "electron" -type f 2>/dev/null || echo "No electron binary found"
-
       - name: Import Code Signing Certificate
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
@@ -116,14 +108,16 @@ jobs:
       - name: Build and Package App
         run: |
           echo "Building Gazel for macOS..."
-          pnpm package
+          # Use pnpm exec to ensure electron-forge can find electron in the workspace
+          pnpm exec electron-forge package
           echo "✓ Package complete"
 
       - name: Create Signed Installer
         run: |
           echo "Creating signed and notarized installer..."
           echo "This may take several minutes for Apple notarization..."
-          pnpm make
+          # Use pnpm exec to ensure electron-forge can find electron in the workspace
+          pnpm exec electron-forge make
           echo "✓ Installer created and notarized"
 
       - name: Verify Code Signature

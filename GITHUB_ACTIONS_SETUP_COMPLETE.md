@@ -21,6 +21,7 @@ A complete workflow that:
 - ✅ Updated to pnpm/action-setup@v4
 - ✅ Added Bazel setup to generate protobuf files before building
 - ✅ Using bazel-contrib/setup-bazel action with caching for faster builds
+- ✅ Fixed electron package resolution by using `pnpm exec electron-forge` instead of `pnpm package`
 
 ### 2. Documentation Files
 

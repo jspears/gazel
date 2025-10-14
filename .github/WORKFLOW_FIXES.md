@@ -86,6 +86,41 @@ Added Bazel setup and proto generation steps:
 
 ---
 
+### Issue 3: Electron Package Not Found ✅ FIXED
+
+**Error:**
+```
+✖ Packaging application [FAILED: Cannot find the package "electron".
+Perhaps you need to run install it in "/Users/runner/work/gazel/gazel"?]
+```
+
+**Root Cause:**
+This is a pnpm workspace issue. The project uses pnpm workspaces with multiple packages (`proto`, `electron`, `client`, `server`), and electron is listed as a dependency in both:
+- Root `package.json` (devDependencies: `electron@^38.1.2`)
+- `electron/package.json` (dependencies: `electron@^38.2.1`)
+
+With `.npmrc` configured for hoisting (`node-linker=hoisted`, `shamefully-hoist=true`), electron is installed in the root `node_modules`, but when running `pnpm package` (which calls `electron-forge package`), Electron Forge couldn't properly resolve the electron package in the workspace setup.
+
+**Solution:**
+Use `pnpm exec` to run electron-forge commands, which ensures proper module resolution in pnpm workspaces:
+
+```yaml
+# Before (incorrect):
+- name: Build and Package App
+  run: pnpm package  # Calls electron-forge package via npm script
+
+# After (correct):
+- name: Build and Package App
+  run: pnpm exec electron-forge package  # Direct call with pnpm exec
+```
+
+**Why this works:**
+- `pnpm exec` sets up the correct `NODE_PATH` and module resolution for the workspace
+- It ensures electron-forge can find the electron package even in a hoisted workspace setup
+- This is the recommended way to run binaries in pnpm workspaces
+
+---
+
 ## Current Workflow Steps
 
 The workflow now executes in this order:
