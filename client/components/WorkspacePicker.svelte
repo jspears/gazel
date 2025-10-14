@@ -87,6 +87,34 @@
     customPath = '';
   }
 
+  async function switchToWorkspace(path: string) {
+    try {
+      switching = true;
+      error = null;
+
+      const result = await api.switchWorkspace({ workspace: path });
+
+      if (result.success) {
+        // Extract workspace name from path
+        const parts = path.split('/').filter(p => p);
+        const workspaceName = parts[parts.length - 1];
+
+        // Store the workspace
+        storage.setPreference('lastWorkspace', path);
+        storage.setCurrentWorkspace(path, workspaceName);
+
+        // Notify parent component
+        onWorkspaceSelected(path);
+      } else {
+        error = result.message || 'Failed to switch workspace';
+      }
+    } catch (err: any) {
+      error = err.message || 'Failed to switch workspace';
+    } finally {
+      switching = false;
+    }
+  }
+
   function deleteWorkspaceFromHistory(path: string) {
     storage.removeWorkspaceFromHistory(path);
     workspaceHistory = storage.getWorkspaceHistory();
@@ -276,13 +304,25 @@
                     <div class="text-xs text-muted-foreground mt-1">Last used: {formatDate(historyItem.lastUsed)}</div>
                   </div>
                 </button>
-                <button
-                 onclick={() => deleteWorkspaceFromHistory(historyItem.path)}
-                  class="p-2 hover:bg-destructive/10 rounded-md transition-colors group"
-                  title="Remove from history"
-                >
-                  <Trash2 class="w-4 h-4 text-muted-foreground group-hover:text-destructive" />
-                </button>
+                <div class="flex items-center gap-2">
+                  {#if currentWorkspace !== historyItem.path}
+                    <button
+                      onclick={() => switchToWorkspace(historyItem.path)}
+                      disabled={switching}
+                      class="px-3 py-1.5 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Switch to this workspace"
+                    >
+                      Select
+                    </button>
+                  {/if}
+                  <button
+                   onclick={() => deleteWorkspaceFromHistory(historyItem.path)}
+                    class="p-2 hover:bg-destructive/10 rounded-md transition-colors group"
+                    title="Remove from history"
+                  >
+                    <Trash2 class="w-4 h-4 text-muted-foreground group-hover:text-destructive" />
+                  </button>
+                </div>
               </div>
             </div>
           {/each}

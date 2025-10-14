@@ -1,0 +1,168 @@
+name: Build and Sign macOS App
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Import Code Signing Certificate
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          # Decode certificate
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $CERTIFICATE_PATH
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate to keychain
+          security import $CERTIFICATE_PATH \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k $KEYCHAIN_PATH
+          
+          # Set keychain as default
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          
+          # Allow codesign to access the keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Verify certificate is available
+          echo "Available code signing identities:"
+          security find-identity -p codesigning -v
+
+      - name: Setup Apple API Key
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          # Create API key file
+          API_KEY_PATH=$RUNNER_TEMP/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
+          echo "$APPLE_API_KEY_BASE64" | base64 --decode > $API_KEY_PATH
+          
+          # Set environment variables for the build
+          echo "APPLE_API_KEY=$API_KEY_PATH" >> $GITHUB_ENV
+          echo "APPLE_API_KEY_ID=${{ secrets.APPLE_API_KEY_ID }}" >> $GITHUB_ENV
+          echo "APPLE_API_ISSUER=${{ secrets.APPLE_API_ISSUER }}" >> $GITHUB_ENV
+          
+          echo "✓ Apple API key configured"
+
+      - name: Build and Package App
+        run: |
+          echo "Building Gazel for macOS..."
+          pnpm package
+          echo "✓ Package complete"
+
+      - name: Create Signed Installer
+        run: |
+          echo "Creating signed and notarized installer..."
+          echo "This may take several minutes for Apple notarization..."
+          pnpm make
+          echo "✓ Installer created and notarized"
+
+      - name: Verify Code Signature
+        run: |
+          APP_PATH="out/Gazel-darwin-arm64/Gazel.app"
+          
+          echo "Verifying code signature..."
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          
+          echo "Checking signature details..."
+          codesign --display --verbose=4 "$APP_PATH"
+          
+          echo "✓ Code signature verified"
+
+      - name: List Build Artifacts
+        run: |
+          echo "Build artifacts:"
+          ls -lh out/
+          if [ -d "out/make" ]; then
+            echo "Installer artifacts:"
+            find out/make -type f -name "*.zip" -o -name "*.dmg"
+          fi
+
+      - name: Upload Packaged App
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gazel-macOS-app
+          path: out/Gazel-darwin-arm64/Gazel.app
+          retention-days: 30
+
+      - name: Upload Installer
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: Gazel-macOS-installer
+          path: |
+            out/make/**/*.zip
+            out/make/**/*.dmg
+          retention-days: 30
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            out/make/**/*.zip
+            out/make/**/*.dmg
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Clean up sensitive files
+          rm -f $RUNNER_TEMP/certificate.p12
+          rm -f $RUNNER_TEMP/AuthKey_*.p8
+          
+          # Delete temporary keychain
+          if [ -f "$RUNNER_TEMP/app-signing.keychain-db" ]; then
+            security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+          fi
+          
+          echo "✓ Cleanup complete"
+
