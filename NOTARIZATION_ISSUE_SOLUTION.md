@@ -29,7 +29,7 @@ Since Electron Forge doesn't automatically notarize, we need to add a `postPacka
 ### Step 1: Install @electron/notarize
 
 ```bash
-pnpm add -D @electron/notarize
+yarn add -D @electron/notarize
 ```
 
 ### Step 2: Add postPackage Hook
@@ -86,7 +86,7 @@ If you prefer not to modify the Forge config, you can manually notarize after pa
 
 ```bash
 # 1. Package the app
-pnpm package
+yarn package
 
 # 2. Create a ZIP for notarization
 ditto -c -k --keepParent out/Gazel-darwin-arm64/Gazel.app Gazel.zip
@@ -153,7 +153,7 @@ I've already made these changes to `electron/forge.config.ts`:
 **To fix the notarization issue:**
 
 1. Change `asar: false` to `asar: true` in `electron/forge.config.ts` (line 36)
-2. Run `rm -rf out/ && pnpm make`
+2. Run `rm -rf out/ && yarn make`
 3. Wait for notarization (watch for "Notarizing..." in the output)
 4. Verify the app is notarized
 

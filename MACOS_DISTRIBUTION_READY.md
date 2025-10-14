@@ -18,7 +18,7 @@ All required icon files have been generated:
 - ✨ Correct icon in Finder
 - ✨ All required resolutions (16x16 to 1024x1024)
 - ✨ Retina display support (@2x variants)
-- ✨ Easy regeneration with `pnpm generate-icons`
+- ✨ Easy regeneration with `yarn generate-icons`
 
 **Documentation:** See `ICON_SETUP.md`
 
@@ -56,7 +56,7 @@ macOS code signing and notarization configured using App Store Connect API key.
 Run the app in development mode:
 
 ```bash
-pnpm start
+yarn start
 ```
 
 The app will launch with hot reload enabled. The icon should appear in the Dock.
@@ -66,7 +66,7 @@ The app will launch with hot reload enabled. The icon should appear in the Dock.
 Create a packaged app without signing:
 
 ```bash
-pnpm package
+yarn package
 ```
 
 Output: `out/Gazel-darwin-arm64/Gazel.app`
@@ -89,13 +89,13 @@ Create a signed and notarized app for distribution:
 2. **Package with signing**:
    ```bash
    source .env
-   pnpm package
+   yarn package
    ```
 
 3. **Create installer** (signed + notarized):
    ```bash
    source .env
-   pnpm make
+   yarn make
    ```
 
 Output: `out/make/zip/darwin/arm64/Gazel-darwin-arm64-1.0.0.zip`
@@ -107,10 +107,10 @@ If you update the icon design:
 ```bash
 # 1. Replace electron/images/icon.png with your new design
 # 2. Regenerate all icon files
-pnpm generate-icons
+yarn generate-icons
 
 # 3. Rebuild the app
-pnpm package
+yarn package
 ```
 
 ## Distribution Checklist
@@ -120,8 +120,8 @@ Before distributing your app to users:
 ### Pre-Distribution
 
 - [ ] Icons are configured and look correct
-- [ ] App runs correctly in development mode (`pnpm start`)
-- [ ] App runs correctly when packaged (`pnpm package`)
+- [ ] App runs correctly in development mode (`yarn start`)
+- [ ] App runs correctly when packaged (`yarn package`)
 - [ ] All features work in the packaged app
 - [ ] No console errors or warnings
 
@@ -131,12 +131,12 @@ Before distributing your app to users:
 - [ ] Developer ID certificate installed
 - [ ] App Store Connect API key created
 - [ ] Environment variables configured in `.env`
-- [ ] App successfully signed (`source .env && pnpm package`)
+- [ ] App successfully signed (`source .env && yarn package`)
 - [ ] Signature verified (`codesign --verify --deep --strict Gazel.app`)
 
 ### Notarization (Required for Distribution)
 
-- [ ] App successfully notarized (`source .env && pnpm make`)
+- [ ] App successfully notarized (`source .env && yarn make`)
 - [ ] Notarization verified (`spctl --assess --verbose=4 Gazel.app`)
 - [ ] App opens without security warnings on a clean Mac
 
@@ -187,16 +187,16 @@ gazel/
 
 ```bash
 # Development
-pnpm start                    # Start dev mode with hot reload
-pnpm dev:bazel               # Start with Bazel + iBazel
+yarn start                    # Start dev mode with hot reload
+yarn dev:bazel               # Start with Bazel + iBazel
 
 # Building
-pnpm package                 # Package app (unsigned)
-source .env && pnpm package  # Package app (signed)
-source .env && pnpm make     # Create installer (signed + notarized)
+yarn package                 # Package app (unsigned)
+source .env && yarn package  # Package app (signed)
+source .env && yarn make     # Create installer (signed + notarized)
 
 # Icons
-pnpm generate-icons          # Regenerate all icon files
+yarn generate-icons          # Regenerate all icon files
 
 # Verification
 codesign --verify --deep --strict --verbose=2 out/Gazel-darwin-arm64/Gazel.app
@@ -212,10 +212,10 @@ spctl --assess --verbose=4 --type execute out/Gazel-darwin-arm64/Gazel.app
 **Solution:**
 ```bash
 # Regenerate icons
-pnpm generate-icons
+yarn generate-icons
 
 # Rebuild app
-pnpm package
+yarn package
 
 # Clear icon cache (if needed)
 sudo rm -rf /Library/Caches/com.apple.iconservices.store
@@ -244,7 +244,7 @@ security find-identity -p codesigning -v
 
 # Try signing again
 source .env
-pnpm package
+yarn package
 ```
 
 See `CODE_SIGNING_SETUP.md` for detailed troubleshooting.
@@ -254,7 +254,7 @@ See `CODE_SIGNING_SETUP.md` for detailed troubleshooting.
 ### For Development
 
 1. Continue developing features
-2. Test regularly with `pnpm start`
+2. Test regularly with `yarn start`
 3. Commit changes to git
 
 ### For Distribution
@@ -264,7 +264,7 @@ See `CODE_SIGNING_SETUP.md` for detailed troubleshooting.
 3. **Create a release**:
    ```bash
    source .env
-   pnpm make
+   yarn make
    ```
 4. **Distribute** the signed app:
    - Upload to your website
@@ -274,7 +274,7 @@ See `CODE_SIGNING_SETUP.md` for detailed troubleshooting.
 ### For Continuous Improvement
 
 1. **Update icons** as your design evolves
-2. **Keep dependencies updated** (`pnpm update`)
+2. **Keep dependencies updated** (`yarn update`)
 3. **Monitor for Electron security updates**
 4. **Gather user feedback** and iterate
 

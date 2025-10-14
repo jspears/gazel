@@ -36,7 +36,7 @@ This mode uses iBazel to watch Bazel targets and automatically rebuild on file c
 
 ```bash
 # From workspace root
-pnpm run dev:bazel
+yarn run dev:bazel
 
 # Or with Bazel
 bazel run //electron:dev
@@ -54,7 +54,7 @@ This mode runs Electron Forge without iBazel:
 
 ```bash
 # From workspace root
-pnpm start
+yarn start
 
 # Or with Bazel
 bazel run //electron:start
@@ -86,7 +86,7 @@ Creates a distributable package:
 
 ```bash
 # With pnpm
-pnpm package
+yarn package
 
 # With Bazel
 bazel build //electron:package
@@ -98,7 +98,7 @@ Creates platform-specific installers (DMG for macOS, etc.):
 
 ```bash
 # With pnpm
-pnpm make
+yarn make
 
 # With Bazel
 bazel build //electron:make
@@ -180,7 +180,7 @@ If the app shows a blank screen:
 ### iBazel Not Detecting Changes
 
 If iBazel doesn't rebuild on file changes:
-- Make sure you're running `pnpm run dev:bazel` or `bazel run //electron:dev`
+- Make sure you're running `yarn run dev:bazel` or `bazel run //electron:dev`
 - Check that the file you're editing is part of a watched Bazel target
 - Try restarting the dev server
 
@@ -188,7 +188,7 @@ If iBazel doesn't rebuild on file changes:
 
 If you get Bazel build errors:
 - Run `bazel clean` to clear the build cache
-- Make sure all dependencies are installed: `pnpm install`
+- Make sure all dependencies are installed: `yarn install`
 - Check that proto files are generated: `bazel build //proto:index`
 
 ## Environment Variables

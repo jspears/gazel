@@ -14,7 +14,7 @@
 		"@bufbuild/protoc-gen-es": "^2.9.0",
 		"@connectrpc/connect": "^2.1.0",
 		"@connectrpc/connect-node": "^2.1.0",
-		"@speajus/gazel-proto": "workspace:*",
+		"@speajus/gazel-proto": "workspace:^",
 		"dotenv": "^17.2.2",
 		"sax": "^1.4.1",
 		"tsconfig-paths": "^4.2.0",

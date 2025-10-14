@@ -117,7 +117,7 @@ To verify the implementation works:
 
 ## Known Issues
 
-1. **Build Error**: The `pnpm package` command currently fails due to a pre-existing Vite configuration issue where server code is being bundled for the browser. This is unrelated to the metadata headers implementation.
+1. **Build Error**: The `yarn package` command currently fails due to a pre-existing Vite configuration issue where server code is being bundled for the browser. This is unrelated to the metadata headers implementation.
 
 2. **TypeScript Errors**: There are pre-existing TypeScript errors in the codebase (mostly related to proto imports and type mismatches). The new metadata interceptor files compile without errors.
 

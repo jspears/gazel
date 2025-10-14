@@ -11,11 +11,11 @@ Common issues and solutions for the macOS build workflow.
 Error: Unable to locate executable file: pnpm. Please verify either the file path exists...
 ```
 
-**Cause:** pnpm is not installed before Node.js tries to use it for caching.
+**Cause:** yarn is not installed before Node.js tries to use it for caching.
 
 **Solution:** ✅ Already fixed in the workflow! The workflow now:
-1. Installs pnpm first
-2. Then sets up Node.js with pnpm cache
+1. Installs yarn first
+2. Then sets up Node.js with yarn cache
 3. Then installs dependencies
 
 **If you still see this error:**
@@ -124,7 +124,7 @@ Could not resolve "./gazel_pb.js" from "proto/index.ts"
 
 ---
 
-### ❌ "pnpm install failed"
+### ❌ "yarn install failed"
 
 **Error:**
 ```
@@ -137,14 +137,14 @@ ERR_PNPM_FETCH_404  GET https://registry.npmjs.org/...
 
 1. **Check if it works locally:**
    ```bash
-   pnpm install --frozen-lockfile
+   yarn install --frozen-lockfile
    ```
 
 2. **Update lockfile if needed:**
    ```bash
-   pnpm install
+   yarn install
    git add pnpm-lock.yaml
-   git commit -m "Update pnpm lockfile"
+   git commit -m "Update yarn lockfile"
    git push
    ```
 
@@ -232,7 +232,7 @@ ERR_PNPM_FETCH_404  GET https://registry.npmjs.org/...
    - Total build time: 10-15 minutes is normal
 
 2. **Dependency installation slow:**
-   - Ensure pnpm cache is working
+   - Ensure yarn cache is working
    - Check "Setup Node.js" step shows "Cache restored"
 
 3. **Multiple builds running:**
@@ -361,7 +361,7 @@ Before asking for help:
 
 - [ ] Check workflow logs in Actions tab
 - [ ] Verify all 5 secrets are set correctly
-- [ ] Test signing locally: `source .env && pnpm make`
+- [ ] Test signing locally: `source .env && yarn make`
 - [ ] Check this troubleshooting guide
 - [ ] Review the setup guides
 
@@ -369,17 +369,17 @@ Before asking for help:
 
 ```bash
 # Test local build
-pnpm package
+yarn package
 
 # Test local signing
 source .env
-pnpm make
+yarn make
 
 # Verify certificate locally
 security find-identity -p codesigning -v
 
-# Check pnpm version
-pnpm --version
+# Check yarn version
+yarn --version
 
 # View workflow file
 cat .github/workflows/build-macos.yml
@@ -421,8 +421,8 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test
+      - run: yarn install --frozen-lockfile
+      - run: yarn test
 
   build-macos:
     needs: test  # Wait for tests to pass

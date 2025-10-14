@@ -176,7 +176,7 @@ Open `app/example.html` in a browser to see a working example of the client in a
 
 ```bash
 # Start the server
-pnpm run dev:server
+yarn run dev:server
 
 # Open the example in a browser
 open app/example.html
@@ -186,13 +186,13 @@ open app/example.html
 
 ```bash
 # Install dependencies
-pnpm install
+yarn install
 
 # Build TypeScript
-pnpm run build
+yarn run build
 
 # Watch for changes
-pnpm run watch
+yarn run watch
 ```
 
 ## Notes

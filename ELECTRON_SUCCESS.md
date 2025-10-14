@@ -91,8 +91,8 @@ If you encounter issues:
 ### Electron not starting?
 ```bash
 # Reinstall Electron
-pnpm remove electron
-pnpm add -D electron
+yarn remove electron
+yarn add -D electron
 ```
 
 ### Port already in use?

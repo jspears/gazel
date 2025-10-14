@@ -6,7 +6,7 @@ This document tracks the fixes applied to the macOS build workflow.
 
 **Date:** 2025-10-14
 
-The project has been migrated from pnpm to Yarn for better compatibility and simpler workflow configuration.
+The project has been migrated from yarn to Yarn for better compatibility and simpler workflow configuration.
 
 **Changes:**
 - Replaced `pnpm-workspace.yaml` with `workspaces` field in `package.json`
@@ -19,13 +19,13 @@ The project has been migrated from pnpm to Yarn for better compatibility and sim
 - Yarn is included with Node.js (no separate installation step needed in CI)
 - Simpler workspace configuration
 - Better compatibility with Electron Forge
-- No need for `pnpm exec` workarounds
+- No need for `yarn exec` workarounds
 
 ---
 
 ## Issues Encountered and Fixed (Historical - Pre-Yarn Migration)
 
-### Issue 1: pnpm Not Found ✅ FIXED
+### Issue 1: yarn Not Found ✅ FIXED
 
 **Error:**
 ```
@@ -33,17 +33,17 @@ Error: Unable to locate executable file: pnpm. Please verify either the file pat
 ```
 
 **Root Cause:**
-The workflow was trying to use pnpm for Node.js caching before pnpm was actually installed.
+The workflow was trying to use yarn for Node.js caching before yarn was actually installed.
 
 **Solution:**
-Reordered the steps to install pnpm before setting up Node.js:
+Reordered the steps to install yarn before setting up Node.js:
 
 ```yaml
 # Before (incorrect):
 - name: Setup Node.js
   uses: actions/setup-node@v4
   with:
-    cache: 'pnpm'  # ❌ pnpm not installed yet
+    cache: 'pnpm'  # ❌ yarn not installed yet
 
 - name: Install pnpm
   uses: pnpm/action-setup@v3
@@ -57,12 +57,12 @@ Reordered the steps to install pnpm before setting up Node.js:
 - name: Setup Node.js
   uses: actions/setup-node@v4
   with:
-    cache: 'pnpm'  # ✅ Now pnpm is available
+    cache: 'pnpm'  # ✅ Now yarn is available
 ```
 
 **Additional improvements:**
 - Updated `pnpm/action-setup` from v3 to v4
-- Updated pnpm version from 8 to 9 (matches local environment: 9.14.4)
+- Updated yarn version from 8 to 9 (matches local environment: 9.14.4)
 
 ---
 
@@ -116,29 +116,29 @@ Perhaps you need to run install it in "/Users/runner/work/gazel/gazel"?]
 ```
 
 **Root Cause:**
-This is a pnpm workspace issue. The project uses pnpm workspaces with multiple packages (`proto`, `electron`, `client`, `server`), and electron is listed as a dependency in both:
+This is a yarn workspace issue. The project uses yarn workspaces with multiple packages (`proto`, `electron`, `client`, `server`), and electron is listed as a dependency in both:
 - Root `package.json` (devDependencies: `electron@^38.1.2`)
 - `electron/package.json` (dependencies: `electron@^38.2.1`)
 
-With `.npmrc` configured for hoisting (`node-linker=hoisted`, `shamefully-hoist=true`), electron is installed in the root `node_modules`, but when running `pnpm package` (which calls `electron-forge package`), Electron Forge couldn't properly resolve the electron package in the workspace setup.
+With `.npmrc` configured for hoisting (`node-linker=hoisted`, `shamefully-hoist=true`), electron is installed in the root `node_modules`, but when running `yarn package` (which calls `electron-forge package`), Electron Forge couldn't properly resolve the electron package in the workspace setup.
 
 **Solution:**
-Use `pnpm exec` to run electron-forge commands, which ensures proper module resolution in pnpm workspaces:
+Use `yarn exec` to run electron-forge commands, which ensures proper module resolution in yarn workspaces:
 
 ```yaml
 # Before (incorrect):
 - name: Build and Package App
-  run: pnpm package  # Calls electron-forge package via npm script
+  run: yarn package  # Calls electron-forge package via npm script
 
 # After (correct):
 - name: Build and Package App
-  run: pnpm exec electron-forge package  # Direct call with pnpm exec
+  run: yarn exec electron-forge package  # Direct call with yarn exec
 ```
 
 **Why this works:**
-- `pnpm exec` sets up the correct `NODE_PATH` and module resolution for the workspace
+- `yarn exec` sets up the correct `NODE_PATH` and module resolution for the workspace
 - It ensures electron-forge can find the electron package even in a hoisted workspace setup
-- This is the recommended way to run binaries in pnpm workspaces
+- This is the recommended way to run binaries in yarn workspaces
 
 ---
 
@@ -148,8 +148,8 @@ The workflow now executes in this order:
 
 1. **Checkout code** - Get the repository
 2. **Install pnpm** - Install package manager (v9)
-3. **Setup Node.js** - Install Node.js with pnpm cache
-4. **Install dependencies** - Run `pnpm install --frozen-lockfile`
+3. **Setup Node.js** - Install Node.js with yarn cache
+4. **Install dependencies** - Run `yarn install --frozen-lockfile`
 5. **Setup Bazel** - Install Bazel via bazel-contrib action
 6. **Generate Proto Files** - Build proto files with Bazel
 7. **Import Certificate** - Set up code signing certificate
@@ -169,9 +169,9 @@ The workflow now executes in this order:
 
 The workflow uses multiple caching layers:
 
-1. **pnpm cache** (via `actions/setup-node@v4`):
+1. **yarn cache** (via `actions/setup-node@v4`):
    - Caches `node_modules` dependencies
-   - Speeds up `pnpm install`
+   - Speeds up `yarn install`
 
 2. **Bazelisk cache** (via `setup-bazel`):
    - Caches the Bazel binary itself
@@ -218,7 +218,7 @@ bazel build //proto:index
 ls -la bazel-bin/proto/
 
 # Build the app
-pnpm package
+yarn package
 ```
 
 ### GitHub Actions Testing
@@ -311,7 +311,7 @@ Consider adding:
 | Date | Version | Changes |
 |------|---------|---------|
 | 2025-10-14 | 1.2 | Added Bazel setup for proto generation |
-| 2025-10-14 | 1.1 | Fixed pnpm installation order, updated to v9 |
+| 2025-10-14 | 1.1 | Fixed yarn installation order, updated to v9 |
 | 2025-10-14 | 1.0 | Initial workflow creation |
 
 ---

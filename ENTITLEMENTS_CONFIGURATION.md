@@ -87,7 +87,7 @@ Simply setting `entitlements` and `entitlements-inherit` at the top level of `os
 
 ## Verification
 
-After building with `pnpm package`, verify the entitlements are applied:
+After building with `yarn package`, verify the entitlements are applied:
 
 ```bash
 codesign -d --entitlements - out/Gazel-darwin-arm64/Gazel.app

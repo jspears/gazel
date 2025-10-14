@@ -13,7 +13,7 @@ This error occurs because Electron's default security policies block access to l
 ## Root Cause
 
 The issue happens when:
-1. The app is packaged (using `pnpm make` or `pnpm package`)
+1. The app is packaged (using `yarn make` or `yarn package`)
 2. Resources are bundled in an asar archive
 3. The renderer process tries to load HTML/CSS/JS files using the `file://` protocol
 4. Electron's `webSecurity` setting (enabled by default) blocks this access
@@ -87,7 +87,7 @@ After applying this fix, test the packaged app:
 
 ```bash
 # Package the app
-pnpm package
+yarn package
 
 # Run the packaged app
 open out/Gazel-darwin-arm64/Gazel.app

@@ -125,7 +125,7 @@ Run the test script to verify everything is set up correctly:
 
 If you encounter issues:
 
-1. **Electron not found**: Run `pnpm add -D electron electron-builder`
+1. **Electron not found**: Run `yarn add -D electron electron-builder`
 2. **TypeScript errors**: Check that all TypeScript files compile with `npx tsc --noEmit`
 3. **Bazel errors**: Ensure all dependencies are properly declared in BUILD files
 4. **Server issues**: Verify the Express server runs independently

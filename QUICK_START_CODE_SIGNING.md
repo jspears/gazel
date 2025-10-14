@@ -22,10 +22,10 @@ Then build as normal:
 source .env
 
 # Package the app (signed)
-pnpm package
+yarn package
 
 # Or create installer (signed + notarized)
-pnpm make
+yarn make
 ```
 
 ## What Was Changed
@@ -56,7 +56,7 @@ Comprehensive documentation with troubleshooting and testing instructions.
 ### 1. Quick Test (Package Only)
 ```bash
 source .env
-pnpm package
+yarn package
 ```
 
 This will create a signed `.app` bundle in the `out/` directory without notarization.
@@ -64,7 +64,7 @@ This will create a signed `.app` bundle in the `out/` directory without notariza
 ### 2. Full Test (Package + Notarize)
 ```bash
 source .env
-pnpm make
+yarn make
 ```
 
 This will sign, notarize, and create a distributable installer. **Note**: Notarization takes several minutes.
@@ -110,8 +110,8 @@ Expected: `accepted` with `source=Notarized Developer ID`
 ## Next Steps
 
 1. **Create `.env` file**: `cp .env.codesigning.example .env`
-2. **Test packaging**: `source .env && pnpm package`
-3. **Test notarization**: `source .env && pnpm make` (takes several minutes)
+2. **Test packaging**: `source .env && yarn package`
+3. **Test notarization**: `source .env && yarn make` (takes several minutes)
 4. **Verify signature**: Use the verification commands above
 
 For detailed information, see `CODE_SIGNING_SETUP.md`.

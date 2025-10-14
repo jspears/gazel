@@ -20,7 +20,7 @@
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.2",
     "@connectrpc/connect": "^2.0.0-rc.3",
-    "@speajus/gazel-proto": "workspace:*",
+    "@speajus/gazel-proto": "workspace:^",
     "electron": "^38.2.1",
     "vite-tsconfig-paths": "^5.1.4"
   },

@@ -66,7 +66,7 @@ echo $APPLE_API_ISSUER
 source .env
 
 # Try again
-pnpm package
+yarn package
 ```
 
 ## 📚 Documentation
@@ -91,10 +91,10 @@ pnpm package
 
 ## 🎯 Next Steps
 
-1. **Test the app**: `pnpm start`
-2. **Package the app**: `pnpm package`
+1. **Test the app**: `yarn start`
+2. **Package the app**: `yarn package`
 3. **Set up signing**: Edit `.env` with your credentials
-4. **Create installer**: `source .env && pnpm make`
+4. **Create installer**: `source .env && yarn make`
 5. **Distribute**: Share the signed app with users
 
 ## 🆘 Need Help?

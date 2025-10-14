@@ -47,6 +47,7 @@
     "@hpcc-js/wasm": "^2.26.2",
     "@types/highlight.js": "^10.1.0",
     "@xyflow/svelte": "0.1.36",
+    "chalk": "^5.6.2",
     "chokidar": "^4.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",

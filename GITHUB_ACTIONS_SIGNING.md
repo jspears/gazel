@@ -261,7 +261,7 @@ If you encounter issues:
 1. Check the workflow logs in the Actions tab
 2. Review the troubleshooting section above
 3. Verify all secrets are correctly configured
-4. Test signing locally first with `source .env && pnpm make`
+4. Test signing locally first with `source .env && yarn make`
 
 ## Next Steps
 

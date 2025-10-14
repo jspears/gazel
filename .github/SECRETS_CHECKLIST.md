@@ -102,7 +102,7 @@ If secrets aren't working:
 2. **Re-encode files** - Ensure no extra whitespace or newlines
 3. **Verify certificate** - Must be "Developer ID Application" (not Mac App Store)
 4. **Check API key permissions** - Must have proper access in App Store Connect
-5. **Test locally first** - Ensure `source .env && pnpm make` works
+5. **Test locally first** - Ensure `source .env && yarn make` works
 
 ## Need Help?
 

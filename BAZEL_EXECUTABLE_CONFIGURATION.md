@@ -140,7 +140,7 @@ If the Bazel executable cannot be verified:
 ### Manual Testing
 1. **Test auto-detection:**
    ```bash
-   rm -rf out/ && pnpm package
+   rm -rf out/ && yarn package
    out/Gazel-darwin-arm64/Gazel.app/Contents/MacOS/Gazel
    ```
    Check console output for: `[config] Found bazelisk at: /path/to/bazelisk`

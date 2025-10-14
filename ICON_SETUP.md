@@ -18,7 +18,7 @@ All icon files are located in the `assets/` directory:
 
 ### Development Mode
 
-When running the app in development mode (`pnpm start`), the icon is loaded from:
+When running the app in development mode (`yarn start`), the icon is loaded from:
 ```typescript
 // electron/main.ts
 const iconPath = path.join(__dirname, '../../assets/icon.png');
@@ -26,7 +26,7 @@ const iconPath = path.join(__dirname, '../../assets/icon.png');
 
 ### Production/Packaged Mode
 
-When packaging the app (`pnpm package` or `pnpm make`), Electron Forge uses the icons configured in `electron/forge.config.ts`:
+When packaging the app (`yarn package` or `yarn make`), Electron Forge uses the icons configured in `electron/forge.config.ts`:
 
 ```typescript
 packagerConfig: {
@@ -89,8 +89,8 @@ Replace the source icon at `electron/images/icon.png` with your new design.
 ### 2. Run the Generation Script
 
 ```bash
-# Using npm/pnpm script
-pnpm generate-icons
+# Using npm/yarn script
+yarn generate-icons
 
 # Or run the script directly
 ./scripts/generate-icons.sh
@@ -106,13 +106,13 @@ This will automatically:
 
 **Development Mode:**
 ```bash
-pnpm start
+yarn start
 ```
 Check that the icon appears correctly in the dock/taskbar.
 
 **Packaged App:**
 ```bash
-pnpm package
+yarn package
 open out/Gazel-darwin-arm64/Gazel.app
 ```
 Check that the icon appears correctly in Finder and when the app is running.
@@ -146,7 +146,7 @@ Check that the icon appears correctly in Finder and when the app is running.
 
 ### Icon Not Showing in Development
 
-**Problem**: Icon doesn't appear when running `pnpm start`
+**Problem**: Icon doesn't appear when running `yarn start`
 
 **Solution**: Check that `assets/icon.png` exists and is not empty:
 ```bash
@@ -156,7 +156,7 @@ file assets/icon.png
 
 If empty, regenerate icons:
 ```bash
-pnpm generate-icons
+yarn generate-icons
 ```
 
 ### Icon Not Showing in Packaged App
@@ -178,7 +178,7 @@ pnpm generate-icons
 
 3. Rebuild the app:
    ```bash
-   pnpm package
+   yarn package
    ```
 
 ### ImageMagick Not Found
@@ -192,7 +192,7 @@ brew install imagemagick
 
 Then regenerate icons:
 ```bash
-pnpm generate-icons
+yarn generate-icons
 ```
 
 ### Icon Appears Blurry
@@ -275,7 +275,7 @@ const config: ForgeConfig = {
 ✅ **Icons are configured and ready to use**
 - All required icon files have been generated
 - Icons work in both development and production modes
-- Easy regeneration with `pnpm generate-icons`
+- Easy regeneration with `yarn generate-icons`
 - Platform-specific icons for macOS, Windows, and Linux
 
 The icon setup is complete and follows Electron best practices!

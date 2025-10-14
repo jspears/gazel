@@ -83,9 +83,9 @@ bazel run //electron-app:package # Package for distribution
 bazel run //electron-app:make    # Create installers
 
 # Or use npm scripts from root (which call Bazel)
-pnpm electron           # Runs bazel run //electron-app:dev
-pnpm electron:package   # Runs bazel run //electron-app:package
-pnpm electron:make      # Runs bazel run //electron-app:make
+yarn electron           # Runs bazel run //electron-app:dev
+yarn electron:package   # Runs bazel run //electron-app:package
+yarn electron:make      # Runs bazel run //electron-app:make
 ```
 
 ## Technical Implementation

@@ -1,10 +1,10 @@
-# Migration from pnpm to Yarn
+# Migration from yarn to Yarn
 
 **Date:** 2025-10-14
 
 ## Overview
 
-This project has been migrated from pnpm to Yarn for better compatibility with Electron Forge and simpler CI/CD configuration.
+This project has been migrated from yarn to Yarn for better compatibility with Electron Forge and simpler CI/CD configuration.
 
 ## Changes Made
 
@@ -108,10 +108,10 @@ Updated comments to reference yarn instead of pnpm.
     cache: 'pnpm'
 
 - name: Install dependencies
-  run: pnpm install --frozen-lockfile
+  run: yarn install --frozen-lockfile
 
 - name: Build and Package App
-  run: pnpm exec electron-forge package
+  run: yarn exec electron-forge package
 ```
 
 **After:**
@@ -129,9 +129,9 @@ Updated comments to reference yarn instead of pnpm.
 ```
 
 **Benefits:**
-- No separate pnpm installation step needed (yarn comes with Node.js)
+- No separate yarn installation step needed (yarn comes with Node.js)
 - Simpler workflow configuration
-- No need for `pnpm exec` workarounds
+- No need for `yarn exec` workarounds
 
 ### 4. Documentation Updates
 
@@ -146,15 +146,15 @@ Updated all documentation files to use `yarn` commands instead of `pnpm`:
 
 If you're working on this project, follow these steps to migrate your local environment:
 
-### 1. Clean Up pnpm Files
+### 1. Clean Up yarn Files
 
 ```bash
-# Remove pnpm lock file and node_modules
+# Remove yarn lock file and node_modules
 rm -rf pnpm-lock.yaml
 rm -rf node_modules
 rm -rf */node_modules
 
-# Remove pnpm store (optional, frees up disk space)
+# Remove yarn store (optional, frees up disk space)
 rm -rf ~/.pnpm-store
 ```
 
@@ -201,7 +201,7 @@ If you have any shell aliases or scripts that use `pnpm`, update them to use `ya
 
 ```bash
 # Before:
-alias dev="pnpm start"
+alias dev="yarn start"
 
 # After:
 alias dev="yarn start"
@@ -209,22 +209,22 @@ alias dev="yarn start"
 
 ## Command Equivalents
 
-| pnpm Command | Yarn Equivalent |
+| yarn Command | Yarn Equivalent |
 |--------------|-----------------|
-| `pnpm install` | `yarn install` |
-| `pnpm install --frozen-lockfile` | `yarn install --frozen-lockfile` |
-| `pnpm add <package>` | `yarn add <package>` |
-| `pnpm add -D <package>` | `yarn add -D <package>` |
-| `pnpm remove <package>` | `yarn remove <package>` |
-| `pnpm run <script>` | `yarn <script>` |
-| `pnpm exec <command>` | `yarn <command>` |
-| `pnpm list` | `yarn list` |
-| `pnpm why <package>` | `yarn why <package>` |
+| `yarn install` | `yarn install` |
+| `yarn install --frozen-lockfile` | `yarn install --frozen-lockfile` |
+| `yarn add <package>` | `yarn add <package>` |
+| `yarn add -D <package>` | `yarn add -D <package>` |
+| `yarn remove <package>` | `yarn remove <package>` |
+| `yarn run <script>` | `yarn <script>` |
+| `yarn exec <command>` | `yarn <command>` |
+| `yarn list` | `yarn list` |
+| `yarn why <package>` | `yarn why <package>` |
 
 ## Benefits of Yarn
 
 1. **Simpler CI/CD**: Yarn comes with Node.js, no separate installation needed
-2. **Better Electron Forge compatibility**: No need for `pnpm exec` workarounds
+2. **Better Electron Forge compatibility**: No need for `yarn exec` workarounds
 3. **Mature ecosystem**: Yarn has been around longer and has better tooling support
 4. **Workspace support**: Yarn workspaces are well-established and widely used
 5. **Faster in some cases**: Yarn can be faster for certain operations
@@ -260,18 +260,18 @@ bazel build //proto:index
 # Make sure you're using yarn, not pnpm
 yarn electron-forge package
 
-# Not: pnpm exec electron-forge package
+# Not: yarn exec electron-forge package
 ```
 
 ## Rollback (if needed)
 
-If you need to rollback to pnpm for any reason:
+If you need to rollback to yarn for any reason:
 
 1. Restore `pnpm-workspace.yaml`
-2. Restore pnpm configuration in `package.json`
-3. Update `.npmrc` back to pnpm settings
+2. Restore yarn configuration in `package.json`
+3. Update `.npmrc` back to yarn settings
 4. Update `MODULE.bazel` to use `pnpm_lock`
-5. Run `pnpm install`
+5. Run `yarn install`
 
 However, the yarn migration should work better for this project.
 

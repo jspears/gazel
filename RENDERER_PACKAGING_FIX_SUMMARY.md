@@ -119,7 +119,7 @@ To test the packaged app:
 ```bash
 # Clean and rebuild
 rm -rf out/
-pnpm package
+yarn package
 
 # Verify renderer files are present
 ls -la out/Gazel-darwin-arm64/Gazel.app/Contents/Resources/app/.vite/renderer/

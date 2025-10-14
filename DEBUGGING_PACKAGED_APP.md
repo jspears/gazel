@@ -42,7 +42,7 @@ First, rebuild the app with the new debugging features:
 rm -rf out/
 
 # Rebuild
-pnpm package
+yarn package
 ```
 
 ### Step 2: Run the Packaged App
@@ -123,7 +123,7 @@ If DevTools opens but shows nothing:
 ls -la electron/.vite/renderer/main_window/
 
 # Rebuild with verbose output
-pnpm package
+yarn package
 ```
 
 ### Issue: "window.electronAPI is undefined"
@@ -158,7 +158,7 @@ export default defineConfig({
 
 Run through this checklist:
 
-- [ ] Rebuilt the app after adding debugging features (`pnpm package`)
+- [ ] Rebuilt the app after adding debugging features (`yarn package`)
 - [ ] DevTools opens automatically when app starts
 - [ ] Checked DevTools Console tab for errors
 - [ ] Checked DevTools Network tab for failed requests
@@ -197,7 +197,7 @@ When working correctly, you should see these messages in order:
 Once you identify the issue:
 
 1. **Fix the code** based on the error messages
-2. **Rebuild**: `pnpm package`
+2. **Rebuild**: `yarn package`
 3. **Test**: `open out/Gazel-darwin-arm64/Gazel.app`
 4. **Verify**: Check that all expected console messages appear
 

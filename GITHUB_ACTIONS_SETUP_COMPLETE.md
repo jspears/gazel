@@ -8,7 +8,7 @@ Your repository is now configured for automated signed macOS builds!
 **File**: `.github/workflows/build-macos.yml`
 
 A complete workflow that:
-- ✅ Builds your Electron app on macOS runners (with pnpm 9)
+- ✅ Builds your Electron app on macOS runners (with yarn 9)
 - ✅ Signs with your Developer ID certificate
 - ✅ Notarizes with Apple
 - ✅ Creates distributable installers
@@ -16,12 +16,12 @@ A complete workflow that:
 - ✅ Creates GitHub releases for version tags
 
 **Recent fixes:**
-- ✅ Fixed pnpm installation order (install pnpm before Node.js cache)
-- ✅ Updated to pnpm v9 to match local environment
+- ✅ Fixed yarn installation order (install yarn before Node.js cache)
+- ✅ Updated to yarn v9 to match local environment
 - ✅ Updated to pnpm/action-setup@v4
 - ✅ Added Bazel setup to generate protobuf files before building
 - ✅ Using bazel-contrib/setup-bazel action with caching for faster builds
-- ✅ Fixed electron package resolution by using `pnpm exec electron-forge` instead of `pnpm package`
+- ✅ Fixed electron package resolution by using `yarn exec electron-forge` instead of `yarn package`
 
 ### 2. Documentation Files
 
@@ -93,12 +93,12 @@ git push origin v1.0.0
 
 ```bash
 # Local development
-pnpm start                      # Dev mode with hot reload
+yarn start                      # Dev mode with hot reload
 
 # Local signed builds
 source .env                     # Load credentials
-pnpm package                    # Package signed app
-pnpm make                       # Create signed installer
+yarn package                    # Package signed app
+yarn make                       # Create signed installer
 
 # GitHub Actions
 git push origin main            # Trigger build
@@ -171,7 +171,7 @@ For version tags:
 
 1. **Check workflow logs**: Actions tab → Click on failed run
 2. **Verify secrets**: Settings → Secrets and variables → Actions
-3. **Test locally first**: `source .env && pnpm make`
+3. **Test locally first**: `source .env && yarn make`
 4. **Review guides**: See documentation files above
 
 ### Common Issues

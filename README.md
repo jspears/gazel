@@ -109,7 +109,7 @@ You can also use pure Bazel commands to run the application.
 #### 🎯 Key Benefits of Using Bazel
 
 **Automatic Dependency Management:**
-- ✅ **No manual `pnpm install` needed** - Bazel handles everything!
+- ✅ **No manual `yarn install` needed** - Bazel handles everything!
 - ✅ Dependencies are installed automatically from `pnpm-lock.yaml`
 - ✅ Bazel caches dependencies for fast subsequent builds
 - ✅ The `//:node_modules` target ensures all packages are available
@@ -264,7 +264,7 @@ gazel/
 ├── MODULE.bazel        # Bazel module configuration (bzlmod)
 ├── BUILD.bazel         # Root build configuration
 ├── package.json        # npm dependencies
-├── pnpm-lock.yaml     # pnpm lock file
+├── pnpm-lock.yaml     # yarn lock file
 ├── tsconfig.json      # TypeScript configuration
 └── tsconfig.server.json # Server TypeScript configuration
 ```
@@ -308,8 +308,8 @@ gazel/
 
 For local development and testing:
 ```bash
-pnpm start              # Development mode with hot reload
-pnpm package            # Package unsigned app
+yarn start              # Development mode with hot reload
+yarn package            # Package unsigned app
 ```
 
 ### Signed Builds (macOS)
@@ -319,7 +319,7 @@ For distribution to users, create signed and notarized builds:
 **Local signing:**
 ```bash
 source .env             # Load your Apple credentials
-pnpm make               # Create signed + notarized installer
+yarn make               # Create signed + notarized installer
 ```
 
 **Automated builds with GitHub Actions:**

@@ -87,7 +87,7 @@ packagerConfig: {
 For local development, you can build without signing:
 
 ```bash
-pnpm start
+yarn start
 ```
 
 ### Package with Code Signing
@@ -99,7 +99,7 @@ To create a signed package:
 source .env
 
 # Package the application (creates signed .app bundle)
-pnpm package
+yarn package
 ```
 
 The signed application will be in the `out/` directory.
@@ -113,7 +113,7 @@ To create a signed and notarized installer:
 source .env
 
 # Create distributable installer (DMG, ZIP, etc.)
-pnpm make
+yarn make
 ```
 
 This will:

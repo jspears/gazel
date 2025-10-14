@@ -1,10 +1,10 @@
-# ✅ Migration from pnpm to Yarn - COMPLETE
+# ✅ Migration from yarn to Yarn - COMPLETE
 
 **Date:** 2025-10-14
 
 ## Summary
 
-The Gazel project has been successfully migrated from pnpm to Yarn. All configuration files, Bazel files, GitHub Actions workflows, and documentation have been updated.
+The Gazel project has been successfully migrated from yarn to Yarn. All configuration files, Bazel files, GitHub Actions workflows, and documentation have been updated.
 
 ## What Was Changed
 
@@ -27,14 +27,14 @@ The Gazel project has been successfully migrated from pnpm to Yarn. All configur
 ### 3. GitHub Actions Workflow ✅
 
 - **`.github/workflows/build-macos.yml`**:
-  - Removed pnpm installation step
+  - Removed yarn installation step
   - Changed cache from 'pnpm' to 'yarn'
   - Updated install command to `yarn install --frozen-lockfile`
-  - Changed build commands to use `yarn` instead of `pnpm exec`
+  - Changed build commands to use `yarn` instead of `yarn exec`
 
 ### 4. Documentation ✅
 
-Updated all references from pnpm to yarn in:
+Updated all references from yarn to yarn in:
 - `QUICK_REFERENCE.md`
 - `RENDERER_NOT_LOADING_FIX.md`
 - `docs/electron-ipc-integration.md`
@@ -52,6 +52,8 @@ Updated all references from pnpm to yarn in:
 Modified:
   .npmrc
   package.json
+  proto/package.json (added version field)
+  client/package.json (added version field)
   MODULE.bazel
   BUILD.bazel
   app/BUILD.bazel
@@ -80,7 +82,10 @@ Created:
 $ yarn install
 ✓ 948 packages installed successfully
 ✓ yarn.lock generated (325 KB)
+✓ All workspace packages resolved correctly
 ```
+
+**Note**: Added version fields to workspace packages (proto and client) to ensure proper workspace resolution.
 
 ### ⏳ 2. Bazel Integration (Next Step)
 
@@ -113,7 +118,7 @@ Push changes and verify the workflow runs successfully:
 
 ```bash
 git add .
-git commit -m "Migrate from pnpm to Yarn"
+git commit -m "Migrate from yarn to Yarn"
 git push origin main
 
 # Check GitHub Actions tab for build status
@@ -123,20 +128,20 @@ git push origin main
 
 | Old (pnpm) | New (yarn) |
 |------------|------------|
-| `pnpm install` | `yarn install` |
-| `pnpm install --frozen-lockfile` | `yarn install --frozen-lockfile` |
-| `pnpm add <pkg>` | `yarn add <pkg>` |
-| `pnpm add -D <pkg>` | `yarn add -D <pkg>` |
-| `pnpm remove <pkg>` | `yarn remove <pkg>` |
-| `pnpm start` | `yarn start` |
-| `pnpm package` | `yarn package` |
-| `pnpm make` | `yarn make` |
-| `pnpm exec electron-forge package` | `yarn electron-forge package` |
+| `yarn install` | `yarn install` |
+| `yarn install --frozen-lockfile` | `yarn install --frozen-lockfile` |
+| `yarn add <pkg>` | `yarn add <pkg>` |
+| `yarn add -D <pkg>` | `yarn add -D <pkg>` |
+| `yarn remove <pkg>` | `yarn remove <pkg>` |
+| `yarn start` | `yarn start` |
+| `yarn package` | `yarn package` |
+| `yarn make` | `yarn make` |
+| `yarn exec electron-forge package` | `yarn electron-forge package` |
 
 ## Benefits of This Migration
 
 1. **Simpler CI/CD**: Yarn comes with Node.js, no separate installation needed
-2. **Better Compatibility**: No need for `pnpm exec` workarounds with Electron Forge
+2. **Better Compatibility**: No need for `yarn exec` workarounds with Electron Forge
 3. **Mature Ecosystem**: Yarn has excellent tooling support
 4. **Workspace Support**: Yarn workspaces are well-established
 5. **Cleaner Configuration**: Single package.json for workspace config
@@ -172,7 +177,7 @@ Yarn reported some peer dependency warnings during installation:
 3. **Commit Changes**:
    ```bash
    git add .
-   git commit -m "Migrate from pnpm to Yarn
+   git commit -m "Migrate from yarn to Yarn
    
    - Replace pnpm-workspace.yaml with workspaces in package.json
    - Update .npmrc for yarn configuration
@@ -198,10 +203,10 @@ Yarn reported some peer dependency warnings during installation:
 If you need to rollback to pnpm:
 
 1. Restore `pnpm-workspace.yaml`
-2. Restore pnpm config in `package.json`
-3. Update `.npmrc` back to pnpm settings
+2. Restore yarn config in `package.json`
+3. Update `.npmrc` back to yarn settings
 4. Update `MODULE.bazel` to use `pnpm_lock`
-5. Run `pnpm install`
+5. Run `yarn install`
 
 However, the yarn migration should work better for this project.
 

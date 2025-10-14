@@ -192,7 +192,7 @@ spctl --assess --verbose=4 --type execute Gazel.app
 **A**: Yes! Use your local setup:
 ```bash
 source .env
-pnpm make
+yarn make
 ```
 
 ### Q: What if I need to update my certificate?

@@ -26,7 +26,7 @@ Your Gazel application has been successfully converted into an Electron desktop 
 ### Development Mode
 ```bash
 # Start the Electron app with hot reload
-pnpm electron
+yarn electron
 # or
 npx electron-forge start
 ```
@@ -34,13 +34,13 @@ npx electron-forge start
 ### Build for Production
 ```bash
 # Package the app (creates unpacked app)
-pnpm electron:package
+yarn electron:package
 
 # Create distributable installers
-pnpm electron:make
+yarn electron:make
 
 # Publish to configured destinations
-pnpm electron:publish
+yarn electron:publish
 ```
 
 ## Project Structure
@@ -56,7 +56,7 @@ gazel/
 ├── vite.main.config.mjs    # Vite config for main process
 ├── vite.preload.config.mjs # Vite config for preload
 ├── vite.renderer.config.mjs # Vite config for renderer
-└── .npmrc               # pnpm configuration with hoisting
+└── .npmrc               # yarn configuration with hoisting
 ```
 
 ## Key Implementation Details
@@ -73,7 +73,7 @@ if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
 }
 ```
 
-### 2. **pnpm Configuration**
+### 2. **yarn Configuration**
 Required `.npmrc` settings for Electron Forge:
 ```
 node-linker=hoisted
@@ -116,7 +116,7 @@ The app is configured with multiple makers for different platforms:
 
 If you encounter issues:
 1. Ensure Electron is properly installed: `cd node_modules/electron && node install.js`
-2. Clear and reinstall dependencies: `rm -rf node_modules pnpm-lock.yaml && pnpm install`
+2. Clear and reinstall dependencies: `rm -rf node_modules pnpm-lock.yaml && yarn install`
 3. Check that `.npmrc` has the correct hoisting configuration
 
 The app is now ready for development and distribution as a native desktop application!

@@ -19,7 +19,7 @@ ls -lh assets/icon.*
 All files should have non-zero sizes. If any file is missing or empty, regenerate:
 
 ```bash
-pnpm generate-icons
+yarn generate-icons
 ```
 
 ## Development Mode Testing
@@ -27,7 +27,7 @@ pnpm generate-icons
 ### Test 1: Icon in Development
 
 ```bash
-pnpm start
+yarn start
 ```
 
 **What to Check:**
@@ -47,7 +47,7 @@ pnpm start
 ### Test 2: Package the App
 
 ```bash
-pnpm package
+yarn package
 ```
 
 **What to Check:**
@@ -122,7 +122,7 @@ If you have code signing configured:
 ```bash
 # Sign and package
 source .env
-pnpm package
+yarn package
 
 # Verify signature
 codesign --verify --deep --strict --verbose=2 out/Gazel-darwin-arm64/Gazel.app
@@ -150,7 +150,7 @@ If you're building for Windows:
 
 ```bash
 # Package for Windows (requires Windows or Wine)
-pnpm package --platform=win32
+yarn package --platform=win32
 ```
 
 **What to Check:**
@@ -165,7 +165,7 @@ If you're building for Linux:
 
 ```bash
 # Package for Linux
-pnpm package --platform=linux
+yarn package --platform=linux
 ```
 
 **What to Check:**
@@ -187,11 +187,11 @@ pnpm package --platform=linux
    ```
 2. If empty or missing, regenerate:
    ```bash
-   pnpm generate-icons
+   yarn generate-icons
    ```
 3. Restart the app:
    ```bash
-   pnpm start
+   yarn start
    ```
 
 ### Issue: No Icon in Packaged App
@@ -212,7 +212,7 @@ pnpm package --platform=linux
    ```
 3. Rebuild:
    ```bash
-   pnpm package
+   yarn package
    ```
 
 ### Issue: Blurry Icon
@@ -228,11 +228,11 @@ pnpm package --platform=linux
    ```
 3. Regenerate icons:
    ```bash
-   pnpm generate-icons
+   yarn generate-icons
    ```
 4. Rebuild:
    ```bash
-   pnpm package
+   yarn package
    ```
 
 ### Issue: Wrong Icon Appears
@@ -248,7 +248,7 @@ pnpm package --platform=linux
 2. Rebuild the app:
    ```bash
    rm -rf out/
-   pnpm package
+   yarn package
    ```
 3. Open the new app bundle
 
@@ -271,7 +271,7 @@ After verifying icons:
 
 1. **Test the app functionality** to ensure everything works
 2. **Set up code signing** (if not already done) - see `CODE_SIGNING_SETUP.md`
-3. **Create installer** with `pnpm make`
+3. **Create installer** with `yarn make`
 4. **Distribute** the signed and notarized app
 
 ## References

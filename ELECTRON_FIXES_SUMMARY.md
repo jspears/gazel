@@ -17,7 +17,7 @@
 **Usage**:
 ```bash
 # Regenerate icons if needed
-pnpm generate-icons
+yarn generate-icons
 ```
 
 **What This Provides**:
@@ -59,7 +59,7 @@ webPreferences: {
 **Testing**:
 ```bash
 # Package the app
-pnpm package
+yarn package
 
 # Run the packaged app
 open out/Gazel-darwin-arm64/Gazel.app
@@ -80,10 +80,10 @@ open out/Gazel-darwin-arm64/Gazel.app
 cp .env.codesigning.example .env
 
 # Package with signing
-source .env && pnpm package
+source .env && yarn package
 
 # Create signed + notarized installer
-source .env && pnpm make
+source .env && yarn make
 ```
 
 ## Current Status
@@ -97,26 +97,26 @@ source .env && pnpm make
 
 ### Run Development Mode
 ```bash
-pnpm start
+yarn start
 # or
 bazel run //electron:start
 ```
 
 ### Package App (Unsigned)
 ```bash
-pnpm package
+yarn package
 ```
 
 ### Package App (Signed)
 ```bash
 source .env
-pnpm package
+yarn package
 ```
 
 ### Create Installer (Signed + Notarized)
 ```bash
 source .env
-pnpm make
+yarn make
 ```
 
 ## Documentation
@@ -138,7 +138,7 @@ pnpm make
 ### App Still Shows File Access Error
 - Ensure you're running the newly packaged app
 - Check that `webSecurity: false` is in `electron/main.ts`
-- Rebuild: `pnpm package`
+- Rebuild: `yarn package`
 
 ### Code Signing Fails
 - Verify environment variables are set: `echo $APPLE_API_KEY`
@@ -147,6 +147,6 @@ pnpm make
 
 ### App Won't Open on Other Macs
 - App must be signed and notarized for distribution
-- Use `pnpm make` with signing credentials
+- Use `yarn make` with signing credentials
 - Verify notarization: `spctl --assess --verbose=4 --type execute Gazel.app`
 

@@ -132,7 +132,7 @@ Monitor the GitHub issue and update to a newer version of `@electron-forge/plugi
 For now, use development mode which works correctly:
 
 ```bash
-pnpm start  # Uses Vite dev server, works fine
+yarn start  # Uses Vite dev server, works fine
 ```
 
 ## Next Steps

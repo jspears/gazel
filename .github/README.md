@@ -160,6 +160,6 @@ If you encounter issues:
 1. Check the workflow logs in the Actions tab
 2. Review the troubleshooting sections in the guides
 3. Verify all secrets are correctly configured
-4. Test signing locally first: `source .env && pnpm make`
+4. Test signing locally first: `source .env && yarn make`
 5. Open an issue with workflow logs attached
 
