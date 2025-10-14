@@ -1,77 +1,82 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { Play, Save, BookOpen, Trash2, Clock } from 'lucide-svelte';
   import { api } from '../client.js';
   import type { QueryTemplate, SavedQuery, BazelTarget } from '@speajus/gazel-proto';
   import { storage } from '../lib/storage.js';
   import { toFull } from '../components/target-util.js';
   import { Graphviz } from '@hpcc-js/wasm/graphviz';
-  
-  let query = '';
-  let queryType = 'query'; // 'query', 'aquery', or 'cquery'
-  let outputFormat = 'label_kind';
-  let queryResult: { targets: BazelTarget[] } | null = null;
-  let rawOutput = '';
-  let templates: QueryTemplate[] = [];
-  let savedQueries: SavedQuery[] = [];
-  let loading = false;
-  let error: string | null = null;
-  let saveDialogOpen = false;
-  let queryName = '';
-  let queryDescription = '';
-  let recentQueries = storage.getRecentQueries();
-  let graphSvg = '';
-  let graphContainer: HTMLDivElement;
+
+  let query = $state('');
+  let queryType = $state<'query' | 'aquery' | 'cquery'>('query');
+  let outputFormat = $state('label_kind');
+  let queryResult = $state<{ targets: BazelTarget[] } | null>(null);
+  let rawLines = $state([]);
+  let templates = $state<QueryTemplate[]>([]);
+  let savedQueries = $state<SavedQuery[]>([]);
+  let loading = $state(false);
+  let error = $state<string | null>(null);
+  let saveDialogOpen = $state(false);
+  let queryName = $state('');
+  let queryDescription = $state('');
+  let recentQueries = $state(storage.getRecentQueries());
+  let graphSvg = $state('');
+  let graphContainer = $state<HTMLDivElement | undefined>(undefined);
 
   // Output formats available for each query type
   const outputFormats = {
     query: [
+      //label, label_kind, build, minrank, maxrank, package, location, graph, xml, proto, streamed_jsonproto
       { value: 'label', label: 'Label' },
       { value: 'label_kind', label: 'Label with Kind' },
-      { value: 'xml', label: 'XML' },
+      { value: 'build', label: 'Build' },
+      { value: 'minrank', label: 'Minrank' },
+      { value: 'maxrank', label: 'Maxrank' },
+      { value: 'package', label: 'Package' },
+      { value: 'location', label: 'Location' },
       { value: 'graph', label: 'Graph (DOT)' },
-      { value: 'proto', label: 'Protocol Buffer' },
-      { value: 'textproto', label: 'Text Protocol Buffer' },
-      { value: 'jsonproto', label: 'JSON Protocol Buffer' },
+      { value: 'xml', label: 'XML' },
+      { value: 'streamed_jsonproto', label: 'Streamed JSON Proto' },
     ],
     cquery: [
-      { value: 'label', label: 'Label' },
+      //label_kind, label, transitions, proto, streamed_proto, textproto, jsonproto, build, graph, starlark, files
       { value: 'label_kind', label: 'Label with Kind' },
+      { value: 'label', label: 'Label' },
       { value: 'transitions', label: 'Transitions (lite)' },
-      { value: 'proto', label: 'Protocol Buffer' },
       { value: 'textproto', label: 'Text Protocol Buffer' },
       { value: 'jsonproto', label: 'JSON Protocol Buffer' },
+      { value: 'build', label: 'Build' },
       { value: 'graph', label: 'Graph (DOT)' },
-      { value: 'files', label: 'Output Files' },
       { value: 'starlark', label: 'Starlark' },
+      { value: 'files', label: 'Output Files' },
     ],
     aquery: [
+      //proto, streamed_proto, textproto, jsonproto, text, summary
       { value: 'text', label: 'Text (human-readable)' },
       { value: 'summary', label: 'Summary' },
-      { value: 'proto', label: 'Protocol Buffer' },
       { value: 'textproto', label: 'Text Protocol Buffer' },
       { value: 'jsonproto', label: 'JSON Protocol Buffer' },
-      { value: 'commands', label: 'Commands' },
     ],
   };
 
   // Get available formats for current query type
-  $: availableFormats = outputFormats[queryType as keyof typeof outputFormats] || outputFormats.query;
+  let availableFormats = $derived.by(() => {
+    return outputFormats[queryType as keyof typeof outputFormats] || outputFormats.query;
+  });
 
   // Update output format when query type changes if current format is not available
-  $: {
+  $effect(() => {
     const formatValues = availableFormats.map(f => f.value);
     if (!formatValues.includes(outputFormat)) {
       // Set to first available format for this query type
       outputFormat = availableFormats[0]?.value || 'label_kind';
     }
-  }
+  });
 
   // Separate templates into examples and regular templates
-  $: exampleTemplates = templates.filter(t => t.category === 'examples');
-  $: regularTemplates = templates.filter(t => t.category !== 'examples');
+  let exampleTemplates = $derived.by(() => templates.filter(t => t.category === 'examples'));
+  let regularTemplates = $derived.by(() => templates.filter(t => t.category !== 'examples'));
 
-  onMount(() => {
+  $effect(() => {
     loadTemplates();
     loadSavedQueries();
     recentQueries = storage.getRecentQueries();
@@ -112,20 +117,48 @@
 
   async function executeQuery() {
     if (!query.trim()) return;
-
-    try {
       loading = true;
       error = null;
       graphSvg = '';
-      const result = await api.executeQuery({ query, outputFormat, queryType });
-      queryResult = result.result;
-      rawOutput = result.raw;
+      queryResult = null;
+      rawLines = [];
+      const targets: BazelTarget[] = [];
 
-      // If output format is graph, render it
-      if (outputFormat === 'graph' && rawOutput) {
-        await renderGraph(rawOutput);
+
+    try {
+
+      // Use streaming API
+      const stream = api.streamQuery({ query, outputFormat, queryType });
+
+      for await (const message of stream) {
+        console.log('Received message:', message);
+        if (message.data.case === 'target') {
+          // Collect targets for streamed_jsonproto format
+          targets.push(message.data.value);
+        } else if (message.data.case === 'rawLine') {
+          // Collect raw output for other formats
+          const line = message.data.value;
+          if (line) {
+            rawLines.push(line);
+          }
+        } else if (message.data.case === 'error') {
+          error = message.data.value;
+          break;
+        }
       }
 
+      // Set results based on output format
+      if (outputFormat === 'streamed_jsonproto' && targets.length > 0) {
+        queryResult = { targets };
+      } else if (rawLines.length > 0) {
+     
+
+      // If output format is graph, render it
+      if (outputFormat === 'graph' && rawLines?.length) {
+        await renderGraph(rawLines.join('\n'));
+        rawLines = [];
+      }
+    }
       // Save to recent queries
       storage.addRecentQuery(query, outputFormat);
       recentQueries = storage.getRecentQueries();
@@ -401,14 +434,15 @@
 
     <div class="lg:col-span-2 bg-card rounded-lg border">
       <div class="p-4 border-b">
+        
+         {#if queryResult?.targets?.length}
         <h3 class="font-semibold">
           Query Results
-          {#if queryResult && queryResult.targets && queryResult.targets.length > 0}
             <span class="text-sm font-normal text-muted-foreground ml-2">
-              (Found {queryResult.targets.length} targets)
+              (Found {queryResult?.targets?.length} targets)
             </span>
-          {/if}
         </h3>
+          {/if}
       </div>
       <div class="p-4 max-h-[600px] overflow-auto">
         {#if loading}
@@ -417,7 +451,11 @@
           <div class="bg-destructive/10 text-destructive p-4 rounded-md">
             <pre class="whitespace-pre-wrap">{error}</pre>
           </div>
-        {:else if queryResult}
+        {:else if rawLines?.length}
+          {#each rawLines as line }
+            <pre class="font-mono text-xs bg-muted p-4 rounded overflow-x-auto">{line}</pre>            
+          {/each}
+        {:else if queryResult?.targets?.length}
           <div class="space-y-2">
             <div class="text-sm text-muted-foreground mb-2">
               Found {queryResult.targets.length} targets
@@ -428,12 +466,12 @@
                   {@html graphSvg}
                 </div>
               {:else}
-                <pre class="font-mono text-xs bg-muted p-4 rounded overflow-x-auto">{rawOutput}</pre>
+                <pre class="font-mono text-xs bg-muted p-4 rounded overflow-x-auto">{rawLines.join('\n')}</pre>
               {/if}
             {:else if outputFormat === 'xml'}
-              <pre class="font-mono text-xs bg-muted p-4 rounded overflow-x-auto">{rawOutput}</pre>
+              <pre class="font-mono text-xs bg-muted p-4 rounded overflow-x-auto">{rawLines.join('\n')}</pre>
             {:else}
-              {#each queryResult.targets as target}
+              {#each queryResult?.targets as target}
                 <div class="font-mono text-sm py-1">
                   {target.label || target.name || toFull(target)}
                   {#if target.kind}

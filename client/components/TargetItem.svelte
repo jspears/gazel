@@ -3,6 +3,7 @@
   import { Target, ExternalLink } from 'lucide-svelte';
   import TargetActions from './TargetActions.svelte';
   import { getRuleDocumentationUrl } from '../lib/bazel-registry.js';
+  import { toFull } from './target-util.js';
 
   interface Props {
     target: BazelTarget;
@@ -40,7 +41,7 @@
   tabindex={0}
   onclick={handleClick}
   onkeydown={handleKeydown}
-  data-target={target.label || target.name}
+  data-target={toFull(target)}
   class="target-item group"
   class:selected
 >

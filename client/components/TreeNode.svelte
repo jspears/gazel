@@ -175,12 +175,6 @@
     color: hsl(var(--foreground));
   }
 
-  .folder-count {
-    font-size: 0.75rem;
-    color: hsl(var(--muted-foreground));
-    font-weight: normal;
-  }
-
   .folder-children {
     overflow: hidden;
     padding-left: 1rem;

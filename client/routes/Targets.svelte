@@ -1,62 +1,50 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import { Search, Filter, Target, ChevronRight, FileCode, ExternalLink, Play, X, Clock, ChevronDown, GitBranch, Terminal, List, Network } from 'lucide-svelte';
+  import { onMount } from 'svelte';
+  import { Search, Target, ChevronRight, Clock, ChevronDown, List, Network } from 'lucide-svelte';
   import { api } from '../client.js';
-  import type { BazelTarget, StreamRunResponse } from '@speajus/gazel-proto';
-  import { createEventDispatcher } from 'svelte';
+  import type { BazelTarget } from '@speajus/gazel-proto';
   import { storage } from '../lib/storage.js';
-  import CopyButton from '../components/CopyButton.svelte';
   import TypeSelector from '../components/TypeSelector.svelte';
   import TargetTreeView from '../components/TargetTreeView.svelte';
-  import AttributesDisplay from '../components/AttributesDisplay.svelte';
   import { navigateToTab, updateParam } from '../lib/navigation.js';
   import TargetActions from '../components/TargetActions.svelte';
   import { toFull } from '../components/target-util.js';
+  import TargetDetails from '../components/TargetDetails.svelte';
 
-  const dispatch = createEventDispatcher();
+  interface Props {
+    initialTarget?: string | null;
+  }
 
-  export let initialTarget: string | null = null;
+  let {
+    initialTarget = $bindable(null)
+  }: Props = $props();
 
-  let targets: BazelTarget[] = [];
-  let filteredTargets: BazelTarget[] = [];
-  let byPackage: Record<string, BazelTarget[]> = {};
-  let loading = false;
-  let error: string | null = null;
-  let searchQuery = '';
-  let selectedType = '';
-  let selectedTarget: BazelTarget | null = null;
-  let targetDependencies: BazelTarget[] = [];
-  let targetReverseDependencies: BazelTarget[] = [];
-  let targetOutputs: Array<string> = [];
-  let loadingOutputs = false;
-  let loadingReverseDeps = false;
-  let usingFallbackSearch = false;
-
-  // Run modal state
-  let showRunModal = false;
-  let runOutput: string[] = [];
-  let runCommand = '';
-  let runStatus: 'idle' | 'running' | 'success' | 'error' = 'idle';
-  let runEventSource: AsyncIterable<StreamRunResponse> | null = null;
-  let outputContainer: HTMLDivElement;
+  let targets = $state<BazelTarget[]>([]);
+  let filteredTargets = $state<BazelTarget[]>([]);
+  let loading = $state(false);
+  let error = $state<string | null>(null);
+  let searchQuery = $state('');
+  let selectedType = $state('');
+  let selectedTarget = $state<BazelTarget | null>(null);
+  let usingFallbackSearch = $state(false);
 
   // Show hidden targets state
-  let showHiddenTargets = false;
+  let showHiddenTargets = $state(false);
 
   // Infinite scrolling state
-  let displayLimit = 100;
-  let loadingMore = false;
-  let loadMoreElement: HTMLDivElement;
+  let displayLimit = $state(100);
+  let loadingMore = $state(false);
+  let loadMoreElement = $state<HTMLDivElement>();
 
   // Search history state
-  let searchHistory: string[] = [];
-  let showSearchHistory = false;
+  let searchHistory = $state<string[]>([]);
+  let showSearchHistory = $state(false);
 
   // Navigation breadcrumb state
-  let navigationHistory: BazelTarget[] = [];
+  let navigationHistory = $state<BazelTarget[]>([]);
 
   // View mode state
-  let viewMode: 'list' | 'tree' = 'tree';
+  let viewMode = $state<'list' | 'tree'>('tree');
 
  
   onMount(async () => {
@@ -72,16 +60,19 @@
 
     // If there's an initial target, find and select it
     if (initialTarget) {
-      const target = targets.find(t =>
-        t.name === initialTarget ||
-        (t.name && t.name.includes(initialTarget))
-      );
+      const target = targets.find(t => {
+        const fullPath = toFull(t);
+        // Match against full path or just the name for backwards compatibility
+        return fullPath === initialTarget ||
+               t.name === initialTarget ||
+               (t.name && t.name.includes(initialTarget));
+      });
 
       if (target) {
         selectTarget(target);
         // Optionally scroll to the target in the list
         setTimeout(() => {
-          const targetElement = document.querySelector(`[data-target="${target.package}:${target.name}"]`);
+          const targetElement = document.querySelector(`[data-target="${toFull(target)}"]`);
           if (targetElement) {
             targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
@@ -120,26 +111,13 @@
       displayLimit = 100; // Reset display limit when loading new targets
       targets = [];
       filteredTargets = [];
-      byPackage = {};
-
       try {
 
       // Stream targets as they load
       for await (const response of api.searchTargets({query: '//...'})) {
         if (response.data.case === 'target') {
           // Convert protobuf message to plain object to avoid cloning issues with Svelte reactivity
-          const protoTarget = response.data.value;
-          const plainTarget: BazelTarget = {
-            label: protoTarget.label,
-            kind: protoTarget.kind,
-            package: protoTarget.package,
-            name: protoTarget.name,
-            location: protoTarget.location,
-            attributes: protoTarget.attributes,
-            dependencies: protoTarget.dependencies,
-            visibility: protoTarget.visibility,
-            tags: protoTarget.tags,
-          } as BazelTarget;
+          const plainTarget: BazelTarget =  response.data.value as BazelTarget;
           // Add target to the list as it arrives
           filteredTargets = [...filteredTargets, plainTarget];
         } else if (response.data.case === 'complete') {
@@ -293,19 +271,17 @@
   }
 
   async function selectTarget(target: BazelTarget, addToHistory = true) {
-    console.log('selectTarget:', target.package, target.name, target.kind);
     selectedTarget = target;
-    targetOutputs = [];
-    targetReverseDependencies = [];
+    
+    // Update URL with selected target (use full path)
+    const fullTargetPath = toFull(target);
+        console.log('selectTarget:',fullTargetPath);
 
-    // Update URL with selected target
-    const targetName =  target.name || '';
-    updateParam('target', targetName);
+    updateParam('target', fullTargetPath);
 
-    // Save to recent targets
-    if ( target.name) {
-      storage.addRecentTarget(target.name);
-    }
+    // Save to recent targets (use full path)
+    storage.addRecentTarget(fullTargetPath);
+    
 
     // Add to navigation history if not navigating back
     if (addToHistory && selectedTarget) {
@@ -320,50 +296,6 @@
       }
     }
 
-    if (target.name) {
-      // Load full target details with attributes
-      try {
-        const fullTargetResult = await api.getTarget({target: toFull(target)});
-        if (fullTargetResult) {
-          selectedTarget = fullTargetResult.target;
-        }
-      } catch (err) {
-        console.error('Failed to load target details:', err);
-      }
-      // Load direct dependencies
-      try {
-        const deps = await api.getTargetDependencies({target:toFull(target), depth: 1});
-        targetDependencies = deps.dependencies;
-
-      } catch (err) {
-        console.error('Failed to load dependencies:', err);
-        targetDependencies = [];
-      }
-
-      // Load reverse dependencies (what depends on this target)
-      loadingReverseDeps = true;
-      try {
-        const rdeps = await api.getReverseDependencies({target: target.name});
-        targetReverseDependencies = rdeps.dependencies || [];
-      } catch (err) {
-        console.error('Failed to load reverse dependencies:', err);
-        targetReverseDependencies = [];
-      } finally {
-        loadingReverseDeps = false;
-      }
-
-      // Load outputs for the selected target
-      loadingOutputs = true;
-      try {
-        const outputResult = await api.getTargetOutputs({target: target.name});
-        targetOutputs = outputResult.outputs || [];
-      } catch (err) {
-        console.error('Failed to load outputs:', err);
-        targetOutputs = [];
-      } finally {
-        loadingOutputs = false;
-      }
-    }
   }
 
   function handleTargetActivation(event: KeyboardEvent, target: BazelTarget) {
@@ -444,36 +376,6 @@
     return null;
   }
 
-  function getExpectedOutputs(ruleType: string): string {
-    const outputPatterns: Record<string, string> = {
-      'cc_binary': 'Executable binary file',
-      'cc_library': 'Static library (.a) and/or shared library (.so)',
-      'cc_test': 'Test executable',
-      'py_binary': 'Python executable or .pex file',
-      'py_library': 'Python source files and compiled .pyc files',
-      'py_test': 'Python test executable',
-      'java_binary': 'JAR file and/or executable wrapper',
-      'java_library': 'JAR file with compiled classes',
-      'java_test': 'Test JAR and test runner',
-      'go_binary': 'Go executable',
-      'go_library': 'Go archive file (.a)',
-      'go_test': 'Go test executable',
-      'rust_binary': 'Rust executable',
-      'rust_library': 'Rust library (.rlib)',
-      'proto_library': 'Protocol buffer descriptor sets',
-      'filegroup': 'Collection of files',
-      'genrule': 'Custom generated files defined by the rule'
-    };
-
-    return outputPatterns[ruleType] || 'Target outputs';
-  }
-
-  function isExecutableTarget(target: BazelTarget): boolean {
-    if (!target.kind) return false;
-
-    return /(_test|_binary)$/.test(target.kind);
-  }
-
   function isHiddenTarget(target: BazelTarget): boolean {
     // Check if the target name starts with a dot
     const name = target.name || '';
@@ -481,84 +383,21 @@
     return lastPart.startsWith('.');
   }
 
-  async function runTarget(target: BazelTarget) {
-    if (!target.name) return;
-
-    const targetName = target.name;
-    runCommand = `bazel run ${targetName}`;
-    runOutput = [];
-    runStatus = 'running';
-    showRunModal = true;
-
-    // Use EventSource for streaming
-    for await (const message of  api.streamRun({target: targetName})){
-      const data = message.event;
-      if (data.case === 'output') {
-        runOutput = [...runOutput, data.value];
-        // Auto-scroll to bottom
-        if (outputContainer) {
-          setTimeout(() => {
-            outputContainer.scrollTop = outputContainer.scrollHeight;
-          }, 0);
-        }
-      } else if (data.case === 'progress') {
-        runOutput = [...runOutput, `ℹ️ ${data.value.currentAction}\n`];
-        // Auto-scroll for info messages too
-        if (outputContainer) {
-          setTimeout(() => {
-            outputContainer.scrollTop = outputContainer.scrollHeight;
-          }, 0);
-        }
-      } else if (data.case === 'complete') {
-        if (data.value.exitCode === 0) {
-          runStatus = 'success';
-          runOutput = [...runOutput, '\n✅ Command completed successfully'];
-        } else if (data.value.exitCode === null) {
-          // Process was killed or terminated abnormally
-          runStatus = 'error';
-          runOutput = [...runOutput, '\n⚠️ Command was terminated'];
-        } else {
-          runStatus = 'error';
-          runOutput = [...runOutput, `\n❌ Command failed with exit code ${data.value.exitCode}`];
-        }
-       
-      } else if (data.case === 'error') {
-        // Handle stream errors
-        runStatus = 'error';
-        runOutput = [...runOutput, `\n❌ Error: ${data.value}`];
-      }
-    }
-  }
-
-
-
-  function closeRunModal() {
-    if (runEventSource) {
-      // If still running, add a message that we're stopping
-      if (runStatus === 'running') {
-        runOutput = [...runOutput, '\n⚠️ Stopping command...'];
-      }
-    }
-    showRunModal = false;
-    runStatus = 'idle';
-    runOutput = [];
-    runCommand = '';
-  }
-
-
-  $: uniqueTypes = [...new Set(targets.map(t => t.kind).filter(Boolean))];
+  let uniqueTypes = $derived([...new Set(targets.map(t => t.kind).filter(Boolean))]);
 
   // Filter targets based on hidden state
-  $: visibleTargets = showHiddenTargets
+  let visibleTargets = $derived(showHiddenTargets
     ? filteredTargets
-    : filteredTargets.filter(t => !isHiddenTarget(t));
+    : filteredTargets.filter(t => !isHiddenTarget(t)));
 
-  $: hiddenCount = filteredTargets.filter(t => isHiddenTarget(t)).length;
+  let hiddenCount = $derived(filteredTargets.filter(t => isHiddenTarget(t)).length);
 
   // Save preference when showHiddenTargets changes
-  $: if (typeof showHiddenTargets !== 'undefined') {
-    storage.setPreference('showHiddenTargets', showHiddenTargets);
-  }
+  $effect(() => {
+    if (typeof showHiddenTargets !== 'undefined') {
+      storage.setPreference('showHiddenTargets', showHiddenTargets);
+    }
+  });
 </script>
 
 <div class="space-y-6">
@@ -630,9 +469,7 @@
         class="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
       />
       <span class="text -sm">Show hidden targets</span>
-      {#if hiddenCount > 0 && !showHiddenTargets}
-        <span class="text-xs text-muted-foreground">({hiddenCount} hidden)</span>
-      {/if}
+  
     </label>
   </div>
 
@@ -757,197 +594,13 @@
         {/if}
       </div>
 
-      <div class="bg-card rounded-lg border">
-        <div class="p-4 border-b">
-          <h3 class="font-semibold">Target Details</h3>
-        </div>
-        <div class="p-4">
-          {#if selectedTarget}
-            <div class="space-y-4">
-              <div>
-                <h4 class="text-sm font-medium text-muted-foreground mb-1">Name</h4>
-                <div class="flex items-center gap-2">
-                  <p class="font-mono text-sm">{selectedTarget.name}</p>
-                  <CopyButton text={toFull(selectedTarget)} size="sm" />
-                   {#if isExecutableTarget(selectedTarget)}
-                <div>
-                  <button
-                    onclick={() => selectedTarget && runTarget(selectedTarget)}
-                    class="p-1 hover:bg-muted rounded transition-colors"
-                    disabled={runStatus === 'running'}
-                  >
-                    <Play class="w-4 h-4 color-{runStatus === 'running' ? 'green' : 'primary'}" />
-                   
-                  </button>
-                </div>
-              {/if}
-                </div>
-              </div>
-
-              {#if selectedTarget.kind}
-                <div>
-                  <h4 class="text-sm font-medium text-muted-foreground mb-1">Type</h4>
-                  <p class="font-mono text-sm">{selectedTarget.kind}</p>
-                  <p class="text-xs text-muted-foreground mt-1">
-                    Expected: {getExpectedOutputs(selectedTarget.kind)}
-                  </p>
-                </div>
-              {/if}
-
-              {#if targetOutputs.length > 0 || loadingOutputs}
-                <div class="col-span-2 border-l-4 border-primary pl-4">
-                  <h4 class="text-sm font-medium text-primary mb-2 flex items-center gap-2">
-                    <span class="font-semibold">Returns / Outputs</span>
-                    {#if !loadingOutputs}
-                      <span class="text-xs text-muted-foreground">({targetOutputs.length} files)</span>
-                    {/if}
-                  </h4>
-                  {#if loadingOutputs}
-                    <p class="text-sm text-muted-foreground">Loading outputs...</p>
-                  {:else if targetOutputs.length > 0}
-                    <div class="space-y-1 max-h-32 overflow-y-auto bg-muted/30 p-2 rounded">
-                      {#each targetOutputs as output}
-                        <div class="flex items-center gap-2 text-sm">
-                          <span class="font-mono text-xs px-1 py-0.5 bg-primary/10 text-primary rounded">
-                            {output}
-                          </span>
-                        </div>
-                      {/each}
-                    </div>
-                  {:else}
-                    <p class="text-sm text-muted-foreground">No outputs detected</p>
-                  {/if}
-                </div>
-              {/if}
-
-              {#if selectedTarget.location}
-                <div>
-                  <h4 class="text-sm font-medium text-muted-foreground mb-1">Location</h4>
-                  <div class="flex items-center gap-2">
-                    <p class="font-mono text-sm">{selectedTarget.location}</p>
-                    {#if getBuildFilePath(selectedTarget)}
-                      <button
-                        onclick={() => selectedTarget && navigateToBuildFile(selectedTarget)}
-                        class="p-1 hover:bg-muted rounded flex items-center gap-1 text-xs text-primary"
-                        title="View in BUILD file"
-                      >
-                        <FileCode class="w-3 h-3" />
-                        <ExternalLink class="w-3 h-3" />
-                      </button>
-                    {/if}
-                  </div>
-                </div>
-              {/if}
-
-             
-
-              {#if selectedTarget.attributes && selectedTarget.attributes.length > 0}
-                <AttributesDisplay
-                  attributes={selectedTarget.attributes}
-                  collapsible={true}
-                  initiallyExpanded={true}
-                />
-              {/if}
-
-              {#if targetDependencies.length > 0}
-                <div>
-                  <h4 class="text-sm font-medium text-muted-foreground mb-1">
-                    Direct Dependencies ({targetDependencies.length})
-                  </h4>
-                  <div class="space-y-1 max-h-40 overflow-y-auto">
-                    {#each targetDependencies as dep}
-                      <button
-                        onclick={() => navigateToTarget(dep)}
-                        class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
-                      >
-                        <ChevronRight class="w-3 h-3" />
-                        {dep.label}
-                      </button>
-                    {/each}
-                  </div>
-                </div>
-              {/if}
-
-              {#if targetReverseDependencies.length > 0 || loadingReverseDeps}
-                <div>
-                  <h4 class="text-sm font-medium text-muted-foreground mb-1">
-                    Used By ({targetReverseDependencies.length})
-                  </h4>
-                  {#if loadingReverseDeps}
-                    <div class="text-sm text-muted-foreground">Loading...</div>
-                  {:else if targetReverseDependencies.length > 0}
-                    <div class="space-y-1 max-h-40 overflow-y-auto">
-                      {#each targetReverseDependencies as rdep}
-                        <button
-                          onclick={() => navigateToTarget(rdep)}
-                          class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
-                        >
-                          <ChevronRight class="w-3 h-3" />
-                          {rdep.label}
-                        </button>
-                      {/each}
-                    </div>
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          {:else}
-            <p class="text-muted-foreground">Select a target to view details</p>
-          {/if}
-        </div>
-      </div>
+      {#if selectedTarget}
+       <TargetDetails target={selectedTarget} />
+      {:else}
+        <p class="text-muted-foreground">Select a target to view details</p>
+      {/if}
     </div>
   {/if}
 </div>
 
-<!-- Run Modal -->
-{#if showRunModal}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div class="bg-background border rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
-      <!-- Modal Header -->
-      <div class="p-4 border-b flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-semibold">Running Target</h2>
-          <p class="text-sm text-muted-foreground font-mono mt-1">{runCommand}</p>
-        </div>
-        <button
-          onclick={closeRunModal}
-          class="p-2 hover:bg-muted rounded-md transition-colors"
-          title="Close"
-        >
-          <X class="w-5 h-5" />
-        </button>
-      </div>
 
-      <!-- Modal Body - Output Log -->
-      <div bind:this={outputContainer} class="flex-1 overflow-y-auto p-4 bg-muted/20">
-        <pre class="font-mono text-sm whitespace-pre-wrap">{runOutput.join('')}</pre>
-        {#if runStatus === 'running'}
-          <div class="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-            <div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
-            <span>Running...</span>
-          </div>
-        {/if}
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="p-4 border-t flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          {#if runStatus === 'success'}
-            <span class="text-green-600 dark:text-green-400 text-sm font-medium">✅ Success</span>
-          {:else if runStatus === 'error'}
-            <span class="text-red-600 dark:text-red-400 text-sm font-medium">❌ Failed</span>
-          {:else if runStatus === 'running'}
-            <span class="text-blue-600 dark:text-blue-400 text-sm font-medium">⏳ Running</span>
-          {/if}
-        </div>
-        <button
-          onclick={closeRunModal}
-          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}

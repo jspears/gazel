@@ -123,6 +123,14 @@
       expanded = !expanded;
     }
   }
+  
+  function showCount(): string {
+    let str = `${sortedAttributes.length}`;
+    if (hideEmpty && filteredAttributes.length < attributes.length) {
+      str += ` of ${attributes.length}`;
+    }
+    return str;
+  }
 </script>
 
 <div class="attributes-display">
@@ -137,7 +145,7 @@
             Attributes
           </h4>
           <span class="text-xs text-muted-foreground">
-            ({sortedAttributes.length} {#if hideEmpty && filteredAttributes.length < attributes.length}of {attributes.length}{/if})
+            ({showCount()})
           </span>
         </div>
         {#if expanded}
@@ -163,7 +171,7 @@
           Attributes
         </h4>
         <span class="text-xs text-muted-foreground">
-          ({sortedAttributes.length}{#if hideEmpty && filteredAttributes.length < attributes.length} of {attributes.length}{/if})
+            ({showCount()})
         </span>
       </div>
       <button
@@ -241,8 +249,7 @@
                   class:text-green-700={formatted === 'true'}
                   class:dark:text-green-400={formatted === 'true'}
                   class:bg-gray-500={formatted === 'false'}
-                  class:text-gray-900={formatted === 'false'}
-                  class:dark:text-red-400={formatted === 'false'}
+                  class:text-white={formatted === 'false'}
                 >
                   {formatted}
                 </span>

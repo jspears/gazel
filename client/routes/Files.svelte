@@ -4,6 +4,7 @@
   import { api } from '../client.js';
   import CopyButton from '../components/CopyButton.svelte';
   import TargetDetails from '../components/TargetDetails.svelte';
+  import RunModal from '../components/RunModal.svelte';
   import hljs from 'highlight.js/lib/core';
   import python from 'highlight.js/lib/languages/python';
   import bash from 'highlight.js/lib/languages/bash';
@@ -55,11 +56,7 @@
 
   // Run modal state
   let showRunModal = $state(false);
-  let runOutput = $state<string[]>([]);
-  let runCommand = $state('');
-  let runStatus = $state<'idle' | 'running' | 'success' | 'error'>('idle');
-  let runEventSource = $state<EventSource | null>(null);
-  let outputContainer = $state<HTMLDivElement>();
+  let targetToRun = $state<string | null>(null);
 
   onMount(() => {
     loadBuildFiles();
@@ -332,67 +329,10 @@
     }
   }
 
-async function runTargetByName(targetName: string) {
+  function runTargetByName(targetName: string) {
     if (!targetName) return;
-
-    runCommand = `bazel run ${targetName}`;
-    runOutput = [];
-    runStatus = 'running';
+    targetToRun = targetName;
     showRunModal = true;
-
-    // Use EventSource for streaming
-    for await (const {event:data} of api.streamRun({target: targetName})){
-      if (data.case === 'progress'){
-        runOutput = [...runOutput, data.value.currentAction];
-        // Auto-scroll to bottom
-        if (outputContainer) {
-          setTimeout(() => {
-            outputContainer.scrollTop = outputContainer.scrollHeight;
-          }, 0);
-        }
-    
-      } else if (data.case === 'complete') {
-        if (data.value.exitCode === 0) {
-          runStatus = 'success';
-          runOutput = [...runOutput, `\n✅ Command completed successfully in (${data.value.durationMs}ms)`];
-        } else if (data.value.exitCode === null) {
-          // Process was killed or terminated abnormally
-          runStatus = 'error';
-          runOutput = [...runOutput, '\n⚠️ Command was terminated'];
-        } else {
-          runStatus = 'error';
-          runOutput = [...runOutput, `\n❌ Command failed with exit code ${data.value.exitCode}`];
-        }
-        // Close the EventSource when process exits
-        if (runEventSource) {
-          runEventSource.close();
-          runEventSource = null;
-        }
-      } else if (data.case === 'error') {
-        // Handle stream errors
-        runStatus = 'error';
-        runOutput = [...runOutput, `\n❌ Error: ${data.value}`];
-        // Close the EventSource on error
-        if (runEventSource) {
-          runEventSource.close();
-          runEventSource = null;
-        }
-      }
-    }
-  }
-
-  function closeRunModal() {
-    if (runEventSource) {
-      // If still running, add a message that we're stopping
-      if (runStatus === 'running') {
-        runOutput = [...runOutput, '\n⚠️ Stopping command...'];
-      }
-      runEventSource.close();
-      runEventSource = null;
-    }
-    showRunModal = false;
-    runStatus = 'idle';
-    runOutput = [];
     runCommand = '';
   }
 
@@ -628,7 +568,7 @@ async function runTargetByName(targetName: string) {
                   <Target class="w-4 h-4 text-muted-foreground" />
                   <div>
                     <button
-                      onclick={() => onNavigateToTargets?.({ target: target.name })}
+                      onclick={() => onNavigateToTargets?.(target)}
                       class="font-mono text-sm hover:text-primary transition-colors"
                     >
                       {target.name}
@@ -642,7 +582,7 @@ async function runTargetByName(targetName: string) {
                  <CopyButton text={target.name} />
                   {#if target.ruleType && (target.ruleType.includes('binary') || target.ruleType.includes('test'))}
                     <button
-                      onclick={() => runTargetByName(target.name)}
+                      onclick={() => runTargetByName(toFull(target))}
                       class="p-1 hover:bg-primary/10 rounded transition-colors"
                       title="Run {target.name}"
                     >
@@ -694,53 +634,4 @@ async function runTargetByName(targetName: string) {
 </div>
 
 <!-- Run Modal -->
-{#if showRunModal}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div class="bg-background border rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
-      <!-- Modal Header -->
-      <div class="p-4 border-b flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-semibold">Running Target</h2>
-          <p class="text-sm text-muted-foreground font-mono mt-1">{runCommand}</p>
-        </div>
-        <button
-          onclick={closeRunModal}
-          class="p-2 hover:bg-muted rounded-md transition-colors"
-          title="Close"
-        >
-          <X class="w-5 h-5" />
-        </button>
-      </div>
-
-      <!-- Modal Body - Output Log -->
-      <div bind:this={outputContainer} class="flex-1 overflow-y-auto p-4 bg-muted/20">
-        <pre class="font-mono text-sm whitespace-pre-wrap">{runOutput.join('')}</pre>
-        {#if runStatus === 'running'}
-          <div class="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-            <div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
-            <span>Running...</span>
-          </div>
-        {/if}
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="p-4 border-t flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          {#if runStatus === 'success'}
-            <span class="text-green-600 dark:text-green-400 text-sm font-medium">✅ Success</span>
-          {:else if runStatus === 'error'}
-            <span class="text-red-600 dark:text-red-400 text-sm font-medium">❌ Failed</span>
-          {:else if runStatus === 'running'}
-            <span class="text-blue-600 dark:text-blue-400 text-sm font-medium">⏳ Running</span>
-          {/if}
-        </div>
-        <button
-          onclick={closeRunModal}
-          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+<RunModal target={targetToRun} bind:open={showRunModal} />

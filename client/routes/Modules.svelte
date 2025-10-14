@@ -1,37 +1,61 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { api } from '../client.js';
-  import { Package, GitBranch, Tag, AlertCircle, ChevronRight, ChevronDown, ExternalLink, Layers, Code, BookOpen, X, Boxes } from 'lucide-svelte';
+  import { Package, GitBranch, Tag, AlertCircle, ChevronRight, ChevronDown, ExternalLink, Layers, Code, BookOpen, X, Boxes, FileCode } from 'lucide-svelte';
   import ElkModuleGraph from '../components/ElkModuleGraph.svelte';
   import type {  GetModuleGraphResponse, Module, Dependency } from '@speajus/gazel-proto';
   import { Graphviz } from '@hpcc-js/wasm/graphviz';
   import {stopPropagation} from '../components/util.js';
-  
-  let loading = true;
-  let error: string | null = null;
-  let moduleGraph: GetModuleGraphResponse | null = null;
-  let selectedModule: GetModuleGraphResponse['modules'][0] | null = null;
-  let expandedModules = new Set<string>();
-  let viewMode: 'list' | 'graph' | 'graphviz' = 'list';
-  let searchQuery = '';
-  let layoutDirection: 'DOWN' | 'RIGHT' = 'DOWN';
-  let dotGraph = '';
-  let graphSvg = '';
-  let loadingGraph = false;
+  import Loader from '../components/Loader.svelte';
+
+  let loading = $state(true);
+  let error = $state<string | null>(null);
+  let moduleGraph = $state<GetModuleGraphResponse | null>(null);
+  let selectedModule = $state<GetModuleGraphResponse['modules'][0] | null>(null);
+  let expandedModules = $state(new Set<string>());
+  let viewMode = $state<'list' | 'graph' | 'graphviz'>('list');
+  let searchQuery = $state('');
+  let layoutDirection = $state<'DOWN' | 'RIGHT'>('DOWN');
+  let dotGraph = $state('');
+  let graphSvg = $state('');
+  let loadingGraph = $state(false);
 
   // Documentation modal state
-  let showDocModal = false;
-  let docModuleName = '';
-  let docModuleVersion = '';
-  let docContent = '';
-  let loadingDoc = false;
-  let docError: string | null = null;
+  let showDocModal = $state(false);
+  let docModuleName = $state('');
+  let docModuleVersion = $state('');
+  let docContent = $state('');
+  let loadingDoc = $state(false);
+  let docError = $state<string | null>(null);
 
-  onMount(async () => {
-    await loadModuleGraph();
+  // Rule source modal state
+  let showRuleSourceModal = $state(false);
+  let ruleSourceContent = $state('');
+  let ruleSourceFile = $state('');
+  let loadingRuleSource = $state(false);
+  let ruleSourceError = $state<string | null>(null);
+
+  // Load module graph on mount
+  $effect(() => {
+    loadModuleGraph();
   });
 
+  function handleRuleSourceModalKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      closeDocModal();
+    }
+  }
 
+  $effect(()=>{
+    if (showRuleSourceModal) {
+      document.body.classList.add('overflow-y-hidden');
+      document.body.addEventListener('keydown', handleRuleSourceModalKeydown);
+      return ()=>{
+        document.body.removeEventListener('keydown', handleRuleSourceModalKeydown);
+      }
+    } else {
+      document.body.classList.remove('overflow-y-hidden');
+    }
+  })
   async function loadModuleGraph() {
     try {
       loading = true;
@@ -123,6 +147,37 @@
     docError = null;
   }
 
+  async function showRuleSource(module: GetModuleGraphResponse['modules'][0]) {
+    showRuleSourceModal = true;
+    ruleSourceContent = '';
+    ruleSourceFile = module.location?.file || '';
+    ruleSourceError = null;
+    loadingRuleSource = true;
+
+    try {
+      if (!module.location?.file) {
+        ruleSourceError = 'No location information available for this module';
+        return;
+      }
+
+      // Get the BUILD file content
+      const result = await api.getBuildFile({ path: module.location.file });
+      ruleSourceContent = result.content;
+    } catch (err: unknown) {
+      console.error('Failed to fetch rule source:', err);
+      ruleSourceError = err instanceof Error ? err.message : 'Failed to fetch rule source';
+    } finally {
+      loadingRuleSource = false;
+    }
+  }
+
+  function closeRuleSourceModal() {
+    showRuleSourceModal = false;
+    ruleSourceContent = '';
+    ruleSourceFile = '';
+    ruleSourceError = null;
+  }
+
   async function handleDependencyClick(dep: Dependency) {
     await showModuleDocumentation(dep.name, dep.version);
   }
@@ -159,9 +214,12 @@
   }
 
   // Load DOT graph when switching to graphviz view
-  $: if (viewMode === 'graphviz' && !dotGraph && !loadingGraph) {
-    loadDotGraph();
-  }
+  $effect(()=>{
+    if (viewMode === 'graphviz' && !dotGraph && !loadingGraph){
+      loadDotGraph();
+    }
+  });
+  
 
   function toggleModule(moduleKey: string) {
     if (expandedModules.has(moduleKey)) {
@@ -203,16 +261,20 @@
     return module.name;
   }
 
-  $: filteredModules = moduleGraph?.modules?.filter((module: any) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return module.name.toLowerCase().includes(query) ||
-           module.apparentName?.toLowerCase().includes(query) ||
-           module.version?.toLowerCase().includes(query) ||
-           module.key.toLowerCase().includes(query);
-  }) || [];
+  let filteredModules = $derived.by(() => {
+    return moduleGraph?.modules?.filter((module: any) => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return module.name.toLowerCase().includes(query) ||
+             module.apparentName?.toLowerCase().includes(query) ||
+             module.version?.toLowerCase().includes(query) ||
+             module.key.toLowerCase().includes(query);
+    }) || [];
+  });
 
-  $: rootModule = moduleGraph?.modules?.find((m: any) => m.key === moduleGraph?.root);
+  let rootModule = $derived.by(() => {
+    return moduleGraph?.modules?.find((m: any) => m.key === moduleGraph?.root);
+  });
 </script>
 
 <div class="space-y-6">
@@ -322,12 +384,24 @@
                   {/if}
                 </div>
               </div>
-              <button
-               onclick={() => selectModule(rootModule)}
-                class="text-primary hover:text-primary/80"
-              >
-                <ChevronRight class="w-5 h-5" />
-              </button>
+              <div class="flex items-center gap-2">
+                {#if rootModule.location?.file}
+                  <button
+                   onclick={() => showRuleSource(rootModule)}
+                    class="text-primary hover:text-primary/80 transition-colors"
+                    title="View rule source"
+                  >
+                    <FileCode class="w-5 h-5" />
+                  </button>
+                {/if}
+                <button
+                 onclick={() => selectModule(rootModule)}
+                  class="text-primary hover:text-primary/80"
+                  title="View module details"
+                >
+                  <ChevronRight class="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         {/if}
@@ -374,9 +448,19 @@
                     </div>
                   </div>
                   <div class="flex items-center gap-2">
+                    {#if module.location?.file}
+                      <button
+                       onclick={stopPropagation(() => showRuleSource(module))}
+                        class="text-muted-foreground hover:text-foreground transition-colors"
+                        title="View rule source"
+                      >
+                        <FileCode class="w-4 h-4" />
+                      </button>
+                    {/if}
                     <button
-                     onclick={stopPropagation(() => selectModule(module))}
+                     onclick={stopPropagation(() => handleDependencyClick(module))}
                       class="text-primary hover:text-primary/80"
+                      title="View module details"
                     >
                       <ExternalLink class="w-4 h-4" />
                     </button>
@@ -438,7 +522,18 @@
       <div class="lg:col-span-1">
         {#if selectedModule}
           <div class="bg-card border rounded-lg p-4 sticky top-4">
-            <h3 class="font-semibold text-lg mb-4">{selectedModule.name}</h3>
+            <div class="flex items-start justify-between mb-4">
+              <h3 class="font-semibold text-lg">{selectedModule.name}</h3>
+              {#if selectedModule.location?.file}
+                <button
+                 onclick={() => showRuleSource(selectedModule)}
+                  class="text-muted-foreground hover:text-foreground transition-colors"
+                  title="View rule source"
+                >
+                  <FileCode class="w-5 h-5" />
+                </button>
+              {/if}
+            </div>
             <div class="space-y-4">
               <div>
                 <h4 class="text-sm font-semibold text-muted-foreground mb-1">Version</h4>
@@ -570,9 +665,7 @@
       <!-- Graphviz View -->
       <div class="space-y-4">
         {#if loadingGraph}
-          <div class="flex items-center justify-center py-12">
-            <div class="text-muted-foreground">Loading graph...</div>
-          </div>
+          <Loader  message="Loading graph..." />
         {:else if graphSvg}
           <div class="bg-card border rounded-lg p-4 overflow-auto" style="max-height: 800px;">
             {@html graphSvg}
@@ -596,7 +689,6 @@
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
    onclick={closeDocModal}
-   onkeydown={(e) => e.key === 'Escape' && closeDocModal()}
     role="dialog"
     aria-modal="true"
     aria-labelledby="doc-modal-title"
@@ -688,6 +780,79 @@
         </a>
         <button
          onclick={closeDocModal}
+          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Rule Source Modal -->
+{#if showRuleSourceModal}
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+   onclick={closeRuleSourceModal}
+   onkeydown={(e) => e.key === 'Escape' && closeRuleSourceModal()}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="rule-source-modal-title"
+    tabindex="-1"
+  >
+    <div
+      class="bg-card border rounded-lg shadow-lg max-w-6xl w-full max-h-[80vh] flex flex-col"
+     onclick={stopPropagation()}
+     onkeydown={stopPropagation()}
+      role="document"
+    >
+      <!-- Modal Header -->
+      <div class="p-4 border-b flex items-center justify-between">
+        <div>
+          <h2 id="rule-source-modal-title" class="text-lg font-semibold flex items-center gap-2">
+            <FileCode class="w-5 h-5" />
+            Rule Source
+          </h2>
+          <p class="text-sm text-muted-foreground mt-1">
+            {ruleSourceFile}
+          </p>
+        </div>
+        <button
+         onclick={closeRuleSourceModal}
+          class="p-2 hover:bg-muted rounded-md transition-colors"
+          title="Close"
+        >
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="flex-1 overflow-y-auto p-4">
+        {#if loadingRuleSource}
+          <div class="flex items-center justify-center py-12">
+            <div class="text-muted-foreground">Loading rule source...</div>
+          </div>
+        {:else if ruleSourceError}
+          <div class="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+              <AlertCircle class="w-5 h-5 text-destructive mt-0.5" />
+              <div>
+                <h3 class="font-semibold text-destructive">Error loading rule source</h3>
+                <p class="text-sm text-muted-foreground mt-1">{ruleSourceError}</p>
+              </div>
+            </div>
+          </div>
+        {:else if ruleSourceContent}
+          <div class="space-y-4">
+            <pre class="bg-muted/50 p-4 rounded-lg overflow-x-auto text-sm font-mono">{ruleSourceContent}</pre>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t flex items-center justify-end gap-2">
+        <button
+         onclick={closeRuleSourceModal}
           class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
         >
           Close

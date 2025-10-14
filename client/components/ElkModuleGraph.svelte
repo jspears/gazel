@@ -113,7 +113,7 @@
 
     const nodeMap = new Map<string, any>();
     const edgeList: any[] = [];
-    
+
     // Filter modules based on search
     const filteredModules = moduleGraph.modules.filter((module: any) => {
       if (!filter) return true;
@@ -137,14 +137,15 @@
       });
     });
 
-    // Create edges from dependencies
-    if (moduleGraph.dependencies) {
+    // Create edges from module dependencies
+    // First, try to use the top-level dependencies array (ModuleDependency[])
+    if (moduleGraph.dependencies && Array.isArray(moduleGraph.dependencies) && moduleGraph.dependencies.length > 0) {
       moduleGraph.dependencies.forEach((dep: any) => {
         // Only include edge if both nodes are in filtered set
         if (nodeMap.has(dep.from) && nodeMap.has(dep.to)) {
           const edgeType = dep.type || 'direct';
           const edgeColor = edgeType === 'dev' ? '#f59e0b' : '#3b82f6';
-          
+
           edgeList.push({
             id: `${dep.from}->${dep.to}`,
             source: dep.from,
@@ -164,6 +165,44 @@
             }
           });
         }
+      });
+    } else {
+      // Fallback: Build edges from each module's dependencies field
+      filteredModules.forEach((module: any) => {
+        const sourceKey = module.key;
+
+        // Use resolved_dependencies if available, otherwise use dependencies
+        const deps =  module.dependencies || module.resolvedDependencies || [];
+
+        deps.forEach((dep: any) => {
+          // dep.key is the target module key
+          const targetKey = dep.key;
+
+          // Only include edge if both nodes are in filtered set
+          if (nodeMap.has(sourceKey) && nodeMap.has(targetKey)) {
+            const edgeType = dep.devDependency ? 'dev' : 'direct';
+            const edgeColor = dep.devDependency ? '#f59e0b' : '#3b82f6';
+
+            edgeList.push({
+              id: `${sourceKey}->${targetKey}`,
+              source: sourceKey,
+              target: targetKey,
+              type: 'smoothstep',
+              animated: dep.devDependency,
+              label: dep.version ? `v${dep.version}` : undefined,
+              labelStyle: { fontSize: 10, fill: '#6b7280' },
+              style: {
+                stroke: edgeColor,
+                strokeWidth: 2,
+                strokeDasharray: dep.devDependency ? '5 5' : undefined
+              },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: edgeColor
+              }
+            });
+          }
+        });
       });
     }
 
@@ -266,8 +305,15 @@
             <div class="w-3 h-3 rounded" style="background-color: {nodeColors.transitive}"></div>
             <span class="text-xs">Transitive Dependency</span>
           </div>
+        </div>
+        <div class="text-xs font-semibold mt-3 mb-2">Edge Types</div>
+        <div class="space-y-1">
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded" style="background-color: {nodeColors.dev}"></div>
+            <div class="w-8 h-0.5" style="background-color: {nodeColors.direct}"></div>
+            <span class="text-xs">Direct</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-0.5 border-t-2 border-dashed" style="border-color: {nodeColors.dev}"></div>
             <span class="text-xs">Dev Dependency</span>
           </div>
         </div>

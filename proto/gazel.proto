@@ -265,6 +265,16 @@ message GetReverseDependenciesResponse {
   repeated BazelTarget dependencies = 3;
 }
 
+message GetOutputConsumersRequest {
+  string output = 1;
+  string producing_target = 2; // The target that produces this output
+}
+message GetOutputConsumersResponse {
+  string output = 1;
+  int32 total = 2;
+  repeated BazelTarget consumers = 3;
+}
+
 message SearchTargetsRequest {
   string query = 1;
   string type = 2;
@@ -523,6 +533,7 @@ service GazelService {
   rpc GetTargetDependencies(GetTargetDependenciesRequest) returns (GetTargetDependenciesResponse);
   rpc GetTargetOutputs(GetTargetOutputsRequest) returns (GetTargetOutputsResponse);
   rpc GetReverseDependencies(GetReverseDependenciesRequest) returns (GetReverseDependenciesResponse);
+  rpc GetOutputConsumers(GetOutputConsumersRequest) returns (GetOutputConsumersResponse);
   rpc SearchTargets(SearchTargetsRequest) returns (stream SearchTargetsResponse);
 
   // Query operations

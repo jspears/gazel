@@ -1,129 +1,116 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import { Target, ChevronRight, FileCode, ExternalLink, Play, GitBranch, Terminal, TestTube } from 'lucide-svelte';
+  import { ChevronRight, FileCode, ExternalLink, Play, TestTube } from 'lucide-svelte';
   import CopyButton from './CopyButton.svelte';
   import AttributesDisplay from './AttributesDisplay.svelte';
   import { api } from '../client.js';
   import type { BazelTarget } from '@speajus/gazel-proto';
-  import { toFull } from './target-util.js';
+  import { toFull, isExecutableTarget, isTest, getExpectedOutputs } from './target-util.js';
   import { getRuleDocumentationUrl, getRuleSourceName } from '../lib/bazel-registry.js';
+  import RunModal from './RunModal.svelte';
+  import Loader from './Loader.svelte';
 
-  const dispatch = createEventDispatcher();
+  interface Props {
+    target?: BazelTarget | null;
+    showActions?: boolean;
+    showNavigation?: boolean;
+    compact?: boolean;
+    onNavigateToFile?: (event: CustomEvent<{ path: string }>) => void;
+    onNavigateToTarget?: (event: CustomEvent<{ target: string }>) => void;
+  }
 
-  export let target: BazelTarget | null = null;
-  export let showActions = true;
-  export let showNavigation = false; // Default to false to hide navigation
-  export let compact = false;
+  let {
+    target = null,
+    showActions = true,
+    showNavigation = false,
+    compact = false,
+    onNavigateToFile,
+    onNavigateToTarget
+  }: Props = $props();
 
-  let fullTarget: BazelTarget | null = null;
-  let targetDependencies: BazelTarget[] = [];
-  let targetReverseDependencies: BazelTarget[] = [];
-  let targetOutputs: string[] = [];
-  let loadingTarget = false;
-  let loadingOutputs = false;
-  let loadingReverseDeps = false;
-  let loadingDeps = false;
+  let fullTarget = $state<BazelTarget | null>(null);
+  let targetDependencies = $state<BazelTarget[]>([]);
+  let targetReverseDependencies = $state<BazelTarget[]>([]);
+  let targetOutputs = $state<string[]>([]);
+  let outputConsumers = $state<Map<string, BazelTarget[]>>(new Map());
+  let loadingConsumers = $state<Set<string>>(false);
+  let loading = $state(true);
+  let showRunModal = $state(false);
+  let error = $state<string | null>(null);
 
-  $: loadTargetDetails(`${target.package}:${target.name}`);
+  $effect(() => {
+    if (target) {
+      loadTargetDetails(toFull(target));
+    }
+  });
   
+
+  function niceName(target: BazelTarget): string {
+    return target.label || toFull(target);
+  }
 
   async function loadTargetDetails(targetName: string) {
     // Reset state
     targetDependencies = [];
     targetReverseDependencies = [];
     targetOutputs = [];
-    fullTarget = target;
-
-    // Load full target details with attributes
-    loadingTarget = true;
+    outputConsumers = new Map();
+ // Load direct dependencies
+    loading = true;
+      error = null;
     try {
-      fullTarget = (await api.getTarget({target: targetName})).target;
-    } catch (err) {
-      console.error('Failed to load target details:', err);
-      fullTarget = target;
-    } finally {
-      loadingTarget = false;
-    }
+      const [ ftarget, deps, rdeps, outputs ] = await Promise.all([
+        api.getTarget({target: targetName}),
+        api.getTargetDependencies({target: targetName, depth:1}),
+        api.getReverseDependencies({target: targetName}),
+        api.getTargetOutputs({target: targetName})
+      ]);
+      targetDependencies = deps.dependencies ?? [];
+      targetReverseDependencies = rdeps.dependencies ?? [];
+      targetOutputs = outputs.outputs;
+      fullTarget = ftarget.target;
+      loading = false;
 
-    // Load direct dependencies
-    loadingDeps = true;
-    try {
-      const deps = await api.getTargetDependencies({target: toFull(target), depth:1});
-      targetDependencies = deps.dependencies;
+      // Load consumers for each output in parallel
+      if (targetOutputs.length > 0) {
+        void loadOutputConsumers(targetOutputs);
+      }
     } catch (err) {
       console.error('Failed to load dependencies:', err);
-      targetDependencies = [];
+      error = err?.message;
     } finally {
-      loadingDeps = false;
-    }
-
-    // Load reverse dependencies (what depends on this target)
-    loadingReverseDeps = true;
-    try {
-      const rdeps = await api.getReverseDependencies({target: toFull(target)});
-      targetReverseDependencies = rdeps.dependencies || [];
-    } catch (err) {
-      console.error('Failed to load reverse dependencies:', err);
-      targetReverseDependencies = [];
-    } finally {
-      loadingReverseDeps = false;
-    }
-
-    // Load outputs for the selected target
-    loadingOutputs = true;
-    try {
-      targetOutputs = (await api.getTargetOutputs({target: toFull(target)})).outputs || [];
-    } catch (err) {
-      console.error('Failed to load outputs:', err);
-      targetOutputs = [];
-    } finally {
-      loadingOutputs = false;
+      loading = false;
     }
   }
 
-  function getExpectedOutputs(ruleType: string): string {
-    const outputPatterns: Record<string, string> = {
-      'cc_binary': 'Executable binary file',
-      'cc_library': 'Static library (.a) and/or shared library (.so)',
-      'cc_test': 'Test executable',
-      'py_binary': 'Python executable or .pex file',
-      'py_library': 'Python source files and compiled .pyc files',
-      'py_test': 'Python test executable',
-      'java_binary': 'JAR file and/or executable wrapper',
-      'java_library': 'JAR file with compiled classes',
-      'java_test': 'Test JAR and test runner',
-      'go_binary': 'Go executable',
-      'go_library': 'Go archive file (.a)',
-      'go_test': 'Go test executable',
-      'rust_binary': 'Rust executable',
-      'rust_library': 'Rust library (.rlib)',
-      'proto_library': 'Protocol buffer descriptor sets',
-      'filegroup': 'Collection of files',
-      'genrule': 'Custom generated files defined by the rule'
-    };
+  async function loadOutputConsumers(outputs: string[]) {
+    loadingConsumers = true;
+    // Get the current target label to pass as the producing target
+    const producingTarget = fullTarget ? toFull(fullTarget) : '';
+    if (!producingTarget) {
+      console.warn('Cannot load output consumers: no producing target');
+      return;
+    }
+    // Load consumers for all outputs in parallel
+    const outputConsumers = new Map( await outputs.map(async (output) => {
 
-    return outputPatterns[ruleType] || 'Target outputs';
+      try {
+        const result = await api.getOutputConsumers({
+          output,
+          producingTarget
+        });
+        return [output, result.consumers ?? []];
+      } catch (err) {
+        console.error(`Failed to load consumers for ${output}:`, err);
+      } finally {
+        loadingConsumers = false;        
+      }
+
+    }));
+
   }
 
-  function isExecutableTarget(target: BazelTarget): boolean {
 
-    const ruleType = target.kind
-    const executableTypes = [
-      'cc_binary',
-      'cc_test',
-      'py_binary',
-      'py_test',
-      'java_binary',
-      'java_test',
-      'go_binary',
-      'go_test',
-      'rust_binary',
-      'sh_binary',
-      'sh_test'
-    ];
 
-    return executableTypes.includes(ruleType);
-  }
 
   function getBuildFilePath(target: BazelTarget): string | null {
     if (target.package) {
@@ -137,32 +124,41 @@
   }
 
   function navigateToBuildFile() {
-
-        dispatch('navigate-to-file', { path: toFull(target) });
-      
-    
-  }
-
-
-
-  function runTarget() {
     if (target) {
-      dispatch('run-target', { target: toFull(target) });
+      onNavigateToFile?.(new CustomEvent('navigate-to-file', { detail: { path: toFull(target) } }));
     }
   }
 
+  function runTarget() {
+    showRunModal = true;
+  }
+
   function navigateToTarget(dep: BazelTarget) {
-    dispatch('navigate-to-target', { target: toFull(dep) });
+    onNavigateToTarget?.(new CustomEvent('navigate-to-target', { detail: { target: toFull(dep) } }));
   }
 </script>
 
-{#if target}
+{#if loading}
+  <Loader/>
+{:else if (target && !error)}
   <div class="space-y-4 {compact ? 'text-sm' : ''}">
     <div>
       <h4 class="text-sm font-medium text-muted-foreground mb-1">Name</h4>
       <div class="flex items-center gap-2">
         <p class="font-mono {compact ? 'text-sm' : ''}">{toFull(target)}</p>
         <CopyButton text={ '//'+toFull(target) } size="sm" />
+        {#if isExecutableTarget(fullTarget || target) && showActions}
+         <button
+         onclick={runTarget}
+          class="p-1 hover:bg-muted rounded transition-all"
+        >
+          {#if isTest(fullTarget || target)}
+            <TestTube class="w-4 h-4  text-green-600 dark:text-green-400" />
+          {:else}
+            <Play class="w-4 h-4  text-green-600 dark:text-green-400" />
+          {/if}
+        </button>
+        {/if}
       </div>
     </div>
     
@@ -190,28 +186,53 @@
           {/if}
         </div>
         <p class="text-xs text-muted-foreground mt-1">
-          Expected: {getExpectedOutputs(target.kind || '')}
+          Expected: {getExpectedOutputs(fullTarget?.ruleType ?? target.kind )}
         </p>
       </div>
     {/if}
 
-    {#if targetOutputs.length > 0 || loadingOutputs}
+    {#if targetOutputs?.length}
       <div class="border-l-4 border-primary pl-4">
         <h4 class="text-sm font-medium text-primary mb-2 flex items-center gap-2">
           <span class="font-semibold">Returns / Outputs</span>
-          {#if !loadingOutputs}
-            <span class="text-xs text-muted-foreground">({targetOutputs.length} files)</span>
-          {/if}
+           <span class="text-xs text-muted-foreground">({targetOutputs.length} files)</span>
         </h4>
-        {#if loadingOutputs}
-          <p class="text-sm text-muted-foreground">Loading outputs...</p>
-        {:else if targetOutputs.length > 0}
-          <div class="space-y-1 max-h-32 overflow-y-auto bg-muted/30 p-2 rounded">
+        {#if targetOutputs.length > 0}
+          <div class="space-y-3 max-h-96 overflow-y-auto bg-muted/30 p-2 rounded">
             {#each targetOutputs as output}
-              <div class="flex items-center gap-2 text-sm">
-                <span class="font-mono text-sm truncate" title={output}>
-                  {output}
-                </span>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2 text-sm">
+                  <FileCode class="w-3 h-3 text-primary flex-shrink-0" />
+                  <span class="font-mono text-sm truncate" title={output}>
+                    {output}
+                  </span>
+                </div>
+
+                {#if loadingConsumers}
+                  <Loader message="Loading consumers..." size="sm" inline={true} class="text-xs text-muted-foreground italic" />
+                {:else if outputConsumers.has(output)}
+                  {@const consumers = outputConsumers.get(output) ?? []}
+                  {#if consumers.length > 0}
+                    <div class="ml-5 space-y-1">
+                      <div class="text-xs text-muted-foreground mb-1">
+                        Consumed by ({consumers.length}):
+                      </div>
+                      {#each consumers as consumer}
+                        <button
+                          onclick={() => navigateToTarget(consumer)}
+                          class="w-full text-left font-mono text-xs text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
+                        >
+                          <ChevronRight class="w-3 h-3" />
+                          {niceName(consumer)}
+                        </button>
+                      {/each}
+                    </div>
+                  {:else}
+                    <div class="ml-5 text-xs text-muted-foreground italic">
+                      No consumers
+                    </div>
+                  {/if}
+                {/if}
               </div>
             {/each}
           </div>
@@ -240,27 +261,9 @@
       </div>
     {/if}
 
-    {#if isExecutableTarget(target) && showActions}
-      <div>
-        <button
-         onclick={runTarget}
-          class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md flex items-center gap-2 transition-colors"
-        >
-          {#if (target.ruleType || target.type || '').includes('test')}
-            <TestTube class="w-4 h-4" />
-            Test Target
-          {:else}
-            <Play class="w-4 h-4" />
-            Run Target
-          {/if}
-        </button>
-      </div>
-    {/if}
 
     <div class="border-l-4 border-purple-500 pl-4">
-      {#if loadingTarget}
-        <div class="text-sm text-muted-foreground">Loading attributes...</div>
-      {:else if fullTarget?.attributes && fullTarget.attributes.length > 0}
+      {#if fullTarget?.attributes?.length}
         <AttributesDisplay
           attributes={fullTarget.attributes}
           collapsible={false}
@@ -273,11 +276,9 @@
     
     <div class="border-l-4 border-blue-500 pl-4">
       <h4 class="text-sm font-medium text-blue-600 mb-1">
-        Direct Dependencies {#if !loadingDeps}({targetDependencies.length}){/if}
+        Direct Dependencies ({targetDependencies.length})
       </h4>
-      {#if loadingDeps}
-        <div class="text-sm text-muted-foreground">Loading...</div>
-      {:else if targetDependencies.length > 0}
+      {#if targetDependencies?.length}
         <div class="space-y-1 max-h-40 overflow-y-auto bg-muted/30 p-2 rounded">
           {#each targetDependencies as dep}
             <button
@@ -285,7 +286,7 @@
               class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
             >
               <ChevronRight class="w-3 h-3" />
-              {dep.full || dep.name}
+              {niceName(dep)}
             </button>
           {/each}
         </div>
@@ -296,11 +297,9 @@
 
     <div class="border-l-4 border-green-500 pl-4">
       <h4 class="text-sm font-medium text-green-600 mb-1">
-        Reverse Dependencies (Used By) {#if !loadingReverseDeps}({targetReverseDependencies.length}){/if}
+        Reverse Dependencies (Used By) ({targetReverseDependencies.length})
       </h4>
-      {#if loadingReverseDeps}
-        <div class="text-sm text-muted-foreground">Loading...</div>
-      {:else if targetReverseDependencies.length > 0}
+      {#if targetReverseDependencies?.length}
         <div class="space-y-1 max-h-40 overflow-y-auto bg-muted/30 p-2 rounded">
           {#each targetReverseDependencies as rdep}
             <button
@@ -308,7 +307,7 @@
               class="w-full text-left font-mono text-sm text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded transition-colors flex items-center gap-2"
             >
               <ChevronRight class="w-3 h-3" />
-              {rdep.full || rdep.name}
+              {niceName(rdep)}
             </button>
           {/each}
         </div>
@@ -317,6 +316,9 @@
       {/if}
     </div>
   </div>
+{:else if error}
+  <div class="text-destructive">Error: {error}</div>
 {:else}
   <p class="text-muted-foreground">Select a target to view details</p>
 {/if}
+<RunModal {target} bind:open={showRunModal} />

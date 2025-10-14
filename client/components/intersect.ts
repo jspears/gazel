@@ -1,6 +1,6 @@
 
 
-export function intersect(root: HTMLElement, callback: MutationCallback) {
+export function intersect(root: HTMLElement, callback: ()=>void) {
         // Set up intersection observer for infinite scrolling
     const observer = new IntersectionObserver(
         (entries) => {

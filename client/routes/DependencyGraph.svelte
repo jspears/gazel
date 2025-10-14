@@ -1,25 +1,30 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { GitBranch, Search, Download, ZoomIn, ZoomOut, Maximize2 } from 'lucide-svelte';
   import DependencyGraph from '../components/DependencyGraph.svelte';
   import EnhancedDependencyGraph from '../components/EnhancedDependencyGraph.svelte';
   import ElkDependencyGraph from '../components/ElkDependencyGraph.svelte';
+  import Loader from '../components/Loader.svelte';
   import { api } from '../client.js';
   import { updateParam } from '../lib/navigation.js';
+  import { Graphviz } from '@hpcc-js/wasm/graphviz';
 
-  export let target: string | null = null;
+  let { target = '' }: { target?: string | null } = $props();
 
-  $: targetInput = target;
-  let filterInput = '';
-  let xmlData = '';
-  let targets: any[] = [];
-  let loading = false;
-  let error: string | null = null;
-  let showRawXml = false;
-  let queryType = 'deps'; // 'deps' or 'direct'
-  let maxDepth = 0; // 0 means unlimited
-  let useStreaming = true; // Use streaming with streamed_jsonproto for better performance
-  let useJsonProto = true; // Use streamed_jsonproto instead of XML
+  let targetInput = $state(target);
+  let filterInput = $state('');
+  let xmlData = $state('');
+  let targets = $state<any[]>([]);
+  let loading = $state(false);
+  let error = $state<string | null>(null);
+  let showRawXml = $state(false);
+  let queryType = $state<'deps' | 'direct'>('deps');
+  let maxDepth = $state(0); // 0 means unlimited
+  let useStreaming = $state(true); // Use streaming with streamed_jsonproto for better performance
+  let useJsonProto = $state(true); // Use streamed_jsonproto instead of XML
+  let viewMode = $state<'elk' | 'graphviz'>('elk');
+  let dotGraph = $state('');
+  let graphSvg = $state('');
+  let loadingGraph = $state(false);
 
   // Example targets for quick access
   const exampleTargets = [
@@ -31,18 +36,28 @@
     '//lib/...'
   ];
 
-  // Watch for initialTarget changes
-  $: if (target){
-    // Automatically generate the graph when a target is provided
-    if (useStreaming) {
-      fetchDependencyGraphStreaming();
-    } else {
-      fetchDependencyGraph();
+  // Watch for target changes and update targetInput
+  $effect(() => {
+    if (target) {
+      targetInput = target;
+      // Automatically generate the graph when a target is provided
+      if (useStreaming) {
+        fetchDependencyGraphStreaming();
+      } else {
+        fetchDependencyGraph();
+      }
     }
-  }
+  });
+
+  // Load DOT graph when switching to graphviz view
+  $effect(() => {
+    if (viewMode === 'graphviz' && !dotGraph && !loadingGraph && xmlData) {
+      loadDotGraph();
+    }
+  });
   
   async function fetchDependencyGraph() {
-    if (!targetInput.trim()) {
+    if (!targetInput?.trim?.()) {
       error = 'Please enter a target pattern';
       return;
     }
@@ -107,13 +122,72 @@
     fetchDependencyGraph();
   }
 
-  function downloadDot() {
-    // For DOT format, we need to re-query with graph output
-    fetchDotFormat();
-  }
-  
-  async function fetchDotFormat() {
+  async function loadDotGraph() {
     if (!targetInput.trim()) return;
+
+    try {
+      loadingGraph = true;
+      console.log('Loading DOT graph...');
+
+      // Build query based on options
+      let query: string;
+      if (queryType === 'direct') {
+        query = `filter("^${targetInput.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$", deps(${targetInput}, 1))`;
+      } else if (maxDepth > 0) {
+        query = `deps(${targetInput}, ${maxDepth})`;
+      } else {
+        query = `deps(${targetInput})`;
+      }
+
+      const result = await api.executeQuery({ query, queryType: 'query', outputFormat: 'graph' });
+
+      if (result.raw) {
+        dotGraph = result.raw;
+        console.log('DOT graph loaded, length:', dotGraph.length);
+
+        // Render the DOT graph to SVG
+        await renderDotGraph(dotGraph);
+      } else {
+        error = 'No DOT data received from query';
+      }
+    } catch (err: any) {
+      console.error('Failed to load DOT graph:', err);
+      error = err.message || 'Failed to load DOT graph';
+    } finally {
+      loadingGraph = false;
+    }
+  }
+
+  async function renderDotGraph(dot: string) {
+    try {
+      console.log('Rendering DOT graph...');
+      const graphviz = await Graphviz.load();
+      const svg = graphviz.dot(dot);
+      graphSvg = svg;
+      console.log('DOT graph rendered, SVG length:', svg.length);
+    } catch (err) {
+      console.error('Failed to render DOT graph:', err);
+      graphSvg = '';
+    }
+  }
+
+  function downloadDot() {
+    // Download the current DOT graph if available, otherwise fetch it
+    if (dotGraph) {
+      const blob = new Blob([dotGraph], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `dependency-graph-${targetInput?.replace(/[^a-z0-9]/gi, '_')}.dot`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } else {
+      fetchDotFormat();
+    }
+  }
+
+  async function fetchDotFormat() {
+    if (!targetInput?.trim()) return;
 
     try {
       const query = `deps(${targetInput})`;
@@ -380,8 +454,22 @@
             </span>
           {/if}
         </h3>
-        
+
         <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 mr-2">
+            <button
+             onclick={() => viewMode = 'elk'}
+              class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors {viewMode === 'elk' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}"
+            >
+              ELK Graph
+            </button>
+            <button
+             onclick={() => viewMode = 'graphviz'}
+              class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors {viewMode === 'graphviz' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}"
+            >
+              Graphviz
+            </button>
+          </div>
           <button
            onclick={downloadDot}
             class="px-3 py-1 text-sm border rounded-md hover:bg-muted flex items-center gap-1"
@@ -399,7 +487,7 @@
           </button>
         </div>
       </div>
-      
+
       <div class="p-4">
         {#if showRawXml}
           <div class="mb-4">
@@ -409,10 +497,30 @@
             </pre>
           </div>
         {/if}
-        
-        <div class="bg-background rounded-lg" style="height: 600px;">
+
+        {#if viewMode === 'elk'}
+          <div class="bg-background rounded-lg" style="height: 600px;">
             <ElkDependencyGraph {xmlData} filter={filterInput} />
-        </div>
+          </div>
+        {:else if viewMode === 'graphviz'}
+          <div class="space-y-4">
+            {#if loadingGraph}
+              <Loader message="Loading graph..." />
+            {:else if graphSvg}
+              <div class="bg-background rounded-lg p-4 overflow-auto" style="max-height: 800px;">
+                {@html graphSvg}
+              </div>
+            {:else if dotGraph}
+              <div class="bg-background rounded-lg p-4">
+                <pre class="text-xs overflow-auto max-h-96">{dotGraph}</pre>
+              </div>
+            {:else}
+              <div class="bg-background rounded-lg p-4">
+                <p class="text-muted-foreground">No graph data available</p>
+              </div>
+            {/if}
+          </div>
+        {/if}
       </div>
     </div>
   {/if}

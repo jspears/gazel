@@ -22,8 +22,14 @@ exports_files([
     "package.json",
     "pnpm-lock.yaml",
     ".npmrc",
-
 ], visibility = ["//visibility:public"])
+
+# Copy Playwright config
+copy_to_bin(
+    name = "playwright_config",
+    srcs = ["playwright.config.ts"],
+    visibility = ["//visibility:public"],
+)
 
 
 js_library(

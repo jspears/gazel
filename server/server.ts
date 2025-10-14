@@ -45,6 +45,9 @@ import {
   type GetReverseDependenciesRequest,
   type GetReverseDependenciesResponse,
   GetReverseDependenciesResponseSchema,
+  type GetOutputConsumersRequest,
+  type GetOutputConsumersResponse,
+  GetOutputConsumersResponseSchema,
   type SearchTargetsRequest,
   type SearchTargetsResponse,
   SearchTargetsResponseSchema,
@@ -925,6 +928,85 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   }
 
   /**
+   * Get targets that consume a specific output file
+   * This works by finding reverse dependencies of the target that produces the output
+   */
+  async getOutputConsumers(
+    request: GetOutputConsumersRequest
+  ): Promise<GetOutputConsumersResponse> {
+    try {
+      const { output, producingTarget } = request;
+      if (!output) {
+        throw new Error("Output file path is required");
+      }
+      if (!producingTarget) {
+        throw new Error("Producing target is required");
+      }
+
+      // Find reverse dependencies of the producing target
+      // These are the targets that consume the outputs of the producing target
+      const query = `rdeps(//..., ${producingTarget})`;
+      const result = await bazelService.query(query, 'streamed_jsonproto');
+      const allTargets = parserService.parseStreamedJsonProto(result.stdout);
+
+      // Filter out the producing target itself
+      const consumers = allTargets.filter((t: any) => {
+        const label = t.full || t.name || "";
+        return label !== producingTarget;
+      });
+
+      // Convert to BazelTarget format
+      const protoConsumers = consumers.map((consumer: any) => {
+        const label = consumer.full || "";
+        const kind = consumer.ruleType || "";
+
+        // Extract package and name from the parsed data or from label
+        let pkg = consumer.package || "";
+        let name = consumer.name || consumer.target || "";
+
+        // If package starts with //, remove it for the package field
+        if (pkg.startsWith("//")) {
+          pkg = pkg.substring(2);
+        }
+
+        // If we still don't have package/name, try parsing from label
+        if (!pkg || !name) {
+          const match = label.match(/^\/\/([^:]*):(.+)$/);
+          if (match) {
+            pkg = match[1];
+            name = match[2];
+          }
+        }
+
+        return create(BazelTargetSchema, {
+          label: label,
+          kind: kind,
+          package: pkg,
+          name: name,
+          tags: [],
+          deps: [],
+          srcs: [],
+          attributes: consumer.attributes ?? [],
+        });
+      });
+
+      return create(GetOutputConsumersResponseSchema, {
+        output: output,
+        total: protoConsumers.length,
+        consumers: protoConsumers,
+      });
+    } catch (error: any) {
+      // If the query fails (e.g., file not found or no consumers), return empty list
+      console.warn(`Failed to get output consumers for ${request.output}: ${error.message}`);
+      return create(GetOutputConsumersResponseSchema, {
+        output: request.output,
+        total: 0,
+        consumers: [],
+      });
+    }
+  }
+
+  /**
    * Search targets (streaming)
    */
   async *searchTargets(
@@ -1027,7 +1109,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
         };
       } else {
         parsedResult = {
-          targets: parserService.parseLabelOutput(result.stdout),
+          targets: [result.stdout+''],
         };
       }
 
@@ -1272,14 +1354,15 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       // Flatten the tree structure into a list of modules
       const moduleMap = new Map<string, any>();
 
-      const flattenModule = (mod: Dependency | Module): void => {
+      const flattenModule = (mod: any): void => {
         if (!mod || !mod.key) return;
 
         // Skip if already processed (handles unexpanded references)
         if (moduleMap.has(mod.key)) return;
         const [name, version] = mod.key.split("@");
-        mod.name = name;
-        mod.version = version;
+        mod.name = mod.name || name;
+        mod.version = mod.version || version;
+        mod.apparentName = mod.apparentName || mod.name;
         moduleMap.set(mod.key, mod);
 
         // Recursively process dependencies
@@ -1294,6 +1377,12 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       flattenModule(rootModule);
 
       console.log("Flattened module count:", moduleMap.size);
+
+      // Mark the root module and calculate root key
+      const rootKey = rootModule.key || "<root>";
+      if (moduleMap.has(rootKey)) {
+        moduleMap.get(rootKey).isRoot = true;
+      }
 
       // Convert to proto format
       const protoModules = Array.from(moduleMap.values()).map(
@@ -1340,8 +1429,20 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
         }
       );
 
+      // Build the dependencies array (ModuleDependency[]) from module dependencies
+      const moduleDependencies: any[] = [];
+      for (const module of protoModules) {
+        for (const dep of module.dependencies) {
+          moduleDependencies.push({
+            from: module.key,
+            to: dep.key,
+            type: dep.devDependency ? 'dev' : 'direct',
+            version: dep.version || '',
+          });
+        }
+      }
+
       // Calculate statistics
-      const rootKey = rootModule.key || "<root>";
       const rootModuleDeps = protoModules.find(
         (m) => m.key === rootKey
       )?.dependencies || [];
@@ -1354,7 +1455,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       const response = create(GetModuleGraphResponseSchema, {
         root: rootKey,
         modules: protoModules,
-        dependencies: [],
+        dependencies: moduleDependencies,
         statistics: create(ModuleStatisticsSchema, {
           totalModules: protoModules.length,
           directDependencies: directDeps,
@@ -1363,7 +1464,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
         }),
       });
 
-      console.log("Returning module graph response with", protoModules.length, "modules");
+      console.log("Returning module graph response with", protoModules.length, "modules and", moduleDependencies.length, "dependencies");
       return response;
     } catch (error: any) {
       console.error("Error in getModuleGraph:", error);

@@ -46,7 +46,7 @@
 
 <style>
   .custom-node {
-    background: white;
+    /* background color is set via inline style */
     border: 2px solid;
     border-radius: 8px;
     padding: 8px 12px;

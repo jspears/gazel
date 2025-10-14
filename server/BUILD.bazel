@@ -58,6 +58,41 @@ js_binary(
     ],
     entry_point = "main.js",
 )
+js_binary(
+    name = "dev",
+    chdir = package_name(),
+    data = [
+        "loader.ts",
+        ":server_ts",
+        ":node_modules",
+        "//:node_modules",
+        "//proto:pkg",
+        ":node_modules/tsconfig-paths",
+        "//:build_pb_root",
+    ],
+    entry_point = "main.js",
+)
+
+# Debug mode - run with: bazel run //server:debug
+# This starts the server with --inspect flag for debugging
+# Connect to it via chrome://inspect in Chrome
+js_binary(
+    name = "debug",
+    chdir = package_name(),
+    data = [
+        "loader.ts",
+        ":server_ts",
+        ":node_modules",
+        "//:node_modules",
+        "//proto:pkg",
+        ":node_modules/tsconfig-paths",
+        "//:build_pb_root",
+    ],
+    entry_point = "main.js",
+    node_options = [
+        "--inspect=9229",
+    ],
+)
 
 # Test target for searchTargets (run with `bazel run //server:searchTargets_test`)
 # Note: This runs outside the sandbox so it has access to bazel/bazelisk in PATH
