@@ -34,19 +34,37 @@ Watch Gazel in action: [View Demo](docs/gazel-bazel.mov)
 - **npm** >= 9.0.0
 - **Bazel** (any recent version)
 
+### Quick Commands
+
+```bash
+# Development mode with hot reload
+bazel run //app:dev
+
+# Production mode
+bazel run //app:run
+```
+
+Both commands will:
+- ✅ Install all dependencies automatically
+- ✅ Configure the workspace automatically
+- ✅ Open your browser automatically
+- ✅ Start both server and client
+
 ### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/jspears/gazel
 cd gazel
-
-# Install dependencies
-npm install
-
-# Start the application
-npm run dev
 ```
+
+#### Bazel Run
+Well you need bazel anyways so we will just do it with bazel.
+```bash
+# Just run! Bazel automatically handles all dependencies
+bazel run //app:dev
+```
+
 
 **That's it!** Open http://localhost:5173 in your browser.
 
@@ -68,7 +86,6 @@ For automatic workspace detection during initial setup:
 The setup script will:
 - ✅ Check system requirements
 - 🔍 Find your Bazel workspace
-- 📝 Create initial .env configuration
 - 📦 Install dependencies (if not already installed)
 
 Note: The setup script is optional. Gazel can now configure workspaces through its UI.
@@ -85,6 +102,39 @@ Opens:
 - 🌐 **Frontend**: http://localhost:5173
 - 🔧 **API**: http://localhost:3001
 
+### Development with Bazel (Alternative)
+
+You can also use pure Bazel commands to run the application.
+
+#### 🎯 Key Benefits of Using Bazel
+
+**Automatic Dependency Management:**
+- ✅ **No manual `pnpm install` needed** - Bazel handles everything!
+- ✅ Dependencies are installed automatically from `pnpm-lock.yaml`
+- ✅ Bazel caches dependencies for fast subsequent builds
+- ✅ The `//:node_modules` target ensures all packages are available
+- ✅ Clean, reproducible builds every time
+
+**Automatic Workspace Configuration:**
+- ✅ **Client automatically sets the workspace** on startup
+- ✅ When running via `bazel run`, the workspace is detected and configured
+- ✅ No manual workspace selection needed for Bazel users
+
+**Run both server and client together (recommended):**
+```bash
+bazel run //app:dev
+```
+This starts both the backend server (port 3002) and frontend dev server (port 5173) in a single terminal with all dependencies automatically installed, workspace automatically configured, and **opens your browser automatically**.
+
+**Or run them separately:**
+```bash
+# Terminal 1 - Backend server
+bazel run //app:server_dev
+
+# Terminal 2 - Frontend dev server
+bazel run //client:dev
+```
+
 ### Production Mode
 
 ```bash
@@ -97,22 +147,53 @@ npm start
 
 Visit http://localhost:3001
 
+### Production with Bazel (Alternative)
+
+**Run production mode (builds and serves the application):**
+```bash
+bazel run //app:run
+```
+
+This command:
+- ✅ Builds the optimized client bundle
+- ✅ Starts the production server on port 3002
+- ✅ Serves the built client files directly from the server
+- ✅ Automatically configures the workspace on client connection
+- ✅ **Opens your browser automatically** at http://localhost:3002
+
+The production server serves both the API and the static client files, providing a complete production-ready deployment.
+
+**Or build and run separately:**
+```bash
+# Build the client
+bazel build //client:build
+
+# Build the server
+bazel build //server:server_ts
+
+# Run production server
+bazel run //app:prod_server
+
+# Preview production build
+bazel run //client:preview
+```
+
 ### Configuration
 
-Gazel stores workspace configuration in two places:
+Gazel manages workspace configuration through the browser:
 
-1. **Browser Local Storage** (Primary)
-   - Workspace selection is saved automatically
-   - Persists across browser sessions
-   - Switch workspaces via the UI
+**Workspace Management**
+- Workspace selection is stored in browser Local Storage
+- The server keeps the current workspace in memory only
+- No workspace configuration is persisted to disk
+- Workspace persists across browser sessions
+- Switch workspaces easily via the UI
 
-2. **`.env` file** (Optional)
-   - Created by setup script or when switching workspaces
-   - Can be edited manually if needed
-   ```env
-   BAZEL_WORKSPACE=/path/to/your/bazel/workspace
-   PORT=3001  # Optional: change the server port
-   ```
+**Optional Server Configuration** (`.env` file)
+```env
+# PORT=3001  # Optional: change the server port
+# BAZEL_EXECUTABLE=/usr/local/bin/bazel  # Optional: custom bazel path
+```
 
 To switch workspaces:
 - Click on the workspace path in the Workspace tab, or
@@ -155,11 +236,45 @@ To switch workspaces:
 
 *Coming soon - See [EXAMPLE_USAGE.md](EXAMPLE_USAGE.md) for detailed usage examples*
 
+## Project Structure
+
+```
+gazel/
+├── client/                 # Frontend application (Svelte + Vite)
+│   ├── lib/               # Shared components and utilities
+│   │   ├── components/    # Svelte components
+│   │   ├── stores/        # Svelte stores
+│   │   ├── types/         # TypeScript types
+│   │   └── utils/         # Utility functions
+│   ├── routes/            # Application routes
+│   ├── index.html         # HTML entry point
+│   ├── main.ts           # Application entry
+│   ├── app.css           # Global styles
+│   ├── vite.config.ts    # Vite configuration
+│   ├── svelte.config.js  # Svelte configuration
+│   ├── tailwind.config.js # Tailwind configuration
+│   ├── postcss.config.js # PostCSS configuration
+│   └── BUILD.bazel      # Bazel build configuration
+├── server/               # Backend server (Express + TypeScript)
+│   ├── index.ts         # Server entry point
+│   ├── routes/          # API routes
+│   └── BUILD.bazel     # Bazel build configuration
+├── app/                 # Application launchers
+│   └── BUILD.bazel     # Bazel targets for running apps
+├── MODULE.bazel        # Bazel module configuration (bzlmod)
+├── BUILD.bazel         # Root build configuration
+├── package.json        # npm dependencies
+├── pnpm-lock.yaml     # pnpm lock file
+├── tsconfig.json      # TypeScript configuration
+└── tsconfig.server.json # Server TypeScript configuration
+```
+
 ## Documentation
 
 - 📖 **[Usage Examples](EXAMPLE_USAGE.md)** - Step-by-step guide with examples
 - 🔧 **[Technical Details](TECHNICAL_DETAILS.md)** - Architecture, API, and development notes
 - 🚀 **[Contributing](CONTRIBUTING.md)** - How to contribute to the project
+- 📊 **[ELK Graph Implementation](ELK_GRAPH_IMPLEMENTATION.md)** - Details on the graph visualization
 
 ## Troubleshooting
 

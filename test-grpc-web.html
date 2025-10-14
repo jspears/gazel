@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test gRPC-Web Connection</title>
+</head>
+<body>
+    <h1>Testing gRPC-Web Connection</h1>
+    <button onclick="testGetCurrentWorkspace()">Test GetCurrentWorkspace</button>
+    <button onclick="testGetWorkspaceInfo()">Test GetWorkspaceInfo</button>
+    <button onclick="testListTargets()">Test ListTargets</button>
+    <pre id="output"></pre>
+
+    <script>
+        async function callGrpcMethod(method, request = {}) {
+            const output = document.getElementById('output');
+            output.textContent = `Testing ${method}...\n`;
+
+            try {
+                const response = await fetch(`http://localhost:8080/gazel.GazelService/${method}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(request)
+                });
+
+                const data = await response.json();
+                output.textContent += 'Success!\n';
+                output.textContent += JSON.stringify(data, null, 2);
+                return data;
+            } catch (error) {
+                output.textContent += 'Error: ' + error.message;
+                throw error;
+            }
+        }
+
+        async function testGetCurrentWorkspace() {
+            await callGrpcMethod('GetCurrentWorkspace');
+        }
+
+        async function testGetWorkspaceInfo() {
+            await callGrpcMethod('GetWorkspaceInfo');
+        }
+
+        async function testListTargets() {
+            await callGrpcMethod('ListTargets', { package: '' });
+        }
+    </script>
+</body>
+</html>

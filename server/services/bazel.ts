@@ -1,7 +1,10 @@
-import { exec, spawn, ChildProcess } from 'child_process';
-import { promisify } from 'util';
+import { exec, spawn, ChildProcess } from 'node:child_process';
+import { promisify } from 'node:util';
+import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
 import config from '../config.js';
 import type { CommandResult, CachedQuery, WorkspaceInfo } from '../types/index.js';
+import { childToStream } from "../utils/stream-util.js";
 
 const execAsync = promisify(exec);
 
@@ -21,6 +24,52 @@ class BazelService {
     this.workspace = config.bazelWorkspace;
     this.executable = config.bazelExecutable;
     this.queryCache = new Map();
+
+    // If workspace is empty and we're running from a Bazel output directory,
+    // try to find the actual workspace root
+    if (!this.workspace || this.workspace.trim() === '') {
+      this.workspace = this.findWorkspaceRoot();
+    }
+  }
+
+  /**
+   * Find the workspace root when running from a Bazel output directory
+   */
+  private findWorkspaceRoot(): string {
+    const cwd = process.cwd();
+
+    // Check if we're in a Bazel output directory
+    if (cwd.includes('bazel-out') || cwd.includes('execroot')) {
+      // Try to extract workspace from BUILD_WORKSPACE_DIRECTORY env var (set by bazel run)
+      const workspaceDir = process.env.BUILD_WORKSPACE_DIRECTORY;
+      if (workspaceDir) {
+        console.log(`[BazelService] Detected workspace from BUILD_WORKSPACE_DIRECTORY: ${workspaceDir}`);
+        return workspaceDir;
+      }
+
+      // Fallback: try to find WORKSPACE or MODULE.bazel file by walking up
+      let dir = cwd;
+      for (let i = 0; i < 10; i++) {
+        const parentDir = dirname(dir);
+        if (parentDir === dir) break; // Reached root
+        dir = parentDir;
+
+        try {
+          if (existsSync(join(dir, 'MODULE.bazel')) ||
+              existsSync(join(dir, 'WORKSPACE')) ||
+              existsSync(join(dir, 'WORKSPACE.bazel'))) {
+            console.log(`[BazelService] Found workspace root: ${dir}`);
+            return dir;
+          }
+        } catch (e) {
+          // Continue searching
+        }
+      }
+    }
+
+    // Default to current directory
+    console.log(`[BazelService] Using current directory as workspace: ${cwd}`);
+    return cwd;
   }
 
   /**
@@ -41,6 +90,12 @@ class BazelService {
       finalArgs = [command, ...args];
     }
 
+    // Add --noblock_for_lock to avoid waiting for locks from parent Bazel processes
+    // This is important when running Bazel commands from within a Bazel-launched app
+    // if (!finalArgs.includes('--noblock_for_lock')) {
+    //   finalArgs.unshift('--noblock_for_lock');
+    // }
+
     // Build command string with proper escaping
     const cmdStr = `${this.executable} ${finalArgs.map(arg => {
       // Skip escaping for flags that start with --
@@ -59,7 +114,7 @@ class BazelService {
       return arg;
     }).join(' ')}`;
 
-
+    console.log(`Executing: ${cmdStr} in ${this.workspace}`);
     try {
       const result = await execAsync(cmdStr, {
         cwd: this.workspace,
@@ -82,24 +137,33 @@ class BazelService {
   /**
    * Execute a Bazel query
    */
-  async query(query: string, outputFormat: string = 'xml'): Promise<CommandResult> {
-    const cacheKey = `${query}:${outputFormat}`;
-    
+  async query(query: string, outputFormat: string = 'xml', queryType: string = 'query'): Promise<CommandResult> {
+    // Ensure queryType has a valid value
+    if (!queryType || queryType.trim() === '') {
+      queryType = 'query';
+    }
+
+    const cacheKey = `${queryType}:${query}:${outputFormat}`;
+
     // Check cache
     if (this.queryCache.has(cacheKey)) {
       const cached = this.queryCache.get(cacheKey)!;
       if (Date.now() - cached.timestamp < config.cache.ttl) {
-        console.log(`Using cached result for query: ${query}`);
+        console.log(`Using cached result for ${queryType}: ${query}`);
         return cached.data;
       }
     }
-    
-    const args = [
+
+    // Build the full command array: [queryType, --output=format, query]
+    const fullCommand = [
+      queryType,
       `--output=${outputFormat}`,
       query  // Don't quote here - execute will handle it
     ];
 
-    const result = await this.execute('query', args);
+    console.log(`[bazel.query] queryType="${queryType}", outputFormat="${outputFormat}", query="${query}"`);
+    console.log(`[bazel.query] Building command: ${JSON.stringify(fullCommand)}`);
+    const result = await this.execute(fullCommand);
     
     // Cache the result
     if (this.queryCache.size >= config.cache.maxSize) {
@@ -225,7 +289,7 @@ class BazelService {
       ? `deps(${target})`
       : `deps(${target}, ${depth})`;
 
-    return this.query(query, 'label');
+    return this.query(query, 'streamed_jsonproto');
   }
 
   /**
@@ -233,7 +297,7 @@ class BazelService {
    */
   async getReverseDependencies(target: string): Promise<CommandResult> {
     // Don't add quotes - let Bazel handle the target as-is
-    return this.query(`rdeps(//..., ${target})`, 'label');
+    return this.query(`rdeps(//..., ${target})`, 'streamed_jsonproto');
   }
 
   /**
@@ -303,8 +367,50 @@ class BazelService {
    * Update the workspace path dynamically
    */
   setWorkspace(newWorkspace: string): void {
+    if (this.workspace === newWorkspace) {
+      return;
+    }
     this.workspace = newWorkspace;
     this.clearCache();
+  }
+
+  /**
+   * Update the Bazel executable path dynamically
+   */
+  setBazelExecutable(newExecutable: string): void {
+    if (this.executable === newExecutable) {
+      return;
+    }
+    this.executable = newExecutable;
+    this.clearCache();
+    console.log(`[BazelService] Bazel executable updated to: ${newExecutable}`);
+  }
+
+  /**
+   * Stream query results using streamed_jsonproto format
+   * This method spawns a Bazel process and yields JSON objects as they arrive
+   *
+   * @param query - The Bazel query expression
+   * @param queryType - The type of query: 'query', 'cquery', or 'aquery'
+   * @returns AsyncGenerator that yields parsed JSON objects
+   */
+  async *streamJsonProto({
+    query,
+    queryType = 'query',
+  }: {
+    query: string;
+    queryType?: 'query' | 'cquery' | 'aquery';
+  }, parser = JSON.parse
+  ) {
+
+    const child = spawn(config.bazelExecutable, [queryType, query, '--output=streamed_jsonproto'], {
+      cwd: config.bazelWorkspace,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    console.log(`Spawning child process in ${config.bazelWorkspace}`);
+    yield* childToStream(child, parser);
+    // yield* spawnToStream(config.bazelExecutable, [queryType, '--output=streamed_jsonproto', query], parser);
   }
 }
 

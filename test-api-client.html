@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test API Client</title>
+</head>
+<body>
+    <h1>Testing API Client</h1>
+    <button onclick="testApiClient()">Test API Client</button>
+    <pre id="output"></pre>
+    
+    <script type="module">
+        // Simple test that mimics what the API client does
+        window.testApiClient = async function() {
+            const output = document.getElementById('output');
+            output.textContent = 'Testing API client...\n';
+            
+            try {
+                // Test if we're in Electron
+                const isElectron = typeof window !== 'undefined' && !!(window.electron?.ipcRenderer);
+                output.textContent += `isElectron: ${isElectron}\n`;
+                
+                // Try to call the gRPC-web server directly
+                output.textContent += 'Calling GetCurrentWorkspace...\n';
+                const response = await fetch('http://localhost:8080/gazel.GazelService/GetCurrentWorkspace', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({})
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                output.textContent += 'Success!\n';
+                output.textContent += JSON.stringify(data, null, 2);
+            } catch (error) {
+                output.textContent += 'Error: ' + error.message + '\n';
+                output.textContent += 'Stack: ' + error.stack;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+    "name": "@gazel/connect",
+    "version": "1.0.0",
+    "description": "Gazel Connect API client using Bazel-generated types",
+    "type": "module",
+    "main": "./src/index.js",
+    "types": "./src/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./src/index.js",
+            "types": "./src/index.d.ts"
+        },
+        "./client": {
+            "import": "./src/client.js",
+            "types": "./src/client.d.ts"
+        }
+    },
+    "dependencies": {
+        "@bufbuild/protobuf": "^2.9.0",
+        "@connectrpc/connect": "^2.1.0",
+        "@connectrpc/connect-web": "^2.1.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.3.0"
+    },
+    "scripts": {
+        "build": "tsc",
+        "watch": "tsc --watch"
+    }
+}

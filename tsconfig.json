@@ -1,49 +1,31 @@
 {
-  "extends": "@tsconfig/svelte/tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "checkJs": true,
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "skipLibCheck": true,
-    "sourceMap": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "inlineSources": true,
-    "types": ["vite/client", "svelte", "node"],
+    "module": "node16",
+    "moduleResolution": "node16",
     "baseUrl": ".",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "svelte", "node"],
+//    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "emitDeclarationOnly": false,
+
+  //  "outDir": "dist",
+    // "sourceMap": true,
+    // "declaration": false,
+    // "declarationMap": false,
+    // "allowJs": false,
     "paths": {
-      "$lib": ["./src/lib"],
-      "$lib/*": ["./src/lib/*"],
-      "$components": ["./src/lib/components"],
-      "$components/*": ["./src/lib/components/*"],
-      "$stores": ["./src/lib/stores"],
-      "$stores/*": ["./src/lib/stores/*"],
-      "$utils": ["./src/lib/utils"],
-      "$utils/*": ["./src/lib/utils/*"],
-      "$types": ["./src/lib/types"],
-      "$types/*": ["./src/lib/types/*"]
+      "@speajus/gazel-proto/*":["./bazel-bin/proto/*", "../proto/*"],
+      "@speajus/gazel-proto":["./bazel-bin/proto/index.js", "../proto/index.js"],
+      "*/build_pb.js": ["./bazel-bin/proto/_virtual_imports/build_proto/build_pb.js"],
+      "*/stardoc_output_pb.js": ["./bazel-bin/proto/_virtual_imports/build_proto/stardoc_output_pb.js"]
     }
+
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.js",
-    "src/**/*.svelte",
-    "src/**/*.d.ts"
-  ],
   "exclude": [
     "node_modules",
     "dist",
-    "server"
   ]
+  
 }

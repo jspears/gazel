@@ -1,0 +1,567 @@
+syntax = "proto3";
+
+package gazel.api.v1;
+
+option go_package = "github.com/jspears/gazel/api/v1;gazelv1";
+
+import "google/protobuf/timestamp.proto";
+import "build.proto";
+
+// ============================================================================
+// Core Types
+// ============================================================================
+
+message WorkspaceInfo {
+  string path = 1;
+  string name = 2;
+  bool valid = 3;
+  string error = 4;
+  repeated string packages = 5;
+  int32 target_count = 6;
+  int32 file_count = 7;
+  string workspace_version = 8; // Version from MODULE.bazel or WORKSPACE
+}
+
+message BazelInfo {
+  string version = 1;
+  string release = 2;
+  string workspace = 3;
+  string execution_root = 4;
+  string output_base = 5;
+  string output_path = 6;
+  string server_pid = 7;
+  string server_log = 8;
+  string command_log = 9;
+  bool used_heap_size_after_gc = 10;
+  string max_heap_size = 11;
+  string committed_heap_size = 12;
+}
+
+message BazelAttribute {
+  string name = 1;
+  string type = 2;
+  optional string string_value = 3;
+  repeated string string_list_value = 4;
+  optional int64 int_value = 5;
+  optional bool boolean_value = 6;
+  repeated StringDictEntry string_dict_value = 7;
+  bool explicitly_specified = 8;
+  bool nodep = 9;
+}
+
+message StringDictEntry {
+  string key = 1;
+  string value = 2;
+}
+
+message BazelTarget {
+  string label = 1;
+  string kind = 2;
+  string package = 3;
+  string name = 4;
+  repeated string tags = 5;
+  repeated string deps = 6;
+  repeated string srcs = 7;
+  repeated BazelAttribute attributes = 8;
+  string visibility = 9;
+  bool testonly = 10;
+  string location = 11;
+}
+
+message BuildFile {
+  string path = 1;
+  string package = 2;
+  repeated BazelTarget targets = 3;
+  int32 line_count = 4;
+  int64 size_bytes = 5;
+  google.protobuf.Timestamp modified_time = 6;
+}
+
+message QueryTemplate {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string template = 4;
+  repeated string parameters = 5;
+  string category = 6;
+  string query_type = 7; // "query", "aquery", or "cquery"
+  string output_format = 8; // Recommended output format for this template
+}
+
+message SavedQuery {
+  string id = 1;
+  string name = 2;
+  string query = 3;
+  string description = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message CommandHistory {
+  string id = 1;
+  string command = 2;
+  repeated string args = 3;
+  bool success = 4;
+  string output = 5;
+  string error = 6;
+  google.protobuf.Timestamp executed_at = 7;
+  int64 duration_ms = 8;
+}
+
+message Module {
+  string key = 1;
+  string name = 2;
+  string version = 3;
+  Location location = 4;
+  int32 compatibility_level = 5;
+  string repo_name = 6;
+  repeated string bazel_compatibility = 7;
+  bool module_rule_exports_all_rules = 8;
+  repeated string tags = 9;
+  repeated Dependency dependencies = 10;
+  repeated Dependency resolved_dependencies = 11;
+  repeated ExtensionUsage extension_usages = 12;
+  int32 dependency_count = 13;
+  int32 extension_count = 14;
+}
+
+message Location {
+  string file = 1;
+  int32 line = 2;
+  int32 column = 3;
+}
+
+message Dependency {
+  string key = 1;
+  string name = 2;
+  string version = 3;
+  bool dev_dependency = 4;
+  string registry = 5;
+}
+
+message ExtensionUsage {
+  string extension_bzl_file = 1;
+  string extension_name = 2;
+  Location location = 3;
+  map<string, string> imports = 4;
+  bool dev_dependency = 5;
+  bool isolate = 6;
+}
+
+message ModuleDependency {
+  string from = 1;
+  string to = 2;
+  string type = 3; // "direct", "dev", "indirect"
+  string version = 4;
+}
+
+// ============================================================================
+// Service Messages
+// ============================================================================
+
+// Workspace Service Messages
+message GetWorkspaceInfoRequest {}
+message GetWorkspaceInfoResponse {
+  WorkspaceInfo info = 1;
+}
+
+message GetCurrentWorkspaceRequest {}
+message GetCurrentWorkspaceResponse {
+  bool configured = 1;
+  string workspace = 2;
+  bool valid = 3;
+  string error = 4;
+}
+
+message ScanWorkspacesRequest {}
+message ScanWorkspacesResponse {
+  message Workspace {
+    string path = 1;
+    string name = 2;
+    string type = 3; // "current", "parent", "home", "discovered"
+  }
+  repeated Workspace workspaces = 1;
+}
+
+message SwitchWorkspaceRequest {
+  string workspace = 1;
+}
+message SwitchWorkspaceResponse {
+  bool success = 1;
+  string workspace = 2;
+  string message = 3;
+}
+
+message GetWorkspaceFilesRequest {}
+message GetWorkspaceFilesResponse {
+  message WorkspaceFile {
+    string path = 1;
+    string name = 2;
+    string type = 3; // "workspace", "build", "module"
+    int32 targets = 4;
+    int64 last_modified = 5;
+  }
+  repeated WorkspaceFile files = 1;
+}
+
+message GetBazelInfoRequest {}
+message GetBazelInfoResponse {
+  BazelInfo info = 1;
+}
+
+// Target Service Messages
+message ListTargetsRequest {
+  string pattern = 1;
+  string format = 2;
+}
+message ListTargetsResponse {
+  oneof data {
+    BazelTarget target = 1;
+    ListTargetsComplete complete = 2;
+    string error = 3;
+  }
+}
+message ListTargetsComplete {
+  int32 total = 1;
+}
+
+message TargetList {
+  repeated BazelTarget targets = 1;
+}
+
+message GetTargetRequest {
+  string target = 1;
+}
+message GetTargetResponse {
+  BazelTarget target = 1;
+}
+
+message GetTargetDependenciesRequest {
+  string target = 1;
+  int32 depth = 2;
+}
+message GetTargetDependenciesResponse {
+  string target = 1;
+  int32 depth = 2;
+  int32 total = 3;
+  repeated BazelTarget dependencies = 4;
+}
+
+message GetTargetOutputsRequest {
+  string target = 1;
+}
+message GetTargetOutputsResponse {
+  string target = 1;
+  repeated string outputs = 2;
+  int32 count = 3;
+}
+
+message GetReverseDependenciesRequest {
+  string target = 1;
+}
+message GetReverseDependenciesResponse {
+  string target = 1;
+  int32 total = 2;
+  repeated BazelTarget dependencies = 3;
+}
+
+message GetOutputConsumersRequest {
+  string output = 1;
+  string producing_target = 2; // The target that produces this output
+}
+message GetOutputConsumersResponse {
+  string output = 1;
+  int32 total = 2;
+  repeated BazelTarget consumers = 3;
+}
+
+message SearchTargetsRequest {
+  string query = 1;
+  string type = 2;
+  string package = 3;
+}
+message SearchTargetsResponse {
+  oneof data {
+    BazelTarget target = 1;
+    SearchTargetsComplete complete = 2;
+    string error = 3;
+  }
+}
+message SearchTargetsComplete {
+  string query = 1;
+  int32 total = 2;
+}
+
+// Query Service Messages
+message ExecuteQueryRequest {
+  string query = 1;
+  string output_format = 2;
+  string query_type = 3; // "query", "aquery", or "cquery"
+}
+message ExecuteQueryResponse {
+  string query = 1;
+  string output_format = 2;
+  QueryResult result = 3;
+  string raw = 4;
+}
+
+message QueryResult {
+  repeated BazelTarget targets = 1;
+}
+
+message StreamQueryRequest {
+  string query = 1;
+  string output_format = 2;
+  bool parse_xml = 3;
+  string query_type = 4; // "query", "aquery", or "cquery"
+}
+message StreamQueryResponse {
+  oneof data {
+    BazelTarget target = 1;
+    string raw_line = 2;
+    string error = 3;
+  }
+}
+
+// Command Service Messages
+message BuildTargetRequest {
+  string target = 1;
+  repeated string options = 2;
+  string command = 3; // "build", "test", or "run" (default: "build")
+}
+message BuildTargetResponse {
+  bool success = 1;
+  string output = 2;
+  string stderr = 3;
+  string error = 4;
+}
+
+message StreamBuildRequest {
+  string target = 1;
+  repeated string options = 2;
+}
+message StreamBuildResponse {
+  oneof event {
+    string output = 1;
+    string error = 2;
+    BuildProgress progress = 3;
+    BuildComplete complete = 4;
+  }
+}
+
+message BuildProgress {
+  int32 actions_completed = 1;
+  int32 actions_total = 2;
+  string current_action = 3;
+}
+
+message BuildComplete {
+  bool success = 1;
+  int32 exit_code = 2;
+  int64 duration_ms = 3;
+}
+
+// Module Service Messages
+message GetModuleGraphRequest {}
+message GetModuleGraphResponse {
+  string root = 1;
+  repeated Module modules = 2;
+  repeated ModuleDependency dependencies = 3;
+  ModuleStatistics statistics = 4;
+}
+
+message ModuleStatistics {
+  int32 total_modules = 1;
+  int32 direct_dependencies = 2;
+  int32 dev_dependencies = 3;
+  int32 indirect_dependencies = 4;
+}
+
+message GetModuleInfoRequest {
+  string module_name = 1;
+}
+message GetModuleInfoResponse {
+  Module module = 1;
+}
+
+message GetModuleGraphDotRequest {
+  repeated string options = 1; // Additional options like --depth, --from, etc.
+}
+message GetModuleGraphDotResponse {
+  string dot = 1; // DOT format graph
+}
+
+message GetQueryTemplatesRequest {}
+message GetQueryTemplatesResponse {
+  repeated QueryTemplate templates = 1;
+}
+
+message GetSavedQueriesRequest {}
+message GetSavedQueriesResponse {
+  repeated SavedQuery queries = 1;
+}
+
+message SaveQueryRequest {
+  string name = 1;
+  string query = 2;
+  string description = 3;
+}
+message SaveQueryResponse {
+  SavedQuery query = 1;
+}
+
+message DeleteQueryRequest {
+  string id = 1;
+}
+message DeleteQueryResponse {
+  bool success = 1;
+}
+
+message StreamRunRequest {
+  string target = 1;
+  repeated string options = 2;
+}
+message StreamRunResponse {
+  oneof event {
+    string output = 1;
+    string error = 2;
+    RunProgress progress = 3;
+    RunComplete complete = 4;
+  }
+}
+
+message RunProgress {
+  string current_action = 1;
+}
+
+message RunComplete {
+  bool success = 1;
+  int32 exit_code = 2;
+  int64 duration_ms = 3;
+}
+
+// File Service Messages
+message GetBuildFileRequest {
+  string path = 1;
+}
+message GetBuildFileResponse {
+  string path = 1;
+  string content = 2;
+  repeated BuildFileTarget targets = 3;
+  int32 lines = 4;
+}
+
+message BuildFileTarget {
+  string rule_type = 1;
+  string name = 2;
+  int32 line = 3;
+}
+
+message GetRulesByFileRequest {
+  string file = 1;
+}
+message GetRulesByFileResponse {
+  string file = 1;
+  repeated blaze_query.Rule rules = 2;
+}
+
+message SearchInFilesRequest {
+  string query = 1;
+  bool case_sensitive = 2;
+}
+message SearchInFilesResponse {
+  string query = 1;
+  bool case_sensitive = 2;
+  int32 total = 3;
+  repeated SearchResult results = 4;
+}
+
+message SearchResult {
+  string file = 1;
+  int32 line = 2;
+  string content = 3;
+}
+
+// Command History Messages
+message GetCommandHistoryRequest {
+  int32 limit = 1; // Maximum number of history items to return (default: 50)
+}
+
+message GetCommandHistoryResponse {
+  repeated CommandHistoryItem history = 1;
+}
+
+message CommandHistoryItem {
+  string id = 1;
+  string command = 2; // "build", "test", "run"
+  string target = 3;
+  repeated string options = 4;
+  int64 timestamp = 5;
+  bool success = 6;
+  string output = 7;
+  string error = 8;
+  int32 duration_ms = 9;
+}
+
+// Configuration messages
+message UpdateBazelExecutableRequest {
+  string executable = 1; // Path to bazel/bazelisk executable (empty for auto-detect)
+}
+
+message UpdateBazelExecutableResponse {
+  bool success = 1;
+  string message = 2;
+  string detected_path = 3; // The actual path being used after resolution
+}
+
+// ============================================================================
+// Services
+// ============================================================================
+
+service GazelService {
+  // Workspace operations
+  rpc GetWorkspaceInfo(GetWorkspaceInfoRequest) returns (GetWorkspaceInfoResponse);
+  rpc GetCurrentWorkspace(GetCurrentWorkspaceRequest) returns (GetCurrentWorkspaceResponse);
+  rpc ScanWorkspaces(ScanWorkspacesRequest) returns (ScanWorkspacesResponse);
+  rpc SwitchWorkspace(SwitchWorkspaceRequest) returns (SwitchWorkspaceResponse);
+  rpc GetWorkspaceFiles(GetWorkspaceFilesRequest) returns (GetWorkspaceFilesResponse);
+  rpc GetBazelInfo(GetBazelInfoRequest) returns (GetBazelInfoResponse);
+
+  // Target operations
+  rpc ListTargets(ListTargetsRequest) returns (stream ListTargetsResponse);
+  rpc GetTarget(GetTargetRequest) returns (GetTargetResponse);
+  rpc GetTargetDependencies(GetTargetDependenciesRequest) returns (GetTargetDependenciesResponse);
+  rpc GetTargetOutputs(GetTargetOutputsRequest) returns (GetTargetOutputsResponse);
+  rpc GetReverseDependencies(GetReverseDependenciesRequest) returns (GetReverseDependenciesResponse);
+  rpc GetOutputConsumers(GetOutputConsumersRequest) returns (GetOutputConsumersResponse);
+  rpc SearchTargets(SearchTargetsRequest) returns (stream SearchTargetsResponse);
+
+  // Query operations
+  rpc ExecuteQuery(ExecuteQueryRequest) returns (ExecuteQueryResponse);
+  rpc StreamQuery(StreamQueryRequest) returns (stream StreamQueryResponse);
+  rpc GetQueryTemplates(GetQueryTemplatesRequest) returns (GetQueryTemplatesResponse);
+  rpc GetSavedQueries(GetSavedQueriesRequest) returns (GetSavedQueriesResponse);
+  rpc SaveQuery(SaveQueryRequest) returns (SaveQueryResponse);
+  rpc DeleteQuery(DeleteQueryRequest) returns (DeleteQueryResponse);
+
+  // Build operations
+  rpc BuildTarget(BuildTargetRequest) returns (BuildTargetResponse);
+  rpc StreamBuild(StreamBuildRequest) returns (stream StreamBuildResponse);
+  rpc StreamRun(StreamRunRequest) returns (stream StreamRunResponse);
+
+  // Module operations
+  rpc GetModuleGraph(GetModuleGraphRequest) returns (GetModuleGraphResponse);
+  rpc GetModuleInfo(GetModuleInfoRequest) returns (GetModuleInfoResponse);
+  rpc GetModuleGraphDot(GetModuleGraphDotRequest) returns (GetModuleGraphDotResponse);
+
+  // File operations
+  rpc GetBuildFile(GetBuildFileRequest) returns (GetBuildFileResponse);
+  rpc GetRulesByFile(GetRulesByFileRequest) returns (GetRulesByFileResponse);
+  rpc SearchInFiles(SearchInFilesRequest) returns (SearchInFilesResponse);
+
+  // Command history operations
+  rpc GetCommandHistory(GetCommandHistoryRequest) returns (GetCommandHistoryResponse);
+
+  // Configuration operations
+  rpc UpdateBazelExecutable(UpdateBazelExecutableRequest) returns (UpdateBazelExecutableResponse);
+}

@@ -1,0 +1,92 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@npm//:vite/package_json.bzl", vite_bin = "bin")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_config")
+
+package(default_visibility = ["//visibility:public"])
+
+npm_link_all_packages(name = "node_modules")
+
+# Client source files and config
+js_library(
+    name = "client_src",
+    srcs =  glob([
+    "**/*.svelte",
+    "**/*.ts",
+    "**/*.css",
+    "**/*.js",
+    "**/*.html",
+    "public/**/*",
+
+]),
+    deps = [
+        "//proto:pkg",
+        "//:node_modules",
+        ":node_modules",
+    ],
+)
+
+# Vite dev server using vite binary
+vite_bin.vite_binary(
+    name = "dev",
+    args = ["--host", "0.0.0.0", "--open"],
+    chdir = package_name(),
+    data = [
+        ":client_src",
+        ":tsconfig",
+        "//:package_json",
+        "//:node_modules",
+        ":node_modules",
+        "//proto:pkg",
+    ],
+)
+
+# Vite production build for web
+vite_bin.vite(
+    name = "build",
+    srcs = [
+        ":client_src",
+        ":tsconfig",
+        "//:package_json",
+        "//:node_modules",
+        ":node_modules",
+        "//proto:pkg",
+    ],
+    args = ["build"],
+    chdir = package_name(),
+    out_dirs = ["dist"],
+)
+
+# Vite production build for Electron
+vite_bin.vite(
+    name = "build_electron",
+    srcs = [
+        ":client_src",
+        ":tsconfig",
+        "//:package_json",
+        "//:node_modules",
+        ":node_modules",
+    ],
+    env = {
+        "VITE_ELECTRON": "1",
+    },
+    args = ["build"],
+    chdir = package_name(),
+    out_dirs = ["dist"],
+)
+
+# Vite preview server (for testing production build)
+vite_bin.vite_binary(
+    name = "preview",
+    args = ["preview", "--host", "0.0.0.0"],
+    chdir = package_name(),
+    data = [":build"],
+)
+
+ts_config(
+    name = "tsconfig",
+    src = "tsconfig.json",
+    deps = [
+        "//:tsconfig",
+    ],
+)

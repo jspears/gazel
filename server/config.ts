@@ -1,21 +1,52 @@
 import type { Config } from './types/index.js';
 import dotenv from 'dotenv';
-import fs from 'node:fs';
-import path from 'node:path';
+import { execSync } from 'node:child_process';
 
 dotenv.config();
 
-let bazelWorkspace = process.env.BAZEL_WORKSPACE || '';
-console.log(`Using BAZEL_WORKSPACE '${bazelWorkspace}'`)
+/**
+ * Find the Bazel executable in the system PATH
+ * Tries bazelisk first, then falls back to bazel
+ */
+export function findBazelExecutable(): string {
+  // If explicitly set via environment variable, use that
+  if (process.env.BAZEL_EXECUTABLE) {
+    return process.env.BAZEL_EXECUTABLE;
+  }
 
-// Don't throw error if no workspace is set - allow app to start and show picker
-// if (!bazelWorkspace)
-//   throw new Error(`Please point BAZEL_WORKSPACE to your bazel workspace`)
+  // Try to find bazelisk first
+  try {
+    const which = process.platform === 'win32' ? 'where' : 'which';
+    const bazeliskPath = execSync(`${which} bazelisk`, { encoding: 'utf8' }).trim().split('\n')[0];
+    if (bazeliskPath) {
+      console.log(`[config] Found bazelisk at: ${bazeliskPath}`);
+      return bazeliskPath;
+    }
+  } catch (error) {
+    // bazelisk not found, try bazel
+  }
+
+  // Fall back to bazel
+  try {
+    const which = process.platform === 'win32' ? 'where' : 'which';
+    const bazelPath = execSync(`${which} bazel`, { encoding: 'utf8' }).trim().split('\n')[0];
+    if (bazelPath) {
+      console.log(`[config] Found bazel at: ${bazelPath}`);
+      return bazelPath;
+    }
+  } catch (error) {
+    // bazel not found either
+  }
+
+  // If neither is found, default to 'bazel' and let it fail with a helpful error
+  console.warn('[config] Neither bazelisk nor bazel found in PATH, defaulting to "bazel"');
+  return 'bazel';
+}
 
 export const config: Config = {
   port: parseInt(process.env.PORT || '3002', 10),
-  bazelWorkspace,
-  bazelExecutable: process.env.BAZEL_EXECUTABLE || 'bazel',
+  bazelWorkspace:'',
+  bazelExecutable: findBazelExecutable(),
   cors: {
     origin: process.env.NODE_ENV === 'production'
       ? false
@@ -28,39 +59,25 @@ export const config: Config = {
   }
 };
 
-// Function to update workspace dynamically
+// Function to update workspace dynamically (in memory only)
 export function setWorkspace(newWorkspace: string): void {
   config.bazelWorkspace = newWorkspace;
-  bazelWorkspace = newWorkspace;
+}
 
-  // Update .env file for persistence
-  const envPath = path.join(process.cwd(), '.env');
-  let envContent = '';
-
-  try {
-    envContent = fs.readFileSync(envPath, 'utf-8');
-  } catch {
-    // .env file doesn't exist, create it
+// Function to update Bazel executable dynamically (in memory only)
+// Returns the actual path being used after resolution
+export function setBazelExecutable(executable: string): string {
+  if (!executable || executable.trim() === '') {
+    // Empty string means auto-detect
+    const detected = findBazelExecutable();
+    config.bazelExecutable = detected;
+    return detected;
   }
 
-  // Update or add BAZEL_WORKSPACE line
-  const lines = envContent.split('\n');
-  let found = false;
+  // Use the provided executable path
+  config.bazelExecutable = executable;
 
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].startsWith('BAZEL_WORKSPACE=')) {
-      lines[i] = `BAZEL_WORKSPACE=${newWorkspace}`;
-      found = true;
-      break;
-    }
-  }
-
-  if (!found) {
-    lines.push(`BAZEL_WORKSPACE=${newWorkspace}`);
-  }
-
-  fs.writeFileSync(envPath, lines.join('\n'));
-  console.log(`Updated BAZEL_WORKSPACE to '${newWorkspace}'`);
+  return executable;
 }
 
 export default config;

@@ -56,6 +56,15 @@ export interface ParsedTarget {
   target?: string;
   full: string;
   ruleType?: string;
+  name?: string;
+  location?: string;
+  attributes?: any;
+  generatingRule?: string;
+  label?: string;
+  kind?: string;
+  tags?: string[];
+  deps?: string[];
+  srcs?: string[];
 }
 
 export interface CachedQuery {

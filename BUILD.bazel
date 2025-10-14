@@ -1,0 +1,59 @@
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@aspect_bazel_lib//lib:copy_to_bin.bzl", "copy_to_bin")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_config")
+
+# Link all npm packages
+npm_link_all_packages(name = "node_modules")
+
+package(default_visibility = ["//visibility:public"])
+
+ts_config(
+    name = "tsconfig",
+    src = "tsconfig.json",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//:node_modules",
+    ],
+)
+# Export config files
+exports_files([
+    "tsconfig.json",
+    "package.json",
+    "pnpm-lock.yaml",
+    ".npmrc",
+], visibility = ["//visibility:public"])
+
+# Copy Playwright config
+copy_to_bin(
+    name = "playwright_config",
+    srcs = ["playwright.config.ts"],
+    visibility = ["//visibility:public"],
+)
+
+
+js_library(
+    name = "package_json",
+    srcs = ["package.json"],
+    visibility = ["//visibility:public"],
+)
+
+# Copy build_pb files to root for gazel_pb imports
+genrule(
+    name = "build_pb_root",
+    srcs = ["//proto:build_ts_proto"],
+    outs = [
+        "build_pb.js",
+        "stardoc_output_pb.js",
+    ],
+    cmd = """
+        for f in $(locations //proto:build_ts_proto); do
+            if [[ $$f == *"/build_pb.js" ]]; then
+                cp $$f $(location build_pb.js)
+            elif [[ $$f == *"/stardoc_output_pb.js" ]]; then
+                cp $$f $(location stardoc_output_pb.js)
+            fi
+        done
+    """,
+    visibility = ["//visibility:public"],
+)
