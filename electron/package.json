@@ -1,6 +1,5 @@
 {
   "name": "gazel-electron",
-  "version": "1.0.0",
   "description": "Gazel - Bazel Explorer Electron Application",
   "main": "main.js",
   "type": "module",
