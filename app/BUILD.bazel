@@ -100,9 +100,9 @@ EOF
 
 # Combined development mode - runs both server and client
 # This target spawns bazel run commands for both server and client
-# Note: Bazel automatically handles npm dependencies through the pnpm-lock.yaml file.
+# Note: Bazel automatically handles npm dependencies through the yarn.lock file.
 # The //:node_modules target ensures all dependencies are installed and available.
-# No need to run 'pnpm install' manually - Bazel manages this automatically.
+# No need to run 'yarn install' manually - Bazel manages this automatically.
 js_binary(
     name = "dev",
     data = [

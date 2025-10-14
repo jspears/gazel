@@ -69,7 +69,7 @@ if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
 rm -rf out/ electron/.vite/
 
 # Rebuild
-pnpm package
+yarn package
 ```
 
 ### Step 2: Verify Renderer Files Are Included
@@ -191,9 +191,9 @@ export default defineConfig({
 2. Ensure `electron/index.html` exists and is the entry point
 3. Try cleaning node_modules and reinstalling:
    ```bash
-   rm -rf node_modules package-lock.json
-   pnpm install
-   pnpm package
+   rm -rf node_modules yarn.lock
+   yarn install
+   yarn package
    ```
 
 ### Issue: "Cannot find module" errors in renderer
@@ -260,5 +260,5 @@ The fix involves:
 3. ✅ Adding enhanced debugging to see what's happening
 4. ✅ Opening DevTools in production to see errors
 
-After rebuilding with `pnpm package`, the renderer files should be included in the asar and the app should load correctly!
+After rebuilding with `yarn package`, the renderer files should be included in the asar and the app should load correctly!
 

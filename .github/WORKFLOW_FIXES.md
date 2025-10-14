@@ -2,7 +2,28 @@
 
 This document tracks the fixes applied to the macOS build workflow.
 
-## Issues Encountered and Fixed
+## Migration to Yarn
+
+**Date:** 2025-10-14
+
+The project has been migrated from pnpm to Yarn for better compatibility and simpler workflow configuration.
+
+**Changes:**
+- Replaced `pnpm-workspace.yaml` with `workspaces` field in `package.json`
+- Updated `.npmrc` to use yarn configuration
+- Changed `MODULE.bazel` to use `yarn.lock` instead of `pnpm-lock.yaml`
+- Updated GitHub Actions workflow to use yarn (no separate installation needed)
+- Updated all documentation to reference yarn commands
+
+**Benefits:**
+- Yarn is included with Node.js (no separate installation step needed in CI)
+- Simpler workspace configuration
+- Better compatibility with Electron Forge
+- No need for `pnpm exec` workarounds
+
+---
+
+## Issues Encountered and Fixed (Historical - Pre-Yarn Migration)
 
 ### Issue 1: pnpm Not Found ✅ FIXED
 

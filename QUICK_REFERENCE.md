@@ -4,27 +4,27 @@
 
 ### Development
 ```bash
-pnpm start              # Start Electron app with hot reload
-pnpm dev                # Start web version (server + client)
-pnpm dev:bazel          # Start with Bazel + iBazel
+yarn start              # Start Electron app with hot reload
+yarn dev                # Start web version (server + client)
+yarn dev:bazel          # Start with Bazel + iBazel
 ```
 
 ### Building
 ```bash
-pnpm package            # Package app (unsigned)
-pnpm make               # Create installer (unsigned)
+yarn package            # Package app (unsigned)
+yarn make               # Create installer (unsigned)
 ```
 
 ### Building with Code Signing
 ```bash
 source .env             # Load signing credentials
-pnpm package            # Package signed app
-pnpm make               # Create signed + notarized installer
+yarn package            # Package signed app
+yarn make               # Create signed + notarized installer
 ```
 
 ### Icons
 ```bash
-pnpm generate-icons     # Regenerate all icon files
+yarn generate-icons     # Regenerate all icon files
 ```
 
 ## 📁 Important Files
@@ -48,8 +48,8 @@ pnpm generate-icons     # Regenerate all icon files
 
 ### Icon Not Showing
 ```bash
-pnpm generate-icons
-pnpm package
+yarn generate-icons
+yarn package
 ```
 
 ### File Access Error

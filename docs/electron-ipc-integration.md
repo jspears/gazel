@@ -175,7 +175,7 @@ Execute builds with progress tracking and error display.
 
 ```bash
 # Install dependencies
-pnpm install
+yarn install
 
 # Start Electron app
 bazel run //electron:gazel-app
