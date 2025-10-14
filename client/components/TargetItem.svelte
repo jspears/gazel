@@ -2,7 +2,7 @@
   import type { BazelTarget } from '@speajus/gazel-proto';
   import { Target, ExternalLink } from 'lucide-svelte';
   import TargetActions from './TargetActions.svelte';
-  import { getRuleDocumentationUrl } from '../lib/bazel-registry.js';
+  import { getRuleDocumentationUrl } from '../lib/rules-registry.js';
   import { toFull } from './target-util.js';
 
   interface Props {

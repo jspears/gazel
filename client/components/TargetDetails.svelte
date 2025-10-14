@@ -5,7 +5,7 @@
   import { api } from '../client.js';
   import type { BazelTarget } from '@speajus/gazel-proto';
   import { toFull, isExecutableTarget, isTest, getExpectedOutputs } from './target-util.js';
-  import { getRuleDocumentationUrl, getRuleSourceName } from '../lib/bazel-registry.js';
+  import { getRuleDocumentationUrl, getRuleSourceName } from '../lib/rules-registry.js';
   import RunModal from './RunModal.svelte';
   import Loader from './Loader.svelte';
 
