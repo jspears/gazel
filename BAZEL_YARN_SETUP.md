@@ -157,15 +157,25 @@ GitHub Actions workflow uses Yarn 4.10.3+ (specified in package.json):
   uses: actions/setup-node@v4
   with:
     node-version: '20'
-    cache: 'yarn'
+    # Note: No cache: 'yarn' here - we set up caching after enabling Corepack
 
 - name: Enable Corepack and Setup Yarn
   run: |
     corepack enable
     yarn --version
 
+- name: Get Yarn cache directory
+  id: yarn-cache-dir-path
+  run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+
+- name: Cache Yarn dependencies
+  uses: actions/cache@v4
+  with:
+    path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+    key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+
 - name: Install dependencies
-  run: yarn install --frozen-lockfile
+  run: yarn install --immutable
 
 - name: Generate proto files (Bazel uses pnpm-lock.yaml)
   run: bazel build //proto:index
@@ -180,6 +190,8 @@ The Yarn version is controlled by the `packageManager` field in package.json:
   "packageManager": "yarn@4.10.3"
 }
 ```
+
+**Important**: Corepack must be enabled BEFORE setting up caching. Using `cache: 'yarn'` in `setup-node` would use the pre-installed Yarn 1.22.22 instead of the version specified in package.json.
 
 ## Benefits
 

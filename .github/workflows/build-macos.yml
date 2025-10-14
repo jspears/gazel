@@ -25,18 +25,32 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'yarn'
-
+      - name: Setup Yarn
+        uses: threeal/setup-yarn-action@v2
+        with:
+          version: '4'
       - name: Enable Corepack and Setup Yarn
         run: |
           corepack enable
           yarn --version
           echo "✓ Yarn $(yarn --version) activated"
 
+      - name: Get Yarn cache directory
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+
+      - name: Cache Yarn dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
       - name: Install dependencies
         run: |
           echo "Installing dependencies..."
-          yarn install --frozen-lockfile
+          yarn install --immutable
           echo "✓ Dependencies installed"
 
       - name: Setup Bazel
