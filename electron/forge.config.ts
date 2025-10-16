@@ -30,6 +30,18 @@ if (hasNotarizationEnv) {
 
 
 const config: ForgeConfig = {
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'jspears',
+          name: 'gazel'
+        },
+        prerelease: true
+      }
+    }
+  ],
   packagerConfig: {
     name: 'Gazel',
     executableName: 'gazel',
