@@ -294,8 +294,8 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
 {#if isInitializing || (checkingWorkspace && !currentWorkspace)}
   <SplashScreen isLoading={true} message={splashMessage} />
 {:else if showWorkspacePicker}
-  <div class="min-h-screen bg-background">
-    <header class="border-b">
+  <div class="min-h-screen bg-background relative">
+    <header class="border-b sticky top-0 bg-background">
       <div class="container mx-auto px-4 py-4">
         <div class="flex items-center justify-between">
           <h1 class="text-2xl font-bold flex items-center gap-2">
@@ -314,7 +314,7 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
   </div>
 {:else}
   <div class="min-h-screen bg-background">
-    <header class="border-b">
+    <header class="border-b sticky top-0 bg-background">
       <div class="container mx-auto px-4 py-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
@@ -348,7 +348,7 @@ const RouteKeys = Object.keys(Routes) as Array<keyof typeof Routes>;
 
     <main class="container mx-auto px-4 py-6">
       <div class="w-full">
-        <div class="flex items-center gap-2 mb-6">
+        <div class="flex items-center gap-2 sticky top-0 bg-background z-10 py-2">
           <div class="grid w-full grid-cols-7 bg-muted p-1 rounded-md flex-1">
           <button
             onclick={() => switchTab('workspace')}

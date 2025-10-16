@@ -29,14 +29,14 @@
   }
 
   async function executeCommand() {
-    if (!target.trim()) return;
+    if (!target?.trim?.()) return;
 
     try {
       loading = true;
       error = null;
       output = '';
 
-      const optionsArray = options.trim() ? options.trim().split(' ') : [];
+      const optionsArray =  options?.trim?.().split(' ') ?? [];
 
       // Use buildTarget for build, test, and run commands
       const result = await api.buildTarget({
@@ -62,13 +62,13 @@
   }
 
   function streamBuild() {
-    if (!target.trim() || isStreaming) return;
+    if (!target?.trim?.() || isStreaming) return;
 
     isStreaming = true;
     output = '';
     error = null;
 
-    const optionsArray = options.trim() ? options.trim().split(' ') : [];
+    const optionsArray = options?.trim?.().split(' ') ?? [];
     const eventSource = api.streamBuild(target, optionsArray, (data) => {
       if (data.type === 'stdout') {
         output += data.data;
@@ -90,7 +90,7 @@
   }
 
   function streamRun() {
-    if (!target.trim() || isStreaming) return;
+    if (!target?.trim() || isStreaming) return;
 
     isStreaming = true;
     output = '';
@@ -195,7 +195,7 @@
       <div class="flex gap-2">
         <button
          onclick={() => { commandType = 'build'; executeCommand(); }}
-          disabled={loading || !target.trim()}
+          disabled={loading || !target?.trim?.()}
           class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
         >
           <Play class="w-4 h-4" />
@@ -203,7 +203,7 @@
         </button>
         <button
          onclick={() => { commandType = 'test'; executeCommand(); }}
-          disabled={loading || !target.trim()}
+          disabled={loading || !target?.trim?.()}
           class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
         >
           <TestTube class="w-4 h-4" />
@@ -211,7 +211,7 @@
         </button>
         <button
          onclick={streamBuild}
-          disabled={loading || isStreaming || !target.trim()}
+          disabled={loading || isStreaming || !target?.trim?.()}
           class="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 disabled:opacity-50 flex items-center gap-2"
         >
           <Play class="w-4 h-4" />
@@ -219,7 +219,7 @@
         </button>
         <button
          onclick={streamRun}
-          disabled={loading || isStreaming || !target.trim()}
+          disabled={loading || isStreaming || !target?.trim?.()}
           class="px-4 py-2 bg-accent text-accent-foreground rounded-md hover:bg-accent/90 disabled:opacity-50 flex items-center gap-2"
         >
           <Terminal class="w-4 h-4" />

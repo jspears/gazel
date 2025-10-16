@@ -4,7 +4,7 @@
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
-		"start": "node main.js",
+		"start": "tsx main.ts",
 		"dev": "tsx watch main.ts",
 		"build": "tsc",
 		"test": "node test-server.js"
