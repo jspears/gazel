@@ -6,7 +6,9 @@
         "@bufbuild/protobuf": "^2.9.0",
         "@connectrpc/connect": "^2.1.0",
         "@speajus/gazel-proto": "workspace:^",
-        "lucide-svelte": "^0.544.0",
+        "bits-ui": "^2.11.7",
+        "lucide-svelte": "^0.546.0",
+        "svelte": "5.40.1",
         "vite-tsconfig-paths": "^5.1.4"
     },
     "devDependencies": {

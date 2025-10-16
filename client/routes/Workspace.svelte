@@ -54,13 +54,6 @@
     onNavigateToFile?.(path);
   }
 
-  function viewWorkspaceFile() {
-    // Find the MODULE.bazel file and navigate to it
-    const moduleFile = buildFiles.find(f => f.type === 'module' || f.type === 'workspace');
-    if (moduleFile) {
-      onNavigateToFile?.(moduleFile.path);
-    }
-  }
 
   function handleOpenWorkspacePicker() {
     onOpenWorkspacePicker?.();
@@ -108,14 +101,6 @@
             </dd>
           </div>
         </dl>
-        {#if buildFiles.some(f => f.type === 'workspace' || f.type === 'module')}
-          <button
-            onclick={viewWorkspaceFile}
-            class="mt-4 w-full px-3 py-2 bg-muted text-muted-foreground rounded-md hover:bg-muted/80 hover:text-foreground text-sm transition-colors"
-          >
-            View {buildFiles.some(f => f.type === 'module') ? 'MODULE.bazel' : 'WORKSPACE'} File
-          </button>
-        {/if}
       </div>
 
       <div class="bg-card p-6 rounded-lg border">
@@ -128,10 +113,7 @@
             <dt class="text-muted-foreground">Total BUILD files</dt>
             <dd class="text-2xl font-bold">{buildFiles.filter(f => f.type === 'build').length}</dd>
           </div>
-          <div>
-            <dt class="text-muted-foreground">MODULE.bazel files</dt>
-            <dd class="text-2xl font-bold">{buildFiles.filter(f => f.type === 'module' || f.type === 'workspace').length}</dd>
-          </div>
+        
         </dl>
       </div>
 

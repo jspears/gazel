@@ -1,0 +1,14 @@
+version: v2
+plugins:
+  - local: ../node_modules/@bufbuild/protoc-gen-es/bin/protoc-gen-es
+    out: generated
+    opt:
+      - target=ts
+      - import_extension=.js
+  - local: ../node_modules/@connectrpc/protoc-gen-connect-es/bin/protoc-gen-connect-es
+    out: generated
+    opt:
+      - target=ts
+      - import_extension=.js
+inputs:
+  - directory: .

@@ -1,11 +1,18 @@
 {
     "name": "@speajus/gazel-proto",
     "type": "module",
-    "main": "index.js",
+    "main": "dist/index.js",
     "dependencies": {
-        "@bufbuild/protobuf": "^2.9.0"
+        "@bufbuild/protobuf": "^2.9.0",
+        "@connectrpc/connect": "^2.1.0"
     },
     "devDependencies": {
-        "@bufbuild/protoc-gen-es": "^2.9.0"
+        "@bufbuild/buf": "^1.58.0",
+        "@bufbuild/protoc-gen-es": "^2.9.0",
+        "@connectrpc/protoc-gen-connect-es": "^1.7.0",
+        "typescript": "^5.9.3"
+    },
+    "scripts": {
+        "build": "buf generate . && tsc"
     }
 }
