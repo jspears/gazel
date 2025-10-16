@@ -61,12 +61,6 @@ jobs:
           disk-cache: ${{ github.workflow }}
           repository-cache: true
 
-      - name: Generate Proto Files
-        run: |
-          echo "Generating protobuf files with Bazel..."
-          bazel build //proto:index
-          echo "✓ Proto files generated"
-
       - name: Import Code Signing Certificate
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
