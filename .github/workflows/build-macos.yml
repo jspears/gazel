@@ -180,7 +180,12 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: Publish Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "Publishing release..."
+          yarn electron-forge publish
+          echo "✓ Release published"
       - name: Cleanup
         if: always()
         run: |
