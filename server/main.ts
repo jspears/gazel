@@ -13,7 +13,6 @@ import { loggingInterceptor } from './logging.js';
 import { metadataInterceptor } from './metadata-interceptor.js';
 
 // Create the service implementation
-const serviceImpl = new GazelServiceImpl();
 
 // Create the Node.js HTTP server with the Connect adapter
 const server = createServer(
@@ -23,7 +22,7 @@ const server = createServer(
     // then logging interceptor logs the request
     interceptors: [metadataInterceptor, loggingInterceptor],
     routes(router) {
-      router.service(GazelService, serviceImpl);
+      router.service(GazelService, new GazelServiceImpl());
     },
   })
 );

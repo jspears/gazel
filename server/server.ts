@@ -1012,6 +1012,7 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
   async *searchTargets(
     request: SearchTargetsRequest
   ): AsyncGenerator<SearchTargetsResponse> {
+    console.log('[searchTargets] Searching for targets...');
     try {
       const { query, type, package: packageFilter } = request;
 
@@ -1034,7 +1035,16 @@ export class GazelServiceImpl implements ServiceImpl<typeof GazelService> {
       // Stream each target individually
       let count = 0;
       for (const target of targets) {
-        const protoTarget = create(BazelTargetSchema, target);
+        const protoTarget = create(BazelTargetSchema, {
+          label: target.label || "",
+          kind: target.ruleType || target.kind || "",
+          package: target.package || "",
+          name: target.name || "",
+          tags: [],
+          deps: [],
+          srcs: [],
+          attributes: [],
+        });
 
         yield create(SearchTargetsResponseSchema, {
           data: {

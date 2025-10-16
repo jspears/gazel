@@ -384,7 +384,7 @@
   }
 
   let uniqueTypes = $derived([...new Set(targets.map(t => t.kind).filter(Boolean))]);
-
+  $inspect(targets);
   // Filter targets based on hidden state
   let visibleTargets = $derived(showHiddenTargets
     ? filteredTargets
